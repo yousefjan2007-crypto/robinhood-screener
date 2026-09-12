@@ -394,8 +394,11 @@ def pass1_many(tokens: list, markets: dict, disc: dict, now_s: float,
         except Exception as exc:
             print(f"  [safety] {t[:10]}… chain facts unreadable: {exc}")
             _mark(s, "rpc", dark=True)
-    _kyber_roundtrips(out, facts, markets, kyber_budget)
-    scans = _scanhood_many(toks, markets, scanhood_budget)
+    # the two slow pass-1 legs run side by side (each is throttled per host; neither waits for the other)
+    with ThreadPoolExecutor(max_workers=1) as _bg:
+        _scan_future = _bg.submit(_scanhood_many, toks, markets, scanhood_budget)
+        _kyber_roundtrips(out, facts, markets, kyber_budget)
+        scans = _scan_future.result()
     for t in toks:
         s = out[t]
         if t not in scans:
@@ -530,6 +533,43 @@ def _apply_blockscout(s: dict, token: str) -> None:
         _mark(s, "blockscout", dark=True)
 
 
+def _apply_blockscout_fast(s: dict, token: str) -> None:
+    """The two Blockscout calls that carry POSITIVE findings for the alert decision — address
+    flags (is_scam, template, verified) and the holder/transfer counters — without the paged
+    top-holders walk, the creation-tx sender or its logs (each a further 1–4 calls at 2 Hz)."""
+    answered = dark = False
+
+    def note(x) -> bool:
+        nonlocal answered, dark
+        if is_deferred(x):
+            dark = True
+            return False
+        answered = True
+        return not is_absent(x)
+
+    cnt = blockscout.token_counters(token)
+    if note(cnt) and isinstance(cnt, dict):
+        h, tx = _i(cnt.get("holders_count")), _i(cnt.get("transfers_count"))
+        if h is not None:
+            s["total_holders"], s["holders_source"] = h, "blockscout"
+            if tx is not None and h > 0:
+                s["tx_per_holder_total"] = round(tx / h, 4)
+    ai = blockscout.address_info(token)
+    if note(ai) and isinstance(ai, dict):
+        sc = ai.get("is_scam")
+        s["is_scam"] = sc if isinstance(sc, bool) else None
+        if ai.get("impl_name"):
+            s["template_name"] = str(ai["impl_name"])
+        s["is_proxy"] = bool(ai.get("proxy_type"))
+        ver = ai.get("is_verified")
+        if isinstance(ver, bool):
+            s["verified_source"] = ver
+    if answered:
+        _mark(s, "blockscout", dark=False)
+    if dark:
+        _mark(s, "blockscout", dark=True)
+
+
 def _apply_robinx(s: dict) -> None:
     dep = s.get("deployer")
     if not dep:
@@ -553,7 +593,8 @@ def _apply_robinx(s: dict) -> None:
             s["creator_dead_frac"] = round(min(dead, launched) / launched, 4)
 
 
-def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = None) -> dict:
+def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = None,
+          fast: bool = False) -> dict:
     """The budgeted pass for ONE token, building on its pass-1 dict (never mutated).
     GeckoTerminal /info → Blockscout (skipped entirely while the host is marked blocked)
     → RobinX wallet of the attributed deployer → the V2 sniper count when the pair's
@@ -580,10 +621,26 @@ def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = 
         _mark(s, "blockscout", dark=True)
     else:
         try:
-            _apply_blockscout(s, t)
+            if fast:
+                _apply_blockscout_fast(s, t)
+            else:
+                _apply_blockscout(s, t)
         except Exception as exc:
             print(f"  [safety] {t[:10]}… blockscout failed: {exc}")
             _mark(s, "blockscout", dark=True)
+
+    if fast:
+        # the alert-path variant: GT + the two Blockscout flag calls only (~6–8 s instead of ~50 s);
+        # RobinX, the launch history, the launcher balance and the sniper count are refined by the
+        # watchlist refresh — an alert is decided on positive findings, and those are all here
+        gt_holders = s.pop("_gt_holders", None)
+        if s.get("total_holders") is None and gt_holders is not None:
+            s["total_holders"], s["holders_source"] = gt_holders, "gt"
+        s.pop(_PAIR_BLOCK_KEY, None)
+        _mark(s, "fast_pass2", dark=False)
+        s["pass"] = 2
+        s["safety_ts"] = now_s
+        return s
 
     gt_holders = s.pop("_gt_holders", None)
     if s.get("total_holders") is None and gt_holders is not None:

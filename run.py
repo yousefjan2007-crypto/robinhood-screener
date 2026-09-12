@@ -397,24 +397,24 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     deferred_by_stage["pass2_overflow"] = len([t for t in fresh if t not in p2_rest])
     safety: dict = {}
 
-    def _p2(t):
+    def _p2(t, fast=False):
         if not budget.ok("pass2"):
             return t, None
         try:
-            return t, SAFE.pass2(t, markets[t], s1[t], now_s, disc=dmap.get(t))
+            return t, SAFE.pass2(t, markets[t], s1[t], now_s, disc=dmap.get(t), fast=fast)
         except Exception as exc:          # one bad token never kills the run
             print(f"  ! pass2({t[:10]}…) failed: {exc}")
             return t, None
 
-    def _run_p2(lst):
+    def _run_p2(lst, fast=False):
         if not lst:
             return
         with ThreadPoolExecutor(max_workers=config.PASS2_WORKERS) as ex:
-            for t, s2 in ex.map(_p2, lst):
+            for t, s2 in ex.map(lambda t_: _p2(t_, fast), lst):
                 if s2 is not None:
                     safety[t] = s2
 
-    _run_p2(prio)
+    _run_p2(prio, fast=True)           # GT + Blockscout flags only: the positive findings an alert needs
     for t in prio:
         safety.setdefault(t, s1.get(t) or SAFE.empty_safety())   # a budget cut leaves pass-1 facts standing
     stage_s["pass2_prio"] = round(budget.elapsed(), 1)
@@ -446,8 +446,12 @@ def run(dry_run: bool = True, send: bool = False) -> list:
 
     # ── score, bands, tier ───────────────────────────────────────────────────────
     survivors: list = []
+    early_by_token = {r["token"]: r for r in early_rows}
     for t in survivors1:
         if t not in safety:
+            continue
+        if t in early_alerted:
+            survivors.append(early_by_token[t])   # what was alerted is what gets ledgered
             continue
         row, gates = _row_for(t, safety[t])
         if row is None:

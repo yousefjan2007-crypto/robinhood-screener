@@ -2465,6 +2465,38 @@ try:
 finally:
     SAFEM.scanhood.scan = _orig_scan
 
+# fast pass 2 (the alert path): GT + Blockscout counters/flags only; never the paged holders, the creator or its logs
+_orig_bs = {k: getattr(SAFEM.blockscout, k) for k in ("token_info", "token_counters", "top_holders", "address_info", "creator_of", "tx_logs")}
+_orig_gt, _orig_rx, _orig_cl = SAFEM.geckoterminal.token_info, SAFEM.robinx.wallet, SAFEM.rpc.creator_launches
+try:
+    _bs_calls = []
+    def _rec(name, val):
+        def f(*a, **k):
+            _bs_calls.append(name); return val
+        return f
+    SAFEM.blockscout.token_counters = _rec("token_counters", {"holders_count": 1200, "transfers_count": 2400})
+    SAFEM.blockscout.address_info = _rec("address_info", {"is_scam": False, "impl_name": "DopplerERC20V1", "proxy_type": "eip1167", "is_verified": True})
+    for k in ("token_info", "top_holders", "creator_of", "tx_logs"):
+        setattr(SAFEM.blockscout, k, _rec(k, {}))
+    SAFEM.geckoterminal.token_info = _rec("gt", {"gt_score": 50.0, "is_honeypot_gt": False})
+    SAFEM.robinx.wallet = _rec("robinx", {})
+    SAFEM.rpc.creator_launches = _rec("launches", [])
+    _s1 = dict(SAFEM.empty_safety(), lp_check_source="v4_launchpad:bankr", deployer="0x" + "ab" * 20)
+    _sf = SAFEM.pass2("0x" + "cd" * 20, {"liq_usd": 5e4}, _s1, 1_789_300_000.0, fast=True)
+    check("fast pass 2 calls GT, token_counters and address_info ONLY (no paged holders, creator, creation logs, RobinX or "
+          "launch history), fills holders/tx-per-holder/is_scam/template and marks fast_pass2",
+          set(_bs_calls) == {"gt", "token_counters", "address_info"} and _sf["total_holders"] == 1200
+          and _sf["holders_source"] == "blockscout" and _sf["tx_per_holder_total"] == 2.0 and _sf["is_scam"] is False
+          and _sf["template_name"] == "DopplerERC20V1" and "fast_pass2" in _sf["sources_used"] and _sf["pass"] == 2,
+          str((_bs_calls, {k: _sf.get(k) for k in ("total_holders", "is_scam", "template_name")})))
+finally:
+    for k, v in _orig_bs.items():
+        setattr(SAFEM.blockscout, k, v)
+    SAFEM.geckoterminal.token_info, SAFEM.robinx.wallet, SAFEM.rpc.creator_launches = _orig_gt, _orig_rx, _orig_cl
+_rs2 = _read(os.path.join(ROOT, "run.py"))
+check("run.py: the prioritised pass 2 is the FAST variant and an early-alerted row is ledgered as alerted (never re-gated away)",
+      "_run_p2(prio, fast=True)" in _rs2 and 'survivors.append(early_by_token[t])' in _rs2)
+
 # the recall fixture: CATGPT as measured 2026-09-12 (age 857 min, $10.9M liq, $9.2M vol24; pass-2 facts verbatim)
 _CAT_M = {"price_usd": 0.01744, "liq_usd": 10943245.36, "vol_h24": 9166859.69, "mcap": 17448744.0, "fdv": 17448744.0,
           "buys_h1": 915, "sells_h1": 1534, "buys_h24": 11202, "sells_h24": 21435, "pair_age_min": 856.97, "dex": "uniswap",
