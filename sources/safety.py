@@ -818,7 +818,7 @@ if __name__ == "__main__":
     assert s1["scanhood_sellable"] is not False or s1["honeypot"] is True
 
     # 2. pass 2
-    s2 = pass2(miz, market, s1, now_s)
+    s2 = pass2(miz, market, s1, now_s, disc={"kind": "flap_create"})   # a Flap launch: creation logs wanted
     print("  pass-2 known:", {k: v for k, v in s2.items() if v not in (None, [])})
     assert set(s2) >= set(SAFETY_KEYS) and s2["pass"] == 2
     assert s1["pass"] == 1, "pass2 mutated s1"
