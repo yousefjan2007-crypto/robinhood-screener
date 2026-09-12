@@ -29,6 +29,22 @@ prior for everything below, and it is not encouraging:
 So: **A-tier means best *survival* odds under every gate, not predicted ROI.** The base rate is
 negative expectancy. A losing scorecard is the screen doing its job — telling you not to scale.
 
+### The reference winners (what "a coin worth finding" looks like here)
+
+The two mid-cap winners used to calibrate this port are **CATGPT** ($15M, 4,370 holders) and
+**ANTHROPIG** ($4.7M), both launched 2026-09-11 around 23:45 UTC through **Bankr's
+`LongLaunchFactory`** — a Doppler integration that auctions `DopplerERC20V1` clones in Uniswap V4
+pools under the Doppler hook, paired against tokenized stocks and "1x Long" tokens rather than
+WETH. Measured on GeckoTerminal's 5-minute bars, CATGPT's path from its first bar: an entry at
++15 min was 7× at 14 h, an entry at +90 min (where the strict band's age check first allows A)
+was 2.5×, and the peak (17× from the first bar) came 13.7 h in; the +90 min entry was only 1.07×
+six hours later. The launchpad is a firehose — **~3,250 launches a day**, 71 % of which never get
+a Dexscreener pair and ~5 % (~160/day) clear both market gates — so the two winners were 2 of
+roughly 2,000 launches that day. **Before 2026-09-12 this port could neither discover them (no V4
+or LongLaunch logs) nor pass them (their owner is the launchpad's shared contract, so "renounced"
+is impossible by design).** The Solana screener never sighted the real OTC either; every
+"OTC"/"stonkape" it ledgered was a copycat that went to zero. Coverage, not judgment, was the gap.
+
 ### What this repo used to be, and why that was dropped
 
 Until 2026-09-12 this was a "proven dev" screener: alert when a new token's deployer had previously
@@ -104,6 +120,22 @@ The **pass-through rule**: a hard gate fails closed only on a *positive* finding
 answered. A source that is dark, rate-limited or has no record passes through and is named in
 `sources_dark`. The A-tier checks are stricter: a check whose input is unknown or came from a
 degraded source is `None`, and an unknown can never be A (tier B with `band_na_reason`).
+
+**Launchpad tokens (Bankr / Doppler on Uniswap V4).** Discovery reads the factory's `Create`
+log (token, launcher, numeraire, hook) and the PoolManager's `Initialize` log for pools under a
+trusted hook (the token is the leg that is not a quote token, a numeraire declared in the same
+window, or a currency repeated across pools). The gate analogues: the token's `owner()` is a
+known **protocol** contract (not a dev key) and passes; the liquidity sits in the hook's custody
+by construction, so "LP known" is answered by the launchpad without a burn percentage; the
+honeypot round trip runs through **KyberSwap** (keyless; both legs routed ⇒ the loss, a sell leg
+with no route on a minutes-old pool stays unknown); the launcher's whole-life launch history comes
+from one indexed log query and is judged by the **dead fraction of its prior launches** — an
+app/agent wallet with 20+ launches passes only on a known dead fraction within the cap; the dev
+holding is the launcher's own balance when the launcher is a person. `DopplerERC20V1` is on the
+template whitelist. The strict champion band still needs a known dev holding and a low launcher
+count, so agent-launched tokens sit in **B** under it; the built-in candidate
+`band_launchpad_lenient` drops exactly those checks on the launchpad and the entry lab decides
+whether the leniency pays.
 
 Some of the Solana gates have **no analogue** here. There is no funding-graph clustering of insider
 wallets, no behavioural wallet tags, no freeze authority, and honeypot.is rejects the chain; GoPlus
@@ -184,9 +216,10 @@ which only grows, and deflates every later Sharpe gate for its family — the po
 ## The paper book and the automation condition
 
 Every A alert and every exit is also filled on paper at a real quote for the plan's actual position
-size ($10) in `data/paper_ledger.csv`. Measured on MIZUKARA's ~2.3 WETH V2 pool: a $10 round trip
-costs 0.93 % in quote (0.6 % fees + ~0.3 % impact) plus two ~$0.07 gas legs — **≈ 2.3 % all-in**,
-with the fixed gas term alone worth 1.4 % at this size. A protective exit on a coin with no route
+size ($10) in `data/paper_ledger.csv`. Measured on a ~2.3 WETH V2 pool (the V2 mechanics fixture):
+a $10 round trip costs 0.93 % in quote (0.6 % fees + ~0.3 % impact) plus two ~$0.07 gas legs —
+**≈ 2.3 % all-in**, with the fixed gas term alone worth 1.4 % at this size. On CATGPT's V4 pool a
+$10 round trip through Kyber quoted at −0.96 % before gas (1.23 % at 0.01 WETH). A protective exit on a coin with no route
 fills at **$0**, exactly like real life.
 
 **Real automated trading is justified ONLY if the PAPER scorecard is repeatedly positive** — never
@@ -269,5 +302,5 @@ file is mode 0600 and the loader warns otherwise. Nothing is hardcoded.
 - History is never rewritten after go-live; the repo grows by one commit per run, bounded by the
   no-per-row-stamp rule and 90-day rotation of resolved rows.
 
-*Not financial advice. Memecoins are near-100 %-loss-prone; the canonical token in this repo
-(MIZUKARA) was the chain's $10M+ launch in July 2026 and traded at an $8k market cap on 2026-09-12.*
+*Not financial advice. Memecoins are near-100 %-loss-prone; the chain's $10M+ launch of July 2026
+traded at an $8k market cap on 2026-09-12, and the reference winners above are one day old.*

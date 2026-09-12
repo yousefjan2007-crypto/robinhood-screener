@@ -154,10 +154,47 @@ TOPIC_FLAP_TOKEN_CREATED = "0x504e7f360b2e5fe33cbaaae4c593bc55305328341bf79009e4
 TOPIC_FLAP_TOKEN_BOUGHT = "0xa800a2038683844fac66747f771bfdfae862eb28b16bcfa387afa9fbacce8ff7"
 TOPIC_FLAP_PROGRESS = "0x4c35e20d1e9bce377c7d9ec1572d934e46d62961f4da8af5beb8002d5906742d"
 TOPIC_SWAP_V2 = "0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822"
+# ── the launchpad that produced the chain's mid-cap winners (measured 2026-09-12) ──
+# CATGPT ($15M) and ANTHROPIG ($4.7M) both came from Bankr's LongLaunchFactory, a Doppler
+# integration: DopplerERC20V1 EIP-1167 clones auctioned in Uniswap V4 pools under the Doppler
+# hook, paired against tokenized stocks / "1x Long" tokens / USDG / native ETH — never only
+# WETH. ~3,250 launches/day; ~5 % clear the market gates. No V2 pair, so the router legs are
+# blind (Kyber routes them keylessly); the token owner is the protocol's shared contract, so
+# "renounced" is impossible by design; the launch tx is often sent by a shared service wallet.
+LONGLAUNCH_FACTORY = "0x1Eef016F22A943abC7DD11422EDeE9D235942104"   # eip1967 proxy; GT dex id bankr-robinhood
+TOPIC_LONGLAUNCH_CREATE = "0x04c10fe2cc69507cbff4c84fc99414ca507db49d5c39eff84b67ea319f43ccf0"
+                                   # topics[1] token, topics[2] launcher; data words: [offset, numeraire,
+                                   # initializer, hook, migrator, governance(0xdead = none), ...]
+V4_POOL_MANAGER = "0x8366a39CC670B4001A1121B8F6A443A643e40951"
+TOPIC_V4_INITIALIZE = "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438"
+                                   # Initialize(id, currency0, currency1, fee, tickSpacing, hooks, sqrtPriceX96, tick):
+                                   # topics[1] pool id, topics[2..3] currencies; data words [fee, tickSpacing, hooks, ...]
+DOPPLER_HOOK = "0x4e3468951D49f2EEa976eD0D6e75fFCb44a9a544"
+TRUSTED_V4_HOOKS = {DOPPLER_HOOK.lower(): "bankr"}   # hook → launchpad name; liquidity is in the hook's custody
+V4_DISCOVERY_HOOKS_ONLY = True     # plain (hook-less) V4 pools are ~15k/day and mostly not launches; hooked ≈ 3k/day
+NUMERAIRE_MIN_POOLS_IN_WINDOW = 2  # a V4 currency seen on >= 2 pools in one log window is a numeraire, not a launch
+PROTOCOL_OWNERS = {                # token owner() addresses that are a launchpad's shared contract, not a dev
+    "0xeb7c034704ef8dcd2d32324c1545f62fb4ad0862": "bankr",   # owner of every LongLaunch DopplerERC20V1 clone
+}
+LAUNCH_SERVICE_MIN_CREATES = 20    # a launcher with this many prior Create events is an agent/service wallet:
+                                   # its history says nothing about THIS token's dev (creator gate passes through)
+LAUNCHPAD_CREATOR_MAX_PRIOR_TOKENS = 10   # launcher wallets on Bankr are often apps/agents launching for many
+                                   # users (CATGPT's launcher: 7 launches, 16.8k txs); the serial-deployer risk is
+                                   # still caught by CREATOR_MAX_DEAD_FRAC over the launcher's PRIOR tokens
+KYBER_ROUNDTRIP_BUDGET_PER_RUN = 8    # no-V2-pair tokens probed through Kyber (2 calls each at 1 Hz), liq-desc;
+                                   # 12 put a Mac dry run at 170 s of the 200 s budget
+KYBER_PROBE_WETH_WEI = 10**16      # 0.01 WETH, same probe as the router legs
 DISCOVERY_LOG_SOURCES = {          # address → (kind, topic0)
     UNIV2_FACTORY: ("pair_v2", TOPIC_PAIR_CREATED),
     V3_FACTORY: ("pool_v3", TOPIC_POOL_CREATED),
     FLAP_ROUTER: ("flap_create", TOPIC_FLAP_TOKEN_CREATED),
+    LONGLAUNCH_FACTORY: ("longlaunch_create", TOPIC_LONGLAUNCH_CREATE),
+    V4_POOL_MANAGER: ("pool_v4", TOPIC_V4_INITIALIZE),
+}
+# reference winners (what "a coin worth finding" looks like on this chain; at-launch numbers in verify.py)
+REFERENCE_TOKENS = {
+    "CATGPT": "0xd6FDE6a3Fc6Ab2d83b2BE58383944CA1baDe1E18",      # launched 2026-09-11 23:40Z, $15M on 09-12
+    "ANTHROPIG": "0x351Ab2C51e223B28D219fE28cc3956410CC11e18",   # launched 2026-09-11 23:55Z, $4.7M on 09-12
 }
 # 4-byte selectors
 SEL_OWNER = "0x8da5cb5b"
@@ -173,7 +210,8 @@ BURN_ADDRESSES = ("0x000000000000000000000000000000000000dead",
 LP_LOCKER_ADDRESSES = ()           # none verified on 4663 yet; extend when one is
 NATIVE_ETH_SENTINELS = ("0x0000000000000000000000000000000000000000",   # uniswap-v4 native-ETH pools
                         "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")   # pons-v2 native-ETH pools
-QUOTE_TOKENS = {WETH.lower(), *NATIVE_ETH_SENTINELS}   # the "other leg" of a pair; the non-quote leg is the candidate
+USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168"           # Global Dollar, the second most common V4 leg
+QUOTE_TOKENS = {WETH.lower(), USDG, *NATIVE_ETH_SENTINELS}   # the "other leg" of a pair; the non-quote leg is the candidate
 UNIV2_FEE_BPS = 30                 # 997/1000 constant-product fallback when the router reverts
 MULTICALL_CHUNK = 50               # calls per aggregate3 eth_call
 CREATION_WINDOW_BLOCKS = 500_000   # attribution fallback: backward eth_getLogs window per step
@@ -267,7 +305,7 @@ HC_MAX_HOLDERS_PER_MIN = 8.0       # organic-growth cap (Cubrate: 67/min = walle
 HC_MAX_TX_PER_HOLDER_H1 = 3.0      # bot-churn cap
 HC_MAX_ROUNDTRIP_PCT = 8.0         # near-fee-only slippage on the probe
 HC_REQUIRE_TEMPLATE_KNOWN = True   # impl name whitelisted or source verified
-TEMPLATE_WHITELIST = {"FlapTaxTokenV3"}
+TEMPLATE_WHITELIST = {"FlapTaxTokenV3", "DopplerERC20V1"}   # Flap launchpad clone; Bankr/Doppler clone
 HC_REQUIRE_LP_KNOWN = True         # an unknown LP status can be B, never A
 HC_MAX_DEV_PCT = 2.0
 DEFAULT_ENTRY_BAND = "band_a_strict"

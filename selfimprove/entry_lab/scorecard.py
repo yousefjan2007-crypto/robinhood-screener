@@ -53,6 +53,7 @@ np.random.default_rng(config.SEED + offset). Never raises on bad data.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 import time
@@ -649,8 +650,15 @@ def synthetic_series(n_days: int = 60, per_day: int = 12, planted: str = "band_s
     rows per day and, when planted_edge, those rows carry the top returns. Every other band is
     an independent random selection (15%; ctl_random_band 10%); the champion picks 2 rows per
     day at random (no edge). start_ts defaults to a UTC midnight so a day's events share a day."""
-    rng = np.random.default_rng(config.SEED if seed is None else seed)
+    base_seed = config.SEED if seed is None else seed
+    rng = np.random.default_rng(base_seed)
     names = [n for n in B.BUILTINS if n != INVERSE]
+    # every "other band" draws from ITS OWN stream (seeded by name) so that registering one more
+    # built-in never re-rolls the returns, the champion's picks or the planted picks of the
+    # fixture (the 2026-09-12 launchpad band moved the shared stream and a null control cleared
+    # the paired bound by chance)
+    band_rng = {n: np.random.default_rng(base_seed + 1000 + int(hashlib.sha256(n.encode()).hexdigest()[:8], 16) % 100_000)
+                for n in names}
     rows = []
     seq = 0
     for d in range(n_days):
@@ -674,8 +682,9 @@ def synthetic_series(n_days: int = 60, per_day: int = 12, planted: str = "band_s
             if n in (planted, champion):
                 continue
             rate = config.BAND_CTL_RANDOM_RATE if n == "ctl_random_band" else 0.15
+            rn = band_rng[n]
             for x in drows:
-                x[n] = 1.0 if rng.random() < rate else 0.0
+                x[n] = 1.0 if rn.random() < rate else 0.0
         for k in rng.choice(per_day, size=2, replace=False):
             drows[int(k)][champion] = 1.0
         picks = rng.choice(n_first, size=3, replace=False)       # in bucket 0: 5 unselected remain

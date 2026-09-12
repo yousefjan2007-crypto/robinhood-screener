@@ -120,7 +120,9 @@ class BandSpec:
 # is config-dependent; both are handled by the body, never by the NA pre-pass).
 _HC_REQUIRES = ("score", "liq_usd", "pair_age_min", "creator_prior_tokens", "roundtrip_loss_pct",
                 "dev_pct", "dev_sniped", "total_holders", "top10_pct", "holders_source",
-                "buys_h1", "sells_h1", "lp_locked_pct")
+                "buys_h1", "sells_h1")
+# lp_locked_pct is deliberately NOT required: hc_checks answers "LP known" from the % OR from a
+# trusted launchpad hook (lp_check_source v4_launchpad:*), so the check itself carries the NA.
 _HC_DATA = ("data/ledger.csv (solana A-vs-B scorecard, 16 A rows)", "$Cubrate post-mortem",
             "sources/safety.py degraded-source rule")
 
@@ -350,6 +352,33 @@ band_lp_burned_renounced = _register(BandSpec(
     ("owner_renounced", "lp_locked_pct", "roundtrip_loss_pct"),
     ("sources/rpc.py chain_facts_many", "MIZUKARA anchor"),
     "candidate", _band_lp_burned_renounced, _explain_lp_burned_renounced, THREE_VALUED=True))
+
+def _band_launchpad_lenient(f):
+    """The strict band minus the three checks a launchpad launch cannot answer for an app- or
+    agent-launched token (dev holding, launcher prior count, creation-tx snipe); identical to
+    band_a_strict off the launchpad, so coverage is the champion's."""
+    c = screen.hc_checks(f)
+    if str(f.get("lp_check_source") or "").startswith("v4_launchpad"):
+        for k in ("dev_pct", "creator_prior", "not_sniped"):
+            c.pop(k, None)
+    return _all_or_none(c)
+
+
+def _explain_launchpad_lenient(f):
+    drop = ("dev_pct", "creator_prior", "not_sniped") if str(f.get("lp_check_source") or "").startswith("v4_launchpad") else ()
+    return _hc_explain(f, drop=drop)
+
+
+band_launchpad_lenient = _register(BandSpec(
+    "band_launchpad_lenient",
+    "Pre-declared 2026-09-12 from the two reference winners (CATGPT, ANTHROPIG: Bankr/Doppler "
+    "launches on Uniswap V4). On the launchpad the dev holding, the launcher's prior count and "
+    "the creation-tx snipe are unanswerable for app/agent-launched tokens, so this band drops "
+    "exactly those three hc checks THERE and equals band_a_strict everywhere else. Tests whether "
+    "the strict band's dev/creator checks cost recall on the chain's dominant launchpad.",
+    tuple(k for k in _HC_REQUIRES if k not in ("dev_pct", "dev_sniped", "creator_prior_tokens")),
+    ("CATGPT/ANTHROPIG launch paths (GT OHLCV 2026-09-12)", "LongLaunch Create logs", "sources/safety.py pass 2"),
+    "candidate", _band_launchpad_lenient, _explain_launchpad_lenient, THREE_VALUED=True))
 
 ctl_random_band = _register(BandSpec(
     "ctl_random_band",

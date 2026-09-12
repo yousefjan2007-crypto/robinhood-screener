@@ -48,7 +48,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config                                                    # noqa: E402
 import http_client                                               # noqa: E402
 from http_client import is_absent, is_deferred                   # noqa: E402
-from sources import blockscout, geckoterminal, robinx, rpc, scanhood   # noqa: E402
+from sources import blockscout, dexscreener, geckoterminal, kyber, robinx, rpc, scanhood   # noqa: E402
 
 BLOCKSCOUT_HOST = "robinhoodchain.blockscout.com"
 LEGACY_INVERSE_CACHE = os.path.join(config.CACHE_DIR, "legacy_creators_inverse.json")
@@ -216,9 +216,9 @@ def _apply_chain_facts(s: dict, facts: dict | None) -> None:
         return
     st = facts.get("status")
     owner = facts.get("owner_state")
-    s["owner_state"] = owner if owner in ("renounced", "owned", "no_owner_fn") else None
+    s["owner_state"] = owner if owner in ("renounced", "owned", "no_owner_fn", "protocol") else None
     s["owner_renounced"] = (True if owner == "renounced" else
-                            False if owner == "owned" else None)
+                            False if owner in ("owned", "protocol") else None)
     lp = _f(facts.get("lp_locked_pct"))
     s["lp_locked_pct"] = lp
     src = facts.get("lp_check_source")
@@ -266,6 +266,13 @@ def _apply_disc(s: dict, d: dict | None) -> None:
     creator = _lower(d.get("creator") or d.get("deployer"))
     if creator:
         s["deployer"] = creator                # overrides ScanHood's weak value
+    # a launchpad pool under a trusted V4 hook: liquidity sits in the hook's custody by
+    # construction (no LP token a dev could pull), so the LP question is answered by the
+    # launchpad, not by a burn percentage. lp_locked_pct stays None (no % exists); the
+    # source names the launchpad and hc_checks reads it as "LP known".
+    hook = _lower(d.get("hook"))
+    if hook and hook in config.TRUSTED_V4_HOOKS and s.get("lp_locked_pct") is None:
+        s["lp_check_source"] = "v4_launchpad:" + config.TRUSTED_V4_HOOKS[hook]
     for k in ("dev_sniped", "sniped"):
         if isinstance(d.get(k), bool):
             s["dev_sniped"] = d[k]
@@ -277,8 +284,45 @@ def _apply_disc(s: dict, d: dict | None) -> None:
         s[_PAIR_BLOCK_KEY] = {"pair": _lower(d["pair"]), "block": _i(d["block"])}
 
 
+def _kyber_roundtrips(out: dict, facts: dict, markets: dict, budget: int | None) -> None:
+    """The router legs are blind on tokens with no V2 pair (every V4 / launchpad token).
+    Probe those through KyberSwap instead — buy KYBER_PROBE_WETH_WEI, quote selling it all
+    back — for at most `budget` tokens per run, deepest liquidity first. Both legs routed ⇒
+    honeypot False + the round-trip loss; an explicit no-route on the SELL leg alone is not
+    proof of a honeypot on a minutes-old pool (unknown, named); a deferred leg names kyber dark."""
+    budget = config.KYBER_ROUNDTRIP_BUDGET_PER_RUN if budget is None else budget
+    cands = [t for t, s in out.items()
+             if s.get("honeypot") is None and s.get("roundtrip_loss_pct") is None
+             and isinstance(facts.get(t), dict) and facts[t].get("pair") is None
+             and facts[t].get("status") in ("ok", "partial")]
+    cands.sort(key=lambda t: -float((markets.get(t) or {}).get("liq_usd") or 0))
+    for t in cands[:max(0, int(budget))]:
+        s = out[t]
+        try:
+            buy = kyber.route(config.WETH, t, config.KYBER_PROBE_WETH_WEI)
+            if is_deferred(buy):
+                _mark(s, "kyber", dark=True)
+                continue
+            if is_absent(buy) or not isinstance(buy, dict) or not buy.get("amount_out"):
+                _mark(s, "kyber", dark=False)          # answered: nothing to route (yet)
+                continue
+            sell = kyber.route(t, config.WETH, int(buy["amount_out"]))
+            if is_deferred(sell):
+                _mark(s, "kyber", dark=True)
+                continue
+            _mark(s, "kyber", dark=False)
+            if is_absent(sell) or not isinstance(sell, dict) or not sell.get("amount_out"):
+                continue                               # buyable, not (yet) sellable: unknown, never a verdict
+            back = int(sell["amount_out"])
+            s["roundtrip_loss_pct"] = round(100.0 * (1.0 - back / float(config.KYBER_PROBE_WETH_WEI)), 4)
+            s["honeypot"] = False
+        except Exception as exc:
+            print(f"  [safety] {t[:10]}… kyber round trip failed: {exc}")
+            _mark(s, "kyber", dark=True)
+
+
 def pass1_many(tokens: list, markets: dict, disc: dict, now_s: float,
-               chain_cache: dict | None = None) -> dict:
+               chain_cache: dict | None = None, kyber_budget: int | None = None) -> dict:
     """The FREE / batched pass for many tokens → {token_lower: safety dict, pass=1}.
     markets: {token_lower: dexscreener market} (a known pair skips the getPair leg);
     disc: {token_lower: discovery record} (may be absent for feed/watchlist tokens);
@@ -325,6 +369,9 @@ def pass1_many(tokens: list, markets: dict, disc: dict, now_s: float,
         except Exception as exc:
             print(f"  [safety] {t[:10]}… chain facts unreadable: {exc}")
             _mark(s, "rpc", dark=True)
+    _kyber_roundtrips(out, facts, markets, kyber_budget)
+    for t in toks:
+        s = out[t]
         try:
             _apply_scan(s, scanhood.scan(t))
         except Exception as exc:
@@ -526,11 +573,59 @@ def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = 
         print(f"  [safety] {t[:10]}… robinx failed: {exc}")
         _mark(s, "robinx", dark=True)
 
+    # Launchpad tokens: the launcher's whole-life LongLaunch history in ONE indexed log query
+    # (exact), judged by the dead fraction of its PRIOR launches (Dexscreener, one batched call).
+    # An agent/service wallet (>= LAUNCH_SERVICE_MIN_CREATES launches) launches for many users:
+    # its history is not this dev's, so both fields stay unknown and the gate passes through.
+    launch_service = False
+    if (str(s.get("lp_check_source") or "").startswith("v4_launchpad") and s.get("deployer")
+            and s.get("creator_prior_tokens") is None):
+        try:
+            launches = rpc.creator_launches(s["deployer"])
+        except Exception as exc:
+            print(f"  [safety] {t[:10]}… launch history failed: {exc}")
+            launches = None
+        if launches is None:
+            _mark(s, "rpc", dark=True)
+        else:
+            prior = [x for x in launches if x != t]
+            if len(prior) >= config.LAUNCH_SERVICE_MIN_CREATES:
+                launch_service = True
+                _mark(s, "launch_service", dark=False)
+            else:
+                s["creator_prior_tokens"] = len(prior)
+                _mark(s, "launchpad", dark=False)
+                if prior:
+                    try:
+                        r = dexscreener.enrich_many(prior[-30:], now_s)
+                        ok = {str(k).lower(): v for k, v in (r.get("ok") or {}).items()}
+                        absent = {str(x).lower() for x in (r.get("absent") or set())}
+                        judged = [x for x in prior[-30:] if x in ok or x in absent]
+                        dead = sum(1 for x in judged if x in absent
+                                   or float((ok.get(x) or {}).get("mcap") or 0) < config.CREATOR_DEAD_MCAP_USD)
+                        if judged:
+                            s["creator_dead_frac"] = round(dead / len(judged), 4)
+                    except Exception as exc:
+                        print(f"  [safety] {t[:10]}… prior-launch outcomes failed: {exc}")
+
+    # dev holding for a launchpad token: the launcher's own balance (exact, two eth_calls) —
+    # meaningful only when the launcher is a person, not an app/agent wallet launching for many
+    if (str(s.get("lp_check_source") or "").startswith("v4_launchpad") and s.get("deployer")
+            and s.get("dev_pct") is None and not launch_service
+            and (s.get("creator_prior_tokens") is None
+                 or s["creator_prior_tokens"] < config.LAUNCH_SERVICE_MIN_CREATES)):
+        try:
+            bal, sup = rpc.balance_of(t, s["deployer"]), rpc.total_supply(t)
+            if bal is not None and sup:
+                s["dev_pct"] = round(100.0 * bal / sup, 4)
+        except Exception as exc:
+            print(f"  [safety] {t[:10]}… launcher balance failed: {exc}")
+
     # Prior-launch count from the explorer when neither RobinX nor the legacy index knows the
     # wallet (RobinX does not attribute Flap launches; the index froze in July). Two tx pages
     # (100 txs) is exact for a fresh deployer; a heavier wallet stays UNKNOWN unless the walk
     # already found more launches than the hard gate allows.
-    if s.get("deployer") and s.get("creator_prior_tokens") is None \
+    if s.get("deployer") and s.get("creator_prior_tokens") is None and not launch_service \
             and not http_client.is_blocked(BLOCKSCOUT_HOST):
         try:
             created = blockscout.wallet_created_tokens(s["deployer"], max_pages=2)

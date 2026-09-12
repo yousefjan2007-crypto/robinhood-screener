@@ -1769,7 +1769,7 @@ HC3 = [n for n, sp in B.BUILTINS.items() if sp.THREE_VALUED]
 kl = dict(good, roundtrip_loss_pct=12.0, dev_pct=None)     # a definite miss beside an unknown
 check("three-valued AND (hc family): a definite miss (round trip 12%) beside an unknown (dev_pct None) is False, not NA; "
       "the unknown alone is NA; True never fires with an unknown",
-      len(HC3) == 6 and all(B.BUILTINS[n].verdict(kl) is False for n in HC3)
+      len(HC3) == 7 and all(B.BUILTINS[n].verdict(kl) is False for n in HC3)
       and B.BUILTINS[CHAMP].verdict(dict(good, dev_pct=None)) is None
       and B.BandSpec("t", "", ("score",), (), "candidate", lambda f: True, THREE_VALUED=True).verdict(dict(good, score=None)) is None,
       str([(n, B.BUILTINS[n].verdict(kl)) for n in HC3]))
@@ -2334,5 +2334,129 @@ with tempfile.TemporaryDirectory() as d:
           "line, PAUSED and the research line", "earliest possible promotion (from trailing-28d observed rates" in body_f
           and "entry band: >=" in body_f and "K5 kill" in body_f and "PAUSED (PAUSE file)" in body_f
           and "research: research merged" in body_f and len(lines_f) <= WS.MAX_LINES)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+section("M. launchpad tokens — Bankr / Doppler on Uniswap V4 (the reference winners CATGPT, ANTHROPIG)")
+from sources import rpc as RPCM, safety as SAFEM   # noqa: E402
+import selfimprove.trials as TRIALS_MOD             # noqa: E402
+
+CAT = config.REFERENCE_TOKENS["CATGPT"].lower()
+_SVC = "0x3a8e5ba5aa9c2464c75621c2bffb9cf912db995d"           # CATGPT's launcher (app/agent wallet)
+_NUM = "0xfe09fb328be1c286b4f597ed34764b7472ae72c5"           # OPENAI 1x Long, its numeraire
+_PID = "0x086f510359ad57e4f8588b71ffa21fe29bbed044e4d13aa2f72ecaefeda95a36"
+_HOOK = config.DOPPLER_HOOK.lower()
+def _pad(a): return "0x" + "0" * 24 + a.lower()[2:]
+def _w(a): return "0" * 24 + a.lower()[2:]
+# the REAL CATGPT creation-tx logs (Blockscout, 2026-09-12), verbatim
+_INIT = {"address": config.V4_POOL_MANAGER, "blockNumber": "0x3a5171b", "transactionHash": "0xfba3", "logIndex": "0x8b",
+         "topics": [config.TOPIC_V4_INITIALIZE, _PID, _pad(CAT), _pad(_NUM)],
+         "data": "0x" + "0" * 58 + "800000" + "0" * 63 + "8" + _w(_HOOK) + "0" * 40 + "121a2e40afbf2f142bd896d" + "f" * 60 + "e5868"}
+_CREATE = {"address": config.LONGLAUNCH_FACTORY, "blockNumber": "0x3a5171b", "transactionHash": "0xfba3", "logIndex": "0x96",
+           "topics": [config.TOPIC_LONGLAUNCH_CREATE, _pad(CAT), _pad(_SVC)],
+           "data": "0x" + "0" * 62 + "20" + _w(_NUM) + _w("0x92d435c96e63c43e12d6d0ab28f6b0b04072f765") + _w(_HOOK)
+                   + _w("0xba2f330edb16cd8056f5988d8ce19bbc63475a0e") + "0" * 60 + "dead"}
+recs = RPCM.decode_discovery([_INIT, _CREATE])
+check("LongLaunch Create + V4 Initialize in one window decode to ONE record: token, launcher, numeraire, Doppler hook, "
+      "pool id, launchpad=bankr (the create row wins, the pool row fills what it lacks)",
+      len(recs) == 1 and recs[0]["kind"] == "longlaunch_create" and recs[0]["token"] == CAT and recs[0]["creator"] == _SVC
+      and recs[0]["numeraire"] == _NUM and recs[0]["hook"] == _HOOK and recs[0]["pool_id"] == _PID and recs[0]["launchpad"] == "bankr",
+      str(recs))
+_other = "0x" + "ab" * 20
+_INIT2 = dict(_INIT, topics=[config.TOPIC_V4_INITIALIZE, "0x" + "11" * 32, _pad(_other), _pad(_NUM)], logIndex="0x8c")
+_hookless = dict(_INIT, data=_INIT["data"][:2 + 64 * 2] + "0" * 64 + _INIT["data"][2 + 64 * 3:])
+two = RPCM.decode_discovery([_INIT, _INIT2])
+check("a hooked V4 pool alone (numeraire unknown in the window) is dropped, a hook-less V4 pool is never a discovery source, "
+      "and a currency repeated on >= 2 pools resolves the OTHER leg as the token",
+      RPCM.decode_discovery([_INIT]) == [] and RPCM.decode_discovery([_hookless]) == []
+      and sorted(r_["token"] for r_ in two) == sorted([CAT, _other]) and all(r_["numeraire"] == _NUM for r_ in two))
+_PROTO = next(iter(config.PROTOCOL_OWNERS))
+check("owner() mapping: zero → renounced, the launchpad's shared owner → protocol, another address → owned, revert → no_owner_fn",
+      RPCM._owner_from(True, _pad("0x" + "0" * 40)) == "renounced" and RPCM._owner_from(True, _pad(_PROTO)) == "protocol"
+      and RPCM._owner_from(True, _pad("0x" + "12" * 20)) == "owned" and RPCM._owner_from(False, None) == "no_owner_fn")
+
+prot_s = dict(CLEAN_S, owner_state="protocol", owner_renounced=False, lp_locked_pct=None, lp_check_source="v4_launchpad:bankr")
+check("hard gates: owner_state 'protocol' passes owner_ok (a launchpad's contract is not a dev key); an unknown LP % with a "
+      "trusted launchpad source passes lp_ok; the same token 'owned' is rejected",
+      screen.hard_gates(CLEAN_M, prot_s)[0] and not screen.hard_gates(CLEAN_M, dict(prot_s, owner_state="owned"))[0])
+check("hc_checks: lp_known is True through the launchpad source without a %, and None when neither a % nor a launchpad source exists",
+      screen.hc_checks(_feat(CLEAN_M, prot_s))["lp_known"] is True
+      and screen.hc_checks(_feat(CLEAN_M, dict(CLEAN_S, lp_locked_pct=None, lp_check_source=None)))["lp_known"] is None)
+svc_s = dict(prot_s, creator_prior_tokens=54, creator_dead_frac=0.48)
+check("creator gate on the launchpad: an app/agent launcher (54 launches) passes only on a KNOWN dead fraction within the cap "
+      "(unknown or above the cap fails); a 7-launch launcher passes under the launchpad cap but not off the launchpad",
+      screen.hard_gates(CLEAN_M, svc_s)[0] and not screen.hard_gates(CLEAN_M, dict(svc_s, creator_dead_frac=None))[0]
+      and not screen.hard_gates(CLEAN_M, dict(svc_s, creator_dead_frac=0.6))[0]
+      and screen.hard_gates(CLEAN_M, dict(prot_s, creator_prior_tokens=7))[0]
+      and not screen.hard_gates(CLEAN_M, dict(CLEAN_S, creator_prior_tokens=7))[0])
+
+# the Kyber round trip for tokens with no V2 pair, with an injected router
+_orig_route = SAFEM.kyber.route
+try:
+    _calls = []
+    def _mk(out_fn):
+        def route(a, b, amt):
+            _calls.append((a.lower(), b.lower(), amt))
+            return out_fn(a, b, amt)
+        return route
+    SAFEM.kyber.route = _mk(lambda a, b, amt: {"amount_out": int(amt * 0.99)})
+    out = {"0x" + "aa" * 20: SAFEM.empty_safety(), "0x" + "bb" * 20: SAFEM.empty_safety(), "0x" + "cc" * 20: SAFEM.empty_safety()}
+    facts = {"0x" + "aa" * 20: {"pair": None, "status": "ok"}, "0x" + "bb" * 20: {"pair": None, "status": "ok"},
+             "0x" + "cc" * 20: {"pair": "0x" + "dd" * 20, "status": "ok"}}
+    mk = {"0x" + "aa" * 20: {"liq_usd": 1e4}, "0x" + "bb" * 20: {"liq_usd": 5e4}}
+    SAFEM._kyber_roundtrips(out, facts, mk, 1)
+    probed = [c[1] for c in _calls if c[0] == config.WETH.lower()]
+    sb = out["0x" + "bb" * 20]
+    check("Kyber round trip: only no-V2-pair tokens are probed, deepest liquidity first, within the per-run budget; both legs "
+          "routed ⇒ honeypot False and the round-trip loss (1 - 0.99² = 1.99%), kyber named as used",
+          probed == ["0x" + "bb" * 20] and sb["honeypot"] is False and abs(sb["roundtrip_loss_pct"] - 1.99) < 0.01
+          and "kyber" in sb["sources_used"] and out["0x" + "aa" * 20]["honeypot"] is None and out["0x" + "cc" * 20]["honeypot"] is None,
+          str((probed, sb["honeypot"], sb["roundtrip_loss_pct"])))
+    _calls = []
+    SAFEM.kyber.route = _mk(lambda a, b, amt: {"amount_out": int(amt * 0.99)} if a.lower() == config.WETH.lower() else http_client.NOT_FOUND)
+    o2 = {"0x" + "aa" * 20: SAFEM.empty_safety()}
+    SAFEM._kyber_roundtrips(o2, {"0x" + "aa" * 20: {"pair": None, "status": "ok"}}, {}, 5)
+    s2_ = o2["0x" + "aa" * 20]
+    SAFEM.kyber.route = _mk(lambda a, b, amt: None)
+    o3 = {"0x" + "aa" * 20: SAFEM.empty_safety()}
+    SAFEM._kyber_roundtrips(o3, {"0x" + "aa" * 20: {"pair": None, "status": "ok"}}, {}, 5)
+    s3_ = o3["0x" + "aa" * 20]
+    check("buyable but not sellable through Kyber is UNKNOWN (never a honeypot verdict on a minutes-old pool) with kyber marked "
+          "answered; a deferred leg leaves everything None and names kyber dark",
+          s2_["honeypot"] is None and s2_["roundtrip_loss_pct"] is None and "kyber" in s2_["sources_used"] and "kyber" not in s2_["sources_dark"]
+          and s3_["honeypot"] is None and "kyber" in s3_["sources_dark"])
+finally:
+    SAFEM.kyber.route = _orig_route
+
+# the recall fixture: CATGPT as measured 2026-09-12 (age 857 min, $10.9M liq, $9.2M vol24; pass-2 facts verbatim)
+_CAT_M = {"price_usd": 0.01744, "liq_usd": 10943245.36, "vol_h24": 9166859.69, "mcap": 17448744.0, "fdv": 17448744.0,
+          "buys_h1": 915, "sells_h1": 1534, "buys_h24": 11202, "sells_h24": 21435, "pair_age_min": 856.97, "dex": "uniswap",
+          "vol_h1": 400000.0, "vol_h6": 2400000.0, "price_chg_h1": 3.0}
+_CAT_S = dict(SAFEM.empty_safety(), owner_state="protocol", owner_renounced=False, lp_locked_pct=None,
+              lp_check_source="v4_launchpad:bankr", honeypot=False, roundtrip_loss_pct=0.0564, is_scam=False,
+              template_name="DopplerERC20V1", is_proxy=True, verified_source=True, total_holders=4370,
+              holders_source="blockscout", top10_pct=5.244, top10_pct_gt=74.0, dev_pct=None, deployer=_SVC,
+              creator_prior_tokens=54, creator_dead_frac=0.4815, tx_per_holder_total=35.5, sources_dark=[])
+cat_ok, cat_g = screen.hard_gates(_CAT_M, _CAT_S)
+cat_score, _ = screen.soft_score(_CAT_M, _CAT_S)
+cat_f = LAB.build_feat(CAT, _CAT_M, _CAT_S, cat_score, True, 0.0)
+cat_v = LAB.evaluate_bands(cat_f, REG, CHAMP)
+check("recall: the reference winner CATGPT passes every hard gate (before 2026-09-12 it died at pass 1 on owner_ok) and is "
+      "LEDGERED — every hc-family band answers True or False, never NA, and the strict champion says False (its dev holding is "
+      "unknowable for an agent launch), so the winner is a B row the lab can learn from",
+      cat_ok and "band_launchpad_lenient" in cat_v and cat_v[CHAMP] is False
+      and all(cat_v[n] is not None for n, sp_ in B.BUILTINS.items() if sp_.THREE_VALUED),
+      str((cat_ok, [k for k, v in cat_g.items() if v is False], cat_v)))
+cat_hi = dict(cat_f, score=75.0)
+check("with the soft score above HC_MIN_SCORE the launchpad band fires on CATGPT while the strict band does not (dev holding "
+      "unknown, launcher count above HC_CREATOR_MAX_PRIOR) — the lab, not a hand edit, decides whether that leniency pays",
+      B.BUILTINS["band_launchpad_lenient"].verdict(cat_hi) is True and B.BUILTINS[CHAMP].verdict(cat_hi) is not True)
+check("band_launchpad_lenient equals band_a_strict off the launchpad (coverage is the champion's) and is a counted trial",
+      all(B.BUILTINS["band_launchpad_lenient"].verdict(f_) == B.BUILTINS[CHAMP].verdict(f_)
+          for f_ in (good, dict(good, score=50.0), dict(good, dev_pct=None)))
+      and "band_launchpad_lenient" in (TRIALS_MOD.load().get("bands_ever_scored") or []))
+check("REFERENCE_TOKENS name the two winners and the registry lists the launchpad band as a candidate, never the champion",
+      set(config.REFERENCE_TOKENS) == {"CATGPT", "ANTHROPIG"} and CHAMP == "band_a_strict"
+      and any(e_["name"] == "band_launchpad_lenient" and e_["status"] == "candidate" for e_ in json.load(open(config.REGISTRY_PATH))["candidates"]))
 
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")

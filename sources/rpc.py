@@ -304,9 +304,14 @@ def _owner_from(success: bool, data: str | None) -> str | None:
     if not success or not data or len(_strip(data)) < 64:
         return "no_owner_fn"
     try:
-        return "renounced" if dec_addr(data, 0) == _ZERO_ADDR else "owned"
+        addr = dec_addr(data, 0)
     except ValueError:
         return "no_owner_fn"
+    if addr == _ZERO_ADDR:
+        return "renounced"
+    if addr.lower() in config.PROTOCOL_OWNERS:
+        return "protocol"                 # a launchpad's shared contract owns every clone; no dev holds the key
+    return "owned"
 
 
 def owner(token: str) -> str | None:
@@ -725,9 +730,31 @@ def _decode_discovery(logs: list) -> list:
             kind = srcs[addr][0]
             data = lg.get("data") or "0x"
             creator = pair = token = None
+            extra: dict = {}
             if kind == "flap_create":
                 creator = dec_addr(data, 1)
                 token = dec_addr(data, 3)
+            elif kind == "longlaunch_create":
+                if len(topics) < 3:
+                    continue
+                token = "0x" + topics[1][-40:]
+                creator = "0x" + topics[2][-40:]
+                nwords = len(_strip(data)) // 64
+                extra = {"numeraire": dec_addr(data, 1) if nwords > 1 else None,
+                         "hook": dec_addr(data, 3) if nwords > 3 else None,
+                         "launchpad": "bankr"}
+            elif kind == "pool_v4":
+                if len(topics) < 4:
+                    continue
+                nwords = len(_strip(data)) // 64
+                hook = dec_addr(data, 2) if nwords > 2 else None
+                if config.V4_DISCOVERY_HOOKS_ONLY and (hook or "").lower() not in config.TRUSTED_V4_HOOKS:
+                    continue
+                # both legs are kept; the numeraire is resolved over the whole window below
+                extra = {"legs": ("0x" + topics[2][-40:], "0x" + topics[3][-40:]),
+                         "hook": hook, "pool_id": topics[1],
+                         "launchpad": config.TRUSTED_V4_HOOKS.get((hook or "").lower())}
+                token = extra["legs"][0]              # placeholder until resolved
             else:
                 if len(topics) < 3:
                     continue
@@ -737,14 +764,87 @@ def _decode_discovery(logs: list) -> list:
                     continue
                 nwords = len(_strip(data)) // 64
                 pair = dec_addr(data, 0 if kind == "pair_v2" else nwords - 1)
-            out.append({"kind": kind, "token": token, "pair": pair, "creator": creator,
-                        "block": int(lg.get("blockNumber", "0x0"), 16),
-                        "tx": lg.get("transactionHash"),
-                        "log_index": int(lg.get("logIndex") or "0x0", 16)})
+            rec = {"kind": kind, "token": token, "pair": pair, "creator": creator,
+                   "block": int(lg.get("blockNumber", "0x0"), 16),
+                   "tx": lg.get("transactionHash"),
+                   "log_index": int(lg.get("logIndex") or "0x0", 16)}
+            rec.update(extra)
+            out.append(rec)
         except (ValueError, TypeError, AttributeError):
             continue                                  # one malformed log never kills a run
+    out = _resolve_v4_legs(out)
     out.sort(key=lambda d: (d["block"], d["log_index"]))
     return out
+
+
+def _resolve_v4_legs(recs: list) -> list:
+    """pool_v4 rows carry both legs; the numeraire side is whichever leg is a quote token, a
+    numeraire declared by a longlaunch_create row in the same window, or a currency seen on
+    >= NUMERAIRE_MIN_POOLS_IN_WINDOW pools in the window (numeraires repeat, launches do not).
+    Both or neither ⇒ the row is dropped. A token seen by both a longlaunch_create and a
+    pool_v4 row keeps ONE record: the create row's creator/numeraire plus the pool's id/hook."""
+    from collections import Counter
+    declared = {str(r.get("numeraire") or "").lower() for r in recs if r["kind"] == "longlaunch_create"}
+    freq = Counter()
+    for r in recs:
+        if r["kind"] == "pool_v4":
+            for leg in r["legs"]:
+                freq[leg.lower()] += 1
+    def is_num(a: str) -> bool:
+        a = a.lower()
+        return a in config.QUOTE_TOKENS or a in declared or freq[a] >= config.NUMERAIRE_MIN_POOLS_IN_WINDOW
+    resolved = []
+    for r in recs:
+        if r["kind"] != "pool_v4":
+            resolved.append(r)
+            continue
+        a, b = r.pop("legs")
+        na, nb = is_num(a), is_num(b)
+        if na == nb:
+            continue
+        r["token"], r["numeraire"] = (b, a) if na else (a, b)
+        resolved.append(r)
+    merged: dict = {}
+    for r in resolved:
+        t = r["token"].lower()
+        cur = merged.get(t)
+        if cur is None:
+            merged[t] = r
+            continue
+        keep, other = (cur, r) if cur["kind"] == "longlaunch_create" else ((r, cur) if r["kind"] == "longlaunch_create" else (cur, r))
+        for k in ("pool_id", "hook", "numeraire", "creator", "launchpad"):
+            if keep.get(k) in (None, "") and other.get(k) not in (None, ""):
+                keep[k] = other[k]
+        merged[t] = keep
+    return list(merged.values())
+
+
+def creator_launches(launcher: str, head: int | None = None) -> list | None:
+    """Every token `launcher` created through LongLaunch over the factory's whole life, in
+    block order — ONE indexed eth_getLogs (0.5 s measured). None when the node did not answer.
+    A count at or above LAUNCH_SERVICE_MIN_CREATES marks an agent/service wallet that launches
+    for many users: its history is not this token's dev history (pass-through, not a reject)."""
+    if not launcher:
+        return None
+    topic = "0x" + "0" * 24 + launcher.lower()[2:]
+    logs, _err = get_logs(config.LONGLAUNCH_FACTORY, [config.TOPIC_LONGLAUNCH_CREATE, None, topic],
+                          0, head or block_number() or 0)
+    if logs is None:
+        return None
+    out = []
+    for lg in logs:
+        try:
+            tps = lg.get("topics") or []
+            out.append(("0x" + str(tps[1])[-40:].lower(), int(lg.get("blockNumber", "0x0"), 16)))
+        except (IndexError, ValueError, TypeError):
+            continue
+    out.sort(key=lambda x: x[1])
+    return [t for t, _b in out]
+
+
+def creator_launch_count(launcher: str, head: int | None = None) -> int | None:
+    l = creator_launches(launcher, head)
+    return None if l is None else len(l)
 
 
 decode_discovery = _decode_discovery   # public alias for callers that own the window loop

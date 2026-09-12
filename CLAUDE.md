@@ -170,6 +170,18 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
 
 ## Gotchas
 
+- **The chain's winners come from Bankr's LongLaunchFactory (Doppler on Uniswap V4)**, not
+  from V2 pairs or Flap: `config.REFERENCE_TOKENS` (CATGPT, ANTHROPIG) are the recall fixtures in
+  verify section M. Their `owner()` is `PROTOCOL_OWNERS` ("protocol", passes), their LP is the
+  hook's custody (`lp_check_source v4_launchpad:bankr`, no %), their round trip comes from Kyber,
+  and the launch tx is often sent by an app/agent wallet — the creator gate then reads the dead
+  fraction of the launcher's prior launches, never the count alone. Every token address ends in
+  `1e18` (salt-mined). Numeraires are tokenized stocks / "1x Long" tokens / USDG / native ETH /
+  other memecoins, so a V4 `Initialize` leg is a numeraire when it is a quote token, declared by
+  a `Create` in the same window, or repeated across pools; otherwise the row is dropped.
+- **MIZUKARA remains only as the V2-mechanics smoke fixture** (a renounced owner, a burned V2
+  pair, router legs) in the sources' `__main__` blocks; it is not a reference for what to find.
+
 - **GeckoTerminal is a hard 30/min per IP, shared on the Mac** with the sibling screeners; the Mac
   rate is 0.25 Hz (0.4 Hz gave ~47 % 429s, measured on the solana screener). The runner has its own IP and uses 0.4 Hz.
 - **`git fetch` + `git show origin/main:` — never `git pull`** in the 60 s book. A collection job

@@ -42,7 +42,7 @@ def hard_gates(market: dict, safety: dict) -> tuple[bool, dict]:
     r["liq_ok"] = _known(liq) and liq >= config.LIQ_FLOOR_USD          # fails closed when unknown
     r["vol_ok"] = _known(vol) and vol >= config.MIN_VOL_H24_USD        # fails closed when unknown
     # chain truth (rpc) — positive findings only
-    owner = s.get("owner_state")
+    owner = s.get("owner_state")            # "protocol" (a launchpad's shared contract) is not a dev key
     r["owner_ok"] = (not config.REQUIRE_OWNER_RENOUNCED) or owner != "owned"
     lp = s.get("lp_locked_pct")
     r["lp_ok"] = (not _known(lp)) or lp >= config.LP_LOCKED_MIN_PCT
@@ -59,9 +59,16 @@ def hard_gates(market: dict, safety: dict) -> tuple[bool, dict]:
     r["dev_ok"] = (not _known(dev)) or dev <= config.DEV_MAX_PCT
     prior = s.get("creator_prior_tokens")
     dead = s.get("creator_dead_frac")
-    r["creator_ok"] = (not _known(prior)) or (
-        prior <= config.CREATOR_MAX_PRIOR_TOKENS
-        and not (prior >= 2 and _known(dead) and dead > config.CREATOR_MAX_DEAD_FRAC))
+    on_launchpad = str(s.get("lp_check_source") or "").startswith("v4_launchpad")
+    max_prior = config.LAUNCHPAD_CREATOR_MAX_PRIOR_TOKENS if on_launchpad else config.CREATOR_MAX_PRIOR_TOKENS
+    dead_ok = not (prior is not None and prior >= 2 and _known(dead) and dead > config.CREATOR_MAX_DEAD_FRAC)
+    # a launchpad app/agent wallet launches for many users (CATGPT's launcher: 54 launches per
+    # RobinX, 16.8k txs): the COUNT says nothing about this token's dev, the track record does —
+    # such a wallet passes only on a KNOWN dead fraction within the cap (unknown fails closed here,
+    # because 20+ launches is itself a positive finding)
+    service = (on_launchpad and _known(prior) and prior >= config.LAUNCH_SERVICE_MIN_CREATES
+               and _known(dead) and dead <= config.CREATOR_MAX_DEAD_FRAC)
+    r["creator_ok"] = (not _known(prior)) or service or (prior <= max_prior and dead_ok)
     snipes = s.get("sniper_swaps_first_blocks")
     r["sniper_ok"] = (not _known(snipes)) or snipes <= config.SNIPER_SWAPS_MAX
     # which sources answered (informational; the alert prints the dark ones)
@@ -209,7 +216,9 @@ def hc_checks(feat: dict) -> dict:
         c["template"] = True
 
     lp = f.get("lp_locked_pct")
-    c["lp_known"] = None if (config.HC_REQUIRE_LP_KNOWN and lp is None) else True
+    # a trusted launchpad hook holds the liquidity by construction: LP is "known" without a %
+    lp_known = lp is not None or str(f.get("lp_check_source") or "").startswith("v4_launchpad")
+    c["lp_known"] = None if (config.HC_REQUIRE_LP_KNOWN and not lp_known) else True
 
     dev = f.get("dev_pct")
     c["dev_pct"] = None if dev is None else dev <= config.HC_MAX_DEV_PCT
