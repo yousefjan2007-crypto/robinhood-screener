@@ -417,7 +417,7 @@ def _scorecard(led: pd.DataFrame) -> str:
                 cells += "<td>·</td>"
         body += f"<tr><td>{label}</td><td>{len(sub)}</td>{cells}</tr>"
         days = int(sub["_day"].nunique())
-        promoted = int(sub["promoted_ts"].astype(str).apply(lambda v: v not in _EMPTY).sum())
+        promoted = int((~ledger.empty_mask(sub["promoted_ts"])).sum())
         rugged = float(sub["rugged_after"].astype(str).str.lower().eq("true").mean())
         n_open = int((~sub["status"].astype(str).isin(["resolved", "suspect"])).sum())
         extra = f" · promoted-B n={promoted}" if tier == "B" else ""

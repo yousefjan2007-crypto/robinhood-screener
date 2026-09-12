@@ -763,7 +763,7 @@ with tempfile.TemporaryDirectory() as d:
     LED.update_forward(T0 + 200, lambda toks: {"ok": {}, "absent": set(), "deferred": set(toks)}, path=LP)
     after = _read(LP)
     check("deferred snapshots write nothing (last_snapshot_ts untouched; 472-of-1,400: deferred is never dead)",
-          before == after and set(LED.load(LP)["last_snapshot_ts"].astype(str)) <= set(LED._EMPTY))
+          before == after and bool(LED.empty_mask(LED.load(LP)["last_snapshot_ts"]).all()))
     t1 = f"0x{1:040x}"
     f1, _ = LED.update_forward(T0 + 300, _snap(price=1.0, absent=[t1]), path=LP)
     r = LED.load(LP).set_index("token")

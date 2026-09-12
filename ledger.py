@@ -54,6 +54,13 @@ _EMPTY = ("", "nan", "None", "NaN")
 _LAST_H = list(HORIZ)[-1]
 
 
+def empty_mask(series: pd.Series) -> pd.Series:
+    """True where a cell is missing or an empty-string marker. Vectorised .astype(str) is NOT
+    enough on its own: pandas >= 3 keeps a missing cell as NA instead of rendering it "nan",
+    so an isin(_EMPTY) test alone silently misses every NaN (found by verify on the runner)."""
+    return series.isna() | series.astype(str).str.strip().isin(_EMPTY)
+
+
 def _num(v, default=0.0) -> float:
     try:
         if str(v) in _EMPTY:
@@ -191,7 +198,7 @@ def record_rows(events: list, alert_ts: float, plan_name: str | None = None,
         seq += 1
         if ev.get("event_kind") == "promotion" and len(led):
             prior = (led["token"].astype(str).str.lower() == token) & \
-                    led["promoted_ts"].astype(str).isin(_EMPTY)
+                    empty_mask(led["promoted_ts"])
             led.loc[prior, "promoted_ts"] = alert_ts
     if new:
         add = pd.DataFrame(new)
@@ -384,7 +391,7 @@ def summary(path: str | None = None) -> None:
         if len(sub) == 0:
             continue
         days = sub["_day"].nunique()
-        promoted = sub["promoted_ts"].astype(str).apply(lambda v: v not in _EMPTY).sum()
+        promoted = int((~empty_mask(sub["promoted_ts"])).sum())
         extra = f", promoted-B n={promoted}" if tier == "B" else ""
         print(f"  tier {tier} ({TIER_LABEL[tier]}), n={len(sub)} across {days} alert-day(s){extra}:")
         for bname, bsub in sub.groupby(sub["band"].astype(str)):

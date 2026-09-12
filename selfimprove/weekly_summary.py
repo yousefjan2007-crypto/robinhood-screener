@@ -149,7 +149,7 @@ def ledger_section(led) -> list:
     n_days = led["_day"].nunique()
     mat = led[led["_matured"]]
     n_sus = int((led["status"].astype(str) == "suspect").sum())
-    promo_b = int(((led["_tier"] == "B") & ~led["promoted_ts"].astype(str).isin(_EMPTY)).sum())
+    promo_b = int(((led["_tier"] == "B") & ~ledger.empty_mask(led["promoted_ts"])).sum())
     n_a = int((led["_tier"] == "A").sum())
     lines = [f"ledger: {len(led)} events ({n_a} A) across {n_days} alert-day(s); matured "
              f"{config.BAND_OUTCOME_METRIC} rows {len(mat)}; suspect {n_sus}; promoted-B {promo_b} "
