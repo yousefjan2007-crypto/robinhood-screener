@@ -179,6 +179,14 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   `1e18` (salt-mined). Numeraires are tokenized stocks / "1x Long" tokens / USDG / native ETH /
   other memecoins, so a V4 `Initialize` leg is a numeraire when it is a quote token, declared by
   a `Create` in the same window, or repeated across pools; otherwise the row is dropped.
+- **Pons (`PONS_FACTORY`) is the largest launchpad by count** (750–1,250 launches/hour, 1–4 %
+  ever indexed): its Create log is a source, absent launches get ONE 30-min recheck
+  (`RECHECK_SCHEDULE_BY_KIND`), and `DISCOVERY_MAX_LOG_TOKENS_PER_RUN` is 200 for that reason.
+  Hook-less V4 pools are a source too (`V4_DISCOVERY_HOOKS_ONLY = False`).
+- **The live champion is `band_volume_early`, set by the operator on 2026-09-12** (age ≤ 30 min,
+  hour-1 volume ≥ $50k, buys ≥ 2× sells, mcap ≤ $2M). `DEFAULT_ENTRY_BAND` is still
+  `band_a_strict`: it is the fallback and the demotion target, not the alerted band. Do not
+  "fix" the champion back without the operator; `champion.py --set` is the path either way.
 - **MIZUKARA remains only as the V2-mechanics smoke fixture** (a renounced owner, a burned V2
   pair, router legs) in the sources' `__main__` blocks; it is not a reference for what to find.
 

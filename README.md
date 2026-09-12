@@ -137,6 +137,28 @@ count, so agent-launched tokens sit in **B** under it; the built-in candidate
 `band_launchpad_lenient` drops exactly those checks on the launchpad and the entry lab decides
 whether the leniency pays.
 
+**Pons and hook-less V4.** Pons (`pons-v2-dex`) is the chain's largest launchpad by count —
+750 to 1,250 launches an hour, each with a singleton-AMM pool at creation; only 1–4 % ever get a
+Dexscreener market and under 1 % clear the market gates. Its `Create` log is a discovery source
+(token, pool id, creator), an absent launch is rechecked **once** at 30 minutes, and Pons pools
+have no V2 pair, so their round trip comes from Kyber when it routes them and stays unknown
+otherwise. Hook-less Uniswap V4 pools held the day's largest winners (AnsemCat, MEME, BONER,
+FLYBRAIN) and are read the same way as the hooked ones, with the numeraire rule dropping any
+pool whose token leg cannot be told from its quote leg.
+
+**What is alerted (operator decision, 2026-09-12).** The live champion entry band is
+`band_volume_early`, set by hand with a recorded reason: pool age ≤ 30 min, hour-1 volume ≥ $50k,
+liquidity ≥ $10k, market cap ≤ $2M and buys ≥ 2× sells. It encodes the operator's thesis that
+the money is in early entries on coins that already trade heavily with buyers dominating; on the
+first day's 40 survivors the three that went 3–23× all had that flow at sighting and every
+balanced-flow sighting went flat or to zero (n = 9, in-sample — a hypothesis, not evidence).
+A-tier therefore no longer means "best survival odds"; it means "early, heavily traded, buyer-
+dominated, and past every hard gate". `band_a_strict` stays a scored candidate, the ledger and
+the paper book judge the alerted band against the silent control, and the one-shot demotion test
+reverts the champion to `band_a_strict` if its selection lift over the same-day, same-age pool
+is not positive. The FOMO the screener ledgered on day one went from $44k to $568 within hours:
+the exit policy, judged by the live book, matters as much as the entry.
+
 Some of the Solana gates have **no analogue** here. There is no funding-graph clustering of insider
 wallets, no behavioural wallet tags, no freeze authority, and honeypot.is rejects the chain; GoPlus
 lists it but covers ~3 % of tokens, so it is never a gate. The substitutes are the router round trip

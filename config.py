@@ -171,7 +171,8 @@ TOPIC_V4_INITIALIZE = "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e611
                                    # topics[1] pool id, topics[2..3] currencies; data words [fee, tickSpacing, hooks, ...]
 DOPPLER_HOOK = "0x4e3468951D49f2EEa976eD0D6e75fFCb44a9a544"
 TRUSTED_V4_HOOKS = {DOPPLER_HOOK.lower(): "bankr"}   # hook → launchpad name; liquidity is in the hook's custody
-V4_DISCOVERY_HOOKS_ONLY = True     # plain (hook-less) V4 pools are ~15k/day and mostly not launches; hooked ≈ 3k/day
+V4_DISCOVERY_HOOKS_ONLY = False    # hook-less V4 pools held the day's biggest winners (AnsemCat $102M, MEME, BONER,
+                                   # FLYBRAIN, CME on 2026-09-12); the numeraire rule drops the ambiguous rows
 NUMERAIRE_MIN_POOLS_IN_WINDOW = 2  # a V4 currency seen on >= 2 pools in one log window is a numeraire, not a launch
 PROTOCOL_OWNERS = {                # token owner() addresses that are a launchpad's shared contract, not a dev
     "0xeb7c034704ef8dcd2d32324c1545f62fb4ad0862": "bankr",   # owner of every LongLaunch DopplerERC20V1 clone
@@ -184,13 +185,24 @@ LAUNCHPAD_CREATOR_MAX_PRIOR_TOKENS = 10   # launcher wallets on Bankr are often 
 KYBER_ROUNDTRIP_BUDGET_PER_RUN = 8    # no-V2-pair tokens probed through Kyber (2 calls each at 1 Hz), liq-desc;
                                    # 12 put a Mac dry run at 170 s of the 200 s budget
 KYBER_PROBE_WETH_WEI = 10**16      # 0.01 WETH, same probe as the router legs
+# Pons (GT dex id pons-v2-dex): the chain's largest launchpad by count — 750–1,250 launches per
+# HOUR measured 2026-09-12, each with a singleton-AMM pool (32-byte ids) at creation; only 1–4 %
+# ever get a Dexscreener market and < 1 % clear the market gates (≈ 100–200/day). FRONTIER's
+# second listing, DOGGO, UP and MONEY came through it. The GT new-pools feed is dominated by it.
+PONS_FACTORY = "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e"
+TOPIC_PONS_CREATE = "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607"
+                                   # topics[1] token, topics[2] pool id (32 bytes), topics[3] creator; data: 3 amounts
 DISCOVERY_LOG_SOURCES = {          # address → (kind, topic0)
     UNIV2_FACTORY: ("pair_v2", TOPIC_PAIR_CREATED),
     V3_FACTORY: ("pool_v3", TOPIC_POOL_CREATED),
     FLAP_ROUTER: ("flap_create", TOPIC_FLAP_TOKEN_CREATED),
     LONGLAUNCH_FACTORY: ("longlaunch_create", TOPIC_LONGLAUNCH_CREATE),
     V4_POOL_MANAGER: ("pool_v4", TOPIC_V4_INITIALIZE),
+    PONS_FACTORY: ("pons_create", TOPIC_PONS_CREATE),
 }
+# launchpad launches are ~99 % absent from Dexscreener at the first scan and mostly stay so: ONE
+# recheck at 30 min, never the 6 h slot (which would hold ~20k dead launches in recheck.json)
+RECHECK_SCHEDULE_BY_KIND = {"pons_create": (1800,), "longlaunch_create": (1800,), "pool_v4": (1800,)}
 # reference winners (what "a coin worth finding" looks like on this chain; at-launch numbers in verify.py)
 REFERENCE_TOKENS = {
     "CATGPT": "0xd6FDE6a3Fc6Ab2d83b2BE58383944CA1baDe1E18",      # launched 2026-09-11 23:40Z, $15M on 09-12
@@ -234,17 +246,18 @@ EXCLUDE_SYMBOL_PATTERNS = (r"x\d+[LS]$",)   # leveraged tokenized-stock legs (OP
 DISCOVERY_BACKFILL_BLOCKS = 3_000        # ~5 min at 0.101 s/block: the first run with no cursor
 DISCOVERY_MAX_CATCHUP_BLOCKS = 300_000   # ~8.4 h: after a longer outage skip ahead and log the gap
 LOG_WINDOW_BLOCKS = 100_000              # Flap ≈ 4k logs / 100k blocks — under the node's 10k cap
-DISCOVERY_MAX_LOG_TOKENS_PER_RUN = 80    # log tokens are NEVER truncated: the cursor advances only
+DISCOVERY_MAX_LOG_TOKENS_PER_RUN = 200   # log tokens are NEVER truncated: the cursor advances only
                                          # to the block of the last log actually processed
 DISCOVERY_FEEDS = ("gt_new_pools",)      # cheap hedge for factories not in the log set; the
                                          # scanhood.launch_feed / robinx.feed_new adapters exist but are off
 GT_NEW_POOLS_PAGES = 2
-DISCOVER_QUOTA = {"logs": 80, "watchlist": 60, "rechecks": 40, "feeds": 20}  # unused quota spills forward
-MAX_DISCOVER = 200                       # bounds only the Dexscreener enrich set (30 addrs/call)
+DISCOVER_QUOTA = {"logs": 200, "watchlist": 60, "rechecks": 40, "feeds": 20}  # unused quota spills forward
+MAX_DISCOVER = 400                       # bounds only the Dexscreener enrich set (30 addrs/call); Pons + hook-less
+                                         # V4 + Bankr ≈ 100 log tokens per 5-min run, 99 % absent → cheap
 SEEN_TTL_S = 6 * 3600                    # rejects only; the ledger dedups survivors
 RECHECK_SCHEDULE_S = (1800, 21600)       # a token that failed ONLY size gates, or has no pair yet,
                                          # is re-enriched at +30m and +6h
-RECHECK_MAX = 2000
+RECHECK_MAX = 3000                       # ≈ 2 h of launchpad launches at one 30-min recheck each
 RECHECK_PER_RUN = 40
 GT_INFO_BUDGET_PER_RUN = 20              # pass-2 GT /info calls per run (24/min on the runner)
 GT_INFO_REFRESH_S = 1800                 # watched tokens refresh pass-2 facts at most this often
@@ -311,7 +324,16 @@ HC_REQUIRE_TEMPLATE_KNOWN = True   # impl name whitelisted or source verified
 TEMPLATE_WHITELIST = {"FlapTaxTokenV3", "DopplerERC20V1"}   # Flap launchpad clone; Bankr/Doppler clone
 HC_REQUIRE_LP_KNOWN = True         # an unknown LP status can be B, never A
 HC_MAX_DEV_PCT = 2.0
-DEFAULT_ENTRY_BAND = "band_a_strict"
+DEFAULT_ENTRY_BAND = "band_a_strict"     # the fallback / demotion target; the LIVE champion is selfimprove/champion.json
+# band_volume_early — the operator's thesis (2026-09-12): the money is in early entries on coins that
+# already trade heavily with buyers dominating; measured at sighting on the day's survivors,
+# FRONTIER (23x), ROBOJENSEN (3.7x), DEGENFLY (3.3x) all had buys >= 2x sells in hour one while
+# every balanced-flow sighting went flat or to zero (n=9, in-sample — a hypothesis, not evidence)
+BAND_VE_MAX_AGE_MIN = 30.0
+BAND_VE_MIN_VOL_H1_USD = 50_000.0
+BAND_VE_MIN_LIQ_USD = 10_000.0
+BAND_VE_BUY_SELL_RATIO = 2.0
+BAND_VE_MAX_MCAP_USD = 2_000_000.0
 
 # ── entry lab (selfimprove/entry_lab) ─────────────────────────────────────────────
 # The ONE flat dict every band reads. build_feat() produces EXACTLY these keys (None when

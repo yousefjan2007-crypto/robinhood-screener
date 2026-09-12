@@ -743,6 +743,12 @@ def _decode_discovery(logs: list) -> list:
                 extra = {"numeraire": dec_addr(data, 1) if nwords > 1 else None,
                          "hook": dec_addr(data, 3) if nwords > 3 else None,
                          "launchpad": "bankr"}
+            elif kind == "pons_create":
+                if len(topics) < 4:
+                    continue
+                token = "0x" + topics[1][-40:]
+                creator = "0x" + topics[3][-40:]
+                extra = {"pool_id": topics[2], "launchpad": "pons"}
             elif kind == "pool_v4":
                 if len(topics) < 4:
                     continue

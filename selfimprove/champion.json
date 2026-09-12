@@ -1,11 +1,17 @@
 {
  "entry_band": {
-  "champion": "band_a_strict",
-  "evidence": null,
+  "champion": "band_volume_early",
+  "demotion_judged": null,
+  "evidence": {
+   "manual": true,
+   "previous": "band_a_strict",
+   "reason": "operator decision 2026-09-12: alert early high-volume entries (age<=30m, hour-1 vol>=50k, buys>=2x sells, mcap<=2M); band_a_strict stays a scored candidate; the demotion test reverts on a non-positive selection lift"
+  },
   "metric": "ret_6h",
-  "previous": null,
+  "nominee": null,
+  "previous": "band_a_strict",
   "promoted_at_event_seq": null,
-  "promoted_ts": null
+  "promoted_ts": 1789229359.525124
  },
  "exit": {
   "champion": "cfg_ladder_stop",
@@ -21,6 +27,14 @@
    "arm": "both",
    "note": "defaults written at repo rebuild 2026-09-12",
    "ts": 0
+  },
+  {
+   "action": "manual_set",
+   "arm": "entry_band",
+   "from": "band_a_strict",
+   "reason": "operator decision 2026-09-12: alert early high-volume entries (age<=30m, hour-1 vol>=50k, buys>=2x sells, mcap<=2M); band_a_strict stays a scored candidate; the demotion test reverts on a non-positive selection lift",
+   "to": "band_volume_early",
+   "ts": 1789229359.525124
   }
  ],
  "locked": false,

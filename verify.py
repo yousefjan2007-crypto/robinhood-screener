@@ -2340,6 +2340,7 @@ with tempfile.TemporaryDirectory() as d:
 section("M. launchpad tokens — Bankr / Doppler on Uniswap V4 (the reference winners CATGPT, ANTHROPIG)")
 from sources import rpc as RPCM, safety as SAFEM   # noqa: E402
 import selfimprove.trials as TRIALS_MOD             # noqa: E402
+import run as RUNM                                   # noqa: E402
 
 CAT = config.REFERENCE_TOKENS["CATGPT"].lower()
 _SVC = "0x3a8e5ba5aa9c2464c75621c2bffb9cf912db995d"           # CATGPT's launcher (app/agent wallet)
@@ -2366,10 +2367,26 @@ _other = "0x" + "ab" * 20
 _INIT2 = dict(_INIT, topics=[config.TOPIC_V4_INITIALIZE, "0x" + "11" * 32, _pad(_other), _pad(_NUM)], logIndex="0x8c")
 _hookless = dict(_INIT, data=_INIT["data"][:2 + 64 * 2] + "0" * 64 + _INIT["data"][2 + 64 * 3:])
 two = RPCM.decode_discovery([_INIT, _INIT2])
-check("a hooked V4 pool alone (numeraire unknown in the window) is dropped, a hook-less V4 pool is never a discovery source, "
-      "and a currency repeated on >= 2 pools resolves the OTHER leg as the token",
+_hookless2 = dict(_INIT2, data=_hookless["data"], logIndex="0x8d")
+hl = RPCM.decode_discovery([_hookless, _hookless2])
+check("a V4 pool alone (numeraire unknown in the window) is dropped whether hooked or not; a currency repeated on >= 2 pools "
+      "resolves the OTHER leg as the token; hook-less pools resolve the same way with launchpad None (they held the day's "
+      "biggest winners) and are a source only while V4_DISCOVERY_HOOKS_ONLY is False",
       RPCM.decode_discovery([_INIT]) == [] and RPCM.decode_discovery([_hookless]) == []
-      and sorted(r_["token"] for r_ in two) == sorted([CAT, _other]) and all(r_["numeraire"] == _NUM for r_ in two))
+      and sorted(r_["token"] for r_ in two) == sorted([CAT, _other]) and all(r_["numeraire"] == _NUM for r_ in two)
+      and not config.V4_DISCOVERY_HOOKS_ONLY and sorted(r_["token"] for r_ in hl) == sorted([CAT, _other])
+      and all(r_["launchpad"] is None for r_ in hl))
+_PONS_TOK = "0x9e410f73" + "ab" * 16
+_PONS = {"address": config.PONS_FACTORY, "blockNumber": "0x3a5171c", "transactionHash": "0x1b3e", "logIndex": "0x12",
+         "topics": [config.TOPIC_PONS_CREATE, _pad(_PONS_TOK), "0x" + "77" * 32, _pad("0x" + "cd" * 20)],
+         "data": "0x" + "0" * 128 + "0" * 48 + "3a4965bf58a40000"}
+pr = RPCM.decode_discovery([_PONS])
+check("a Pons Create log decodes to token (topics[1]), creator (topics[3]), pool id (topics[2]), launchpad=pons; a Pons launch "
+      "gets ONE 30-min recheck slot, a V2 pair the default two",
+      len(pr) == 1 and pr[0]["kind"] == "pons_create" and pr[0]["token"] == _PONS_TOK and pr[0]["creator"] == "0x" + "cd" * 20
+      and pr[0]["pool_id"] == "0x" + "77" * 32 and pr[0]["launchpad"] == "pons"
+      and RUNM._recheck_schedule(pr[0]) == (1800,) and RUNM._recheck_schedule({"kind": "pair_v2"}) == config.RECHECK_SCHEDULE_S
+      and RUNM._recheck_schedule(None) == config.RECHECK_SCHEDULE_S)
 _PROTO = next(iter(config.PROTOCOL_OWNERS))
 check("owner() mapping: zero → renounced, the launchpad's shared owner → protocol, another address → owned, revert → no_owner_fn",
       RPCM._owner_from(True, _pad("0x" + "0" * 40)) == "renounced" and RPCM._owner_from(True, _pad(_PROTO)) == "protocol"
@@ -2455,11 +2472,27 @@ check("band_launchpad_lenient equals band_a_strict off the launchpad (coverage i
       all(B.BUILTINS["band_launchpad_lenient"].verdict(f_) == B.BUILTINS[CHAMP].verdict(f_)
           for f_ in (good, dict(good, score=50.0), dict(good, dev_pct=None)))
       and "band_launchpad_lenient" in (TRIALS_MOD.load().get("bands_ever_scored") or []))
-import run as RUNM   # noqa: E402
 check("pass-1 exclusion: leveraged tokenized-stock legs (OPENAIx1L, NVDAx3L, ANTHROPICx1L) and quote assets are never candidates; "
       "CATGPT / LONGCAT / a symbol merely containing 'x1' are",
       all(RUNM._excluded_symbol(x_) for x_ in ("OPENAIx1L", "NVDAx3L", "ANTHROPICx1L", "usdg", "WETH"))
       and not any(RUNM._excluded_symbol(x_) for x_ in ("CATGPT", "LONGCAT", "MAX1LIFE", "", None)))
+# band_volume_early: the operator's thesis, on the survivors' at-sighting numbers (latest_scan history 2026-09-12)
+_FRONT = dict(good, pair_age_min=4.0, vol_h1=63062.0, liq_usd=14841.0, buys_h1=126, sells_h1=60, mcap=41402.0)     # 23x later
+_MORTY = dict(good, pair_age_min=3.0, vol_h1=51496.0, liq_usd=22840.0, buys_h1=341, sells_h1=253, mcap=59872.0)    # 0.05x later
+_OPEN = dict(good, pair_age_min=1379.0, vol_h1=510032.0, liq_usd=602018.0, buys_h1=688, sells_h1=1059, mcap=3655740.0)
+VE = B.BUILTINS["band_volume_early"]
+check("band_volume_early fires on FRONTIER at sighting (age 4 min, $63k hour-1 volume, buys 2.1x sells), not on Morty "
+      "(balanced flow) nor on OPEN (23 h old, $3.7M); NA without an hour-1 volume; registered as a candidate and a counted trial",
+      VE.verdict(_FRONT) is True and VE.verdict(_MORTY) is False and VE.verdict(_OPEN) is False
+      and VE.verdict(dict(_FRONT, vol_h1=None)) is None and "buys below" in VE.explain(_MORTY)
+      and any(e_["name"] == "band_volume_early" and e_["status"] == "candidate" for e_ in json.load(open(config.REGISTRY_PATH))["candidates"])
+      and "band_volume_early" in (TRIALS_MOD.load().get("bands_ever_scored") or []))
+_live = CH.state()["entry_band"]
+check("the LIVE champion is band_volume_early by a manual --set (evidence.manual, previous band_a_strict, reason recorded) while "
+      "DEFAULT_ENTRY_BAND stays band_a_strict as the fallback and demotion target",
+      _live["champion"] == "band_volume_early" and _live["previous"] == "band_a_strict"
+      and (_live.get("evidence") or {}).get("manual") is True and (_live.get("evidence") or {}).get("reason")
+      and config.DEFAULT_ENTRY_BAND == "band_a_strict", str(_live)[:200])
 check("REFERENCE_TOKENS name the two winners and the registry lists the launchpad band as a candidate, never the champion",
       set(config.REFERENCE_TOKENS) == {"CATGPT", "ANTHROPIG"} and CHAMP == "band_a_strict"
       and any(e_["name"] == "band_launchpad_lenient" and e_["status"] == "candidate" for e_ in json.load(open(config.REGISTRY_PATH))["candidates"]))

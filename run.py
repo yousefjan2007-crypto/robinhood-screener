@@ -171,6 +171,13 @@ def feed_tokens(seen: dict, known: set, budget: _Budget) -> set:
 
 
 # ── the screen for one token ──────────────────────────────────────────────────────
+def _recheck_schedule(d) -> tuple:
+    """The recheck slots for a token by its discovery kind: launchpad launches get ONE 30-min slot
+    (RECHECK_SCHEDULE_BY_KIND); everything else the default (30 min, 6 h)."""
+    kind = (d or {}).get("kind") if isinstance(d, dict) else None
+    return config.RECHECK_SCHEDULE_BY_KIND.get(kind, config.RECHECK_SCHEDULE_S)
+
+
 def _excluded_symbol(symbol) -> bool:
     """Quote assets, tokenized-stock legs and their leveraged variants (OPENAIx1L, NVDAx3L) are
     LongLaunch numeraires that the GT new-pools feed cannot tell from launches."""
@@ -261,8 +268,9 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         r = recheck.get(t) or {"n_checks": 0, "first_seen": now_s}
         if src == "logs" or (src == "rechecks" and r.get("disc")):
             n = int(r.get("n_checks", 0))
-            if n < len(config.RECHECK_SCHEDULE_S):
-                r.update({"next_check": now_s + config.RECHECK_SCHEDULE_S[n], "n_checks": n + 1,
+            sched = _recheck_schedule(r.get("disc") or disc.get(t))
+            if n < len(sched):
+                r.update({"next_check": now_s + sched[n], "n_checks": n + 1,
                           "disc": r.get("disc") or disc.get(t)})
                 recheck[t] = r
             else:
@@ -301,8 +309,9 @@ def run(dry_run: bool = True, send: bool = False) -> list:
             else:
                 r = recheck.get(t) or {"n_checks": 0, "first_seen": now_s}
                 n = int(r.get("n_checks", 0))
-                if n < len(config.RECHECK_SCHEDULE_S) and (m.get("pair_age_min") or 0) < config.AGE_MAX_MINUTES:
-                    r.update({"next_check": now_s + config.RECHECK_SCHEDULE_S[n], "n_checks": n + 1,
+                sched = _recheck_schedule(r.get("disc") or disc.get(t))
+                if n < len(sched) and (m.get("pair_age_min") or 0) < config.AGE_MAX_MINUTES:
+                    r.update({"next_check": now_s + sched[n], "n_checks": n + 1,
                               "disc": r.get("disc") or disc.get(t)})
                     recheck[t] = r
                 else:

@@ -219,6 +219,25 @@
         "sells_h1"
       ],
       "proposal": null
+    },
+    {
+      "name": "band_volume_early",
+      "kind": "band",
+      "module": "entry_lab.bands",
+      "status": "candidate",
+      "registered_ts": 1789229359.0,
+      "registered_at_event_seq": 41,
+      "nominated_at_event_seq": null,
+      "rationale": "The operator's thesis, pre-declared 2026-09-12: get in EARLY (pool age <= 30 min, mcap <= $2M) on a coin that already trades heavily (hour-1 volume >= $50k, liq >= $10k) with buyers dominating (buys >= 2x sells). Measured at sighting on the day's 40 survivors: FRONTIER (23x), ROBOJENSEN (3.7x), DEGENFLY (3.3x) all had buys >= 2x sells while every balanced-flow sighting went flat or to zero (n=9, in-sample). A hypothesis the ledger will judge \u2014 it is the alerted band by manual --set, and the demotion test reverts it to band_a_strict if the selection lift over the same-day, same-age pool is not positive.",
+      "requires": [
+        "pair_age_min",
+        "vol_h1",
+        "liq_usd",
+        "buys_h1",
+        "sells_h1",
+        "mcap"
+      ],
+      "proposal": null
     }
   ]
 }

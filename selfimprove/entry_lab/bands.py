@@ -380,6 +380,42 @@ band_launchpad_lenient = _register(BandSpec(
     ("CATGPT/ANTHROPIG launch paths (GT OHLCV 2026-09-12)", "LongLaunch Create logs", "sources/safety.py pass 2"),
     "candidate", _band_launchpad_lenient, _explain_launchpad_lenient, THREE_VALUED=True))
 
+def _band_volume_early(f):
+    return (f["pair_age_min"] <= config.BAND_VE_MAX_AGE_MIN
+            and f["vol_h1"] >= config.BAND_VE_MIN_VOL_H1_USD
+            and f["liq_usd"] >= config.BAND_VE_MIN_LIQ_USD
+            and f["mcap"] <= config.BAND_VE_MAX_MCAP_USD
+            and f["buys_h1"] >= config.BAND_VE_BUY_SELL_RATIO * max(1.0, float(f["sells_h1"])))
+
+
+def _explain_volume_early(f):
+    parts = []
+    if f["pair_age_min"] > config.BAND_VE_MAX_AGE_MIN:
+        parts.append(f"age above {config.BAND_VE_MAX_AGE_MIN:.0f}m (not early)")
+    if f["vol_h1"] < config.BAND_VE_MIN_VOL_H1_USD:
+        parts.append(f"hour-1 volume below ${config.BAND_VE_MIN_VOL_H1_USD:,.0f}")
+    if f["liq_usd"] < config.BAND_VE_MIN_LIQ_USD:
+        parts.append(f"liq below ${config.BAND_VE_MIN_LIQ_USD:,.0f}")
+    if f["mcap"] > config.BAND_VE_MAX_MCAP_USD:
+        parts.append(f"mcap above ${config.BAND_VE_MAX_MCAP_USD:,.0f} (not early)")
+    if f["buys_h1"] < config.BAND_VE_BUY_SELL_RATIO * max(1.0, float(f["sells_h1"])):
+        parts.append(f"buys below {config.BAND_VE_BUY_SELL_RATIO:.0f}x sells in hour 1")
+    return "; ".join(parts)
+
+
+band_volume_early = _register(BandSpec(
+    "band_volume_early",
+    "The operator's thesis, pre-declared 2026-09-12: get in EARLY (pool age <= 30 min, mcap <= "
+    "$2M) on a coin that already trades heavily (hour-1 volume >= $50k, liq >= $10k) with buyers "
+    "dominating (buys >= 2x sells). Measured at sighting on the day's 40 survivors: FRONTIER (23x), "
+    "ROBOJENSEN (3.7x), DEGENFLY (3.3x) all had buys >= 2x sells while every balanced-flow "
+    "sighting went flat or to zero (n=9, in-sample). A hypothesis the ledger will judge — it is "
+    "the alerted band by manual --set, and the demotion test reverts it to band_a_strict if the "
+    "selection lift over the same-day, same-age pool is not positive.",
+    ("pair_age_min", "vol_h1", "liq_usd", "buys_h1", "sells_h1", "mcap"),
+    ("latest_scan.json history 2026-09-12 (40 survivors, first sighting vs mcap 2.5 h later)",),
+    "candidate", _band_volume_early, _explain_volume_early))
+
 ctl_random_band = _register(BandSpec(
     "ctl_random_band",
     "NEGATIVE CONTROL. Selects a sha256-chosen BAND_CTL_RANDOM_RATE share of tokens and fires at "
