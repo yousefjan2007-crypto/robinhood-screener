@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yousefjan.robinhood-dispatch</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/yousefjan/robinhood_screener/launchd/dispatch.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/yousefjan/robinhood_screener</string>
+    <!-- Every 5 minutes: fire the cloud scan with `gh workflow run`. GitHub's own cron is only a
+         fallback — measured on this account it fired 13.7×/day against a nominal 288 (median gap
+         49 min, p90 280 min). The scan is correct at any cadence (block-cursor discovery catches
+         up exactly), so a missed dispatch costs freshness, never coverage. launchd never overlaps
+         runs of the same label; the workflow's concurrency group dedups on the GitHub side. -->
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/yousefjan/robinhood_screener/dispatch.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/yousefjan/robinhood_screener/dispatch.err.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/yousefjan/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yousefjan.robinhood-livebook</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Library/Frameworks/Python.framework/Versions/3.9/bin/python3</string>
+        <string>/Users/yousefjan/robinhood_screener/selfimprove/livebook.py</string>
+        <string>--tick</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/yousefjan/robinhood_screener</string>
+    <!-- One tick per minute: one git fetch + git show of the cloud ledger (never pull), one
+         cached WETH price, ONE Multicall3 eth_call for every open position (KyberSwap only for
+         tokens with no V2 pair), one batched Dexscreener corroboration when a tick jumps >10x.
+         Positions past the 6h decision horizon drop to a 15-minute mark. StartInterval rather
+         than a resident loop: launchd never overlaps runs of the same label and all state lives
+         on disk, so a crash loses at most one cycle. No in-script sleep: a tick that overran
+         60 s would make launchd skip the next fire exactly when quotes are flaky. tick_wall_s
+         and gap_s are logged on every tick and fill so any skipped fire is measurable, and a
+         fill after a gap > LIVEBOOK_MAX_SCORABLE_GAP_S is scored NaN, never as a real exit. -->
+    <key>StartInterval</key>
+    <integer>60</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/yousefjan/robinhood_screener/livebook.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/yousefjan/robinhood_screener/livebook.err.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/yousefjan/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

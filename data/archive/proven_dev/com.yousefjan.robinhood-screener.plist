@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yousefjan.robinhood-screener</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Library/Frameworks/Python.framework/Versions/3.9/bin/python3</string>
+        <string>/Users/yousefjan/robinhood_screener/run.py</string>
+        <string>--send</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/yousefjan/robinhood_screener</string>
+    <!-- 24/7 coverage: every 2 minutes; each run is 1-2 GT calls + cached lookups.
+         launchd never overlaps runs of the same label, so a slow run simply delays
+         the next fire. -->
+    <key>StartInterval</key>
+    <integer>120</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/yousefjan/robinhood_screener/run.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/yousefjan/robinhood_screener/run.err.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/yousefjan/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

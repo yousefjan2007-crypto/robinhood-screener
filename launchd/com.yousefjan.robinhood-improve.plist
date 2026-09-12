@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.yousefjan.robinhood-improve</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/yousefjan/robinhood_screener/selfimprove/run_improve.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/yousefjan/robinhood_screener</string>
+    <!-- Sunday 11:00 local — after signal-lab-improve (09:00) and solana-improve (10:00) so the
+         three self-review jobs never contend, and before robinhood-research (12:00) which reads
+         this run's verdicts. Syncs the Mac tree to origin/main, re-scores the exit-policy family
+         on the LIVE book and the entry bands on the committed ledger, applies the promotion gate
+         (paired day-clustered bound, beats the best NEGATIVE CONTROL, own bound > 0, DSR at
+         cumulative trials, 40 alert-days, forward-only nomination) and — unlike the solana loop —
+         APPLIES a promotion by writing selfimprove/champion.json and publishing it. Weekly on
+         purpose: a correlated family re-scored daily is a running maximum. Exits 0 always. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key><integer>0</integer>
+        <key>Hour</key><integer>11</integer>
+        <key>Minute</key><integer>0</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/Users/yousefjan/robinhood_screener/improve.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/yousefjan/robinhood_screener/improve.err.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/yousefjan/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

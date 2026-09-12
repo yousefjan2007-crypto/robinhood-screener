@@ -1,0 +1,22 @@
+# The invariant suite on the runner (the cloud partition: sections tagged mac_only print SKIP
+# under GITHUB_ACTIONS). Runs on human pushes to main and on demand — NEVER inside the 5-min job.
+name: verify
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    if: ${{ !contains(github.event.head_commit.message, 'screener state') && !contains(github.event.head_commit.message, '[bot]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt numpy
+      - run: python verify.py

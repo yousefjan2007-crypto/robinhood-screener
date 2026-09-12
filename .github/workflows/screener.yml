@@ -1,0 +1,89 @@
+# robinhood_screener — the cloud scan. The Mac dispatches this every 5 min
+# (launchd/com.yousefjan.robinhood-dispatch.plist → `gh workflow run`); GitHub's own cron is the
+# FALLBACK only: measured on this account it fires ~14×/day against a nominal 288 (2026-09-12).
+# The scan is written to be correct at any cadence (block-cursor discovery catches up exactly).
+name: robinhood-screener
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger:
+        description: "who fired this run (recorded in latest_scan.json)"
+        default: "manual"
+        type: string
+      mode:
+        description: "run | preflight (probe the sources from the runner, commit nothing) | dry"
+        default: "run"
+        type: string
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write            # commit the ledger + state + dashboard back
+  pages: write               # publish docs/ via the Pages deploy action (exempt from the 10 builds/h limit)
+  id-token: write
+
+concurrency:
+  group: screener
+  cancel-in-progress: false  # never interrupt a run mid-write; at most one queued run per group
+
+jobs:
+  scan:
+    # Private-repo minutes would run out in ~2 days at this cadence: the scheduled path is
+    # inert until the repo is public. Dispatch/manual runs are allowed either way.
+    if: ${{ github.event_name != 'schedule' || github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.commit.outputs.published }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Preflight (sources as seen from the runner IP; commits nothing)
+        if: ${{ github.event.inputs.mode == 'preflight' }}
+        run: python preflight.py
+      - name: Run screener
+        if: ${{ github.event.inputs.mode != 'preflight' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TRIGGER: ${{ github.event_name == 'schedule' && 'schedule' || github.event.inputs.trigger }}
+        run: |
+          if [ "${{ github.event.inputs.mode }}" = "dry" ]; then python run.py; else python run.py --send; fi
+      - name: Render dashboard
+        if: ${{ github.event.inputs.mode != 'preflight' }}
+        run: python dashboard.py --write
+      - name: Persist ledger + state + dashboard
+        id: commit
+        if: ${{ github.event.inputs.mode != 'preflight' && github.event.inputs.mode != 'dry' }}
+        run: |
+          git config user.name "robinhood-screener[bot]"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/ docs/
+          if git commit -m "screener state $(date -u +%FT%TZ)"; then
+            # the Mac pushes selfimprove/* on Sundays; rebase over it rather than lose this run
+            git pull --rebase origin main || true
+            git push || true
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no state change"; echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload dashboard artifact
+        if: ${{ github.event.inputs.mode != 'preflight' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  pages:
+    needs: scan
+    if: ${{ needs.scan.result == 'success' && github.event.inputs.mode != 'preflight' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
