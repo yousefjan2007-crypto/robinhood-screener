@@ -2455,6 +2455,11 @@ check("band_launchpad_lenient equals band_a_strict off the launchpad (coverage i
       all(B.BUILTINS["band_launchpad_lenient"].verdict(f_) == B.BUILTINS[CHAMP].verdict(f_)
           for f_ in (good, dict(good, score=50.0), dict(good, dev_pct=None)))
       and "band_launchpad_lenient" in (TRIALS_MOD.load().get("bands_ever_scored") or []))
+import run as RUNM   # noqa: E402
+check("pass-1 exclusion: leveraged tokenized-stock legs (OPENAIx1L, NVDAx3L, ANTHROPICx1L) and quote assets are never candidates; "
+      "CATGPT / LONGCAT / a symbol merely containing 'x1' are",
+      all(RUNM._excluded_symbol(x_) for x_ in ("OPENAIx1L", "NVDAx3L", "ANTHROPICx1L", "usdg", "WETH"))
+      and not any(RUNM._excluded_symbol(x_) for x_ in ("CATGPT", "LONGCAT", "MAX1LIFE", "", None)))
 check("REFERENCE_TOKENS name the two winners and the registry lists the launchpad band as a candidate, never the champion",
       set(config.REFERENCE_TOKENS) == {"CATGPT", "ANTHROPIG"} and CHAMP == "band_a_strict"
       and any(e_["name"] == "band_launchpad_lenient" and e_["status"] == "candidate" for e_ in json.load(open(config.REGISTRY_PATH))["candidates"]))

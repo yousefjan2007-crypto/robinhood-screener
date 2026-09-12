@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -170,6 +171,15 @@ def feed_tokens(seen: dict, known: set, budget: _Budget) -> set:
 
 
 # ── the screen for one token ──────────────────────────────────────────────────────
+def _excluded_symbol(symbol) -> bool:
+    """Quote assets, tokenized-stock legs and their leveraged variants (OPENAIx1L, NVDAx3L) are
+    LongLaunch numeraires that the GT new-pools feed cannot tell from launches."""
+    sym = str(symbol or "")
+    if sym.upper() in config.EXCLUDE_SYMBOLS:
+        return True
+    return any(re.search(pat, sym, re.IGNORECASE) for pat in config.EXCLUDE_SYMBOL_PATTERNS)
+
+
 def _size_gates_only(market: dict) -> bool:
     """True when the ONLY failing market facts are size (liq/vol): a young token to re-check."""
     liq = market.get("liq_usd") or 0.0
@@ -277,7 +287,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     for t, m in markets.items():
         if not budget.ok("pass1"):
             deferred.add(t); continue
-        if t in stocks or str(m.get("symbol", "")).upper() in config.EXCLUDE_SYMBOLS:
+        if t in stocks or _excluded_symbol(m.get("symbol")):
             pass1_rejects["infra_or_stock"] = pass1_rejects.get("infra_or_stock", 0) + 1
             rejected.append(t); continue
         if (m.get("price_usd") or 0) <= 0:

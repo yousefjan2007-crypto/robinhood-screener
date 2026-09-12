@@ -224,6 +224,9 @@ MIZUKARA_POOL = "0xaEca58d7971EAC1909b512b5DE0129791883A906"
 # Infra/RWA are not launches: tokenized stocks (ScanHood official feed) are excluded dynamically;
 # this symbol backstop catches bridged/infra assets besides.
 EXCLUDE_SYMBOLS = {"WETH", "USDG", "USDE", "SYRUPUSDG", "USDC", "USDT", "WBTC", "CBBTC", "VIRTUAL"}
+EXCLUDE_SYMBOL_PATTERNS = (r"x\d+[LS]$",)   # leveraged tokenized-stock legs (OPENAIx1L, NVDAx3L): LongLaunch
+                                            # numeraires, not launches; GT's new-pools feed cannot tell them apart
+
 
 # ── discovery ─────────────────────────────────────────────────────────────────────
 # Exact discovery is a block cursor over factory/launchpad logs; it is correct at ANY cadence
