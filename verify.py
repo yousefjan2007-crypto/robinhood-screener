@@ -2493,6 +2493,27 @@ finally:
     for k, v in _orig_bs.items():
         setattr(SAFEM.blockscout, k, v)
     SAFEM.geckoterminal.token_info, SAFEM.robinx.wallet, SAFEM.rpc.creator_launches = _orig_gt, _orig_rx, _orig_cl
+# full pass 2: the creation-tx logs are read for Flap launches only (dev_sniped is a Flap concept; 6.5 s a call)
+try:
+    _bs_calls = []
+    for k in ("token_info", "token_counters", "top_holders", "creator_of", "wallet_created_tokens", "address_tx_count"):
+        setattr(SAFEM.blockscout, k, _rec(k, {}))
+    SAFEM.blockscout.address_info = _rec("address_info", {"is_scam": False, "creation_tx": "0xabc"})
+    SAFEM.blockscout.tx_logs = _rec("tx_logs", [])
+    SAFEM.geckoterminal.token_info = _rec("gt", {})
+    SAFEM.robinx.wallet = _rec("robinx", {})
+    SAFEM.rpc.creator_launches = _rec("launches", [])
+    SAFEM.pass2("0x" + "cd" * 20, {"liq_usd": 5e4}, SAFEM.empty_safety(), 1_789_300_000.0, disc={"kind": "pons_create"})
+    _n_pons = _bs_calls.count("tx_logs")
+    _bs_calls = []
+    SAFEM.pass2("0x" + "cd" * 20, {"liq_usd": 5e4}, SAFEM.empty_safety(), 1_789_300_000.0, disc={"kind": "flap_create"})
+    _n_flap = _bs_calls.count("tx_logs")
+    check("full pass 2 reads the creation-tx logs for a Flap launch and never for a Pons / V4 / V2 token (dev_sniped is a Flap "
+          "concept; the call costs 6.5 s)", _n_pons == 0 and _n_flap == 1, str((_n_pons, _n_flap)))
+finally:
+    for k, v in _orig_bs.items():
+        setattr(SAFEM.blockscout, k, v)
+    SAFEM.geckoterminal.token_info, SAFEM.robinx.wallet, SAFEM.rpc.creator_launches = _orig_gt, _orig_rx, _orig_cl
 _rs2 = _read(os.path.join(ROOT, "run.py"))
 check("run.py: the prioritised pass 2 is the FAST variant and an early-alerted row is ledgered as alerted (never re-gated away)",
       "_run_p2(prio, fast=True)" in _rs2 and 'survivors.append(early_by_token[t])' in _rs2)

@@ -467,9 +467,11 @@ def _sniped_from_logs(logs: list) -> bool:
     return False
 
 
-def _apply_blockscout(s: dict, token: str) -> None:
+def _apply_blockscout(s: dict, token: str, want_logs: bool = False) -> None:
     """Holders / counters / top-10 / address flags / creation-tx sender / creation-tx logs.
-    Any None (deferred) names blockscout dark; NOT_FOUND is an answer and does not."""
+    Any None (deferred) names blockscout dark; NOT_FOUND is an answer and does not. The
+    creation-tx logs (6.5 s measured) are fetched only when `want_logs` — the dev-snipe read
+    is defined for Flap launches (TokenBought in the creation tx), nowhere else."""
     answered = dark = False
 
     def note(x) -> bool:
@@ -522,7 +524,7 @@ def _apply_blockscout(s: dict, token: str) -> None:
             s["deployer"] = _lower(co["deployer"])       # the creation-tx SENDER wins
         creation_tx = creation_tx or co.get("creation_tx")
 
-    if creation_tx:
+    if creation_tx and want_logs and s.get("dev_sniped") is None:
         logs = blockscout.tx_logs(creation_tx)
         if note(logs) and isinstance(logs, list):
             s["dev_sniped"] = _sniped_from_logs(logs)
@@ -624,7 +626,7 @@ def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = 
             if fast:
                 _apply_blockscout_fast(s, t)
             else:
-                _apply_blockscout(s, t)
+                _apply_blockscout(s, t, want_logs=(isinstance(disc, dict) and disc.get("kind") == "flap_create"))
         except Exception as exc:
             print(f"  [safety] {t[:10]}… blockscout failed: {exc}")
             _mark(s, "blockscout", dark=True)
@@ -712,7 +714,7 @@ def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = 
     if s.get("deployer") and s.get("creator_prior_tokens") is None and not launch_service \
             and not http_client.is_blocked(BLOCKSCOUT_HOST):
         try:
-            created = blockscout.wallet_created_tokens(s["deployer"], max_pages=2)
+            created = blockscout.wallet_created_tokens(s["deployer"], max_pages=1)   # ~6 s a page
             prior = sum(1 for c in created if str(c.get("token", "")).lower() != t.lower())
             n_tx = blockscout.address_tx_count(s["deployer"])
             if prior > config.CREATOR_MAX_PRIOR_TOKENS or (n_tx is not None and n_tx <= 100):

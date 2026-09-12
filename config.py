@@ -262,11 +262,11 @@ RECHECK_SCHEDULE_S = (1800, 21600)       # a token that failed ONLY size gates, 
                                          # is re-enriched at +30m and +6h
 RECHECK_MAX = 3000                       # ≈ 2 h of launchpad launches at one 30-min recheck each
 RECHECK_PER_RUN = 40
-GT_INFO_BUDGET_PER_RUN = 12              # pass-2 GT /info calls per run (24/min on the runner); 20 put the full
-                                         # pass 2 at ~130 s and the whole job past the 4-min dispatch cadence
+GT_INFO_BUDGET_PER_RUN = 8               # full pass-2 tokens per run: Blockscout answers in ~5 s per call (measured
+                                         # 2026-09-12), so a full pass 2 is ~13 s per token even after the trims
 GT_INFO_REFRESH_S = 1800                 # watched tokens refresh pass-2 facts at most this often
 SAFETY_REFRESH_S = 1800                  # ...and chain facts (one Multicall3 batch) at most this often
-WATCH_REFRESH_PER_RUN = 10               # pass-2 refreshes per run, closest-to-A first
+WATCH_REFRESH_PER_RUN = 6                # pass-2 refreshes per run, closest-to-A first
 WATCH_MAX_GATE_FAILS = 2                 # consecutive hard-gate failures evict a watched token
 RUN_TIME_BUDGET_S = 240                  # GLOBAL: checked between tokens in every stage; cuts are
                                          # listed in latest_scan.json.deferred_by_stage, never seen
