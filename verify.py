@@ -603,8 +603,12 @@ hcd = screen.hc_checks(_feat(CLEAN_M, dark_s))
 check("403 outage: with every pass-2 source dark a liquid token still passes hard gates (pass-through)", okd, str(gd))
 check("403 outage: hc_checks returns None (never False) for holders/top10/holders_per_min/tx_per_holder/template",
       all(hcd[k] is None for k in ("holders", "top10", "holders_per_min", "tx_per_holder", "template")), str(hcd))
-check("tier-frozen bug guard: band_a_strict is NA (not False) on the dark token, so the tier is B by refusal",
-      B.band_a_strict.verdict(_feat(CLEAN_M, dark_s)) is None)
+_fdark = _feat(CLEAN_M, dark_s)
+check("tier-frozen bug guard: the dark token is never A — False here (its soft score is a definite miss beside the "
+      "unknowns), and NA (not False) once every KNOWN check passes, so the tier is B by refusal either way",
+      B.band_a_strict.verdict(_fdark) is False and hcd["score"] is False
+      and B.band_a_strict.verdict(dict(_fdark, score=75.0)) is None,
+      str({k: v for k, v in hcd.items() if v is not True}))
 check("the same dark token with a POSITIVE finding (is_scam True) is rejected",
       not screen.hard_gates(CLEAN_M, dict(dark_s, is_scam=True))[0])
 
@@ -1757,8 +1761,18 @@ check("build_feat on the clean fixture reproduces bands.clean_fixture exactly", 
 bad_req = [n for n, sp in B.BUILTINS.items() if not set(sp.REQUIRES) <= set(config.FEATURE_FIELDS)]
 det_bad = [n for n, sp in B.BUILTINS.items() if sp.verdict(good) != sp.verdict(dict(good)) or sp.verdict(good) not in (True, False, None)]
 check("every band is deterministic, verdict in {True, False, None}, REQUIRES ⊆ FEATURE_FIELDS", not bad_req and not det_bad, f"{bad_req} {det_bad}")
-na_bad = [(n, k) for n, sp in B.BUILTINS.items() for k in sp.REQUIRES if sp.verdict(dict(good, **{k: None})) is not None]
+_fires = {"band_top10_le15": {"top10_pct": 15.0, "top10_pct_gt": 15.0}, "band_graduated_only": {"launchpad_completed_age_s": 3600.0}}
+na_bad = [(n, k) for n, sp in B.BUILTINS.items() for k in sp.REQUIRES
+          if sp.verdict(dict(dict(good, **_fires.get(n, {})), **{k: None})) is not None]
 check("a dark REQUIRES field yields None (NA) for every band", not na_bad, str(na_bad[:3]))
+HC3 = [n for n, sp in B.BUILTINS.items() if sp.THREE_VALUED]
+kl = dict(good, roundtrip_loss_pct=12.0, dev_pct=None)     # a definite miss beside an unknown
+check("three-valued AND (hc family): a definite miss (round trip 12%) beside an unknown (dev_pct None) is False, not NA; "
+      "the unknown alone is NA; True never fires with an unknown",
+      len(HC3) == 6 and all(B.BUILTINS[n].verdict(kl) is False for n in HC3)
+      and B.BUILTINS[CHAMP].verdict(dict(good, dev_pct=None)) is None
+      and B.BandSpec("t", "", ("score",), (), "candidate", lambda f: True, THREE_VALUED=True).verdict(dict(good, score=None)) is None,
+      str([(n, B.BUILTINS[n].verdict(kl)) for n in HC3]))
 boom = B.BandSpec("boom", "", ("score",), (), "candidate", lambda f: 1 / 0)
 check("a raising verdict body yields None, never an exception", boom.verdict(good) is None)
 variations = [{}, {"score": 50.0}, {"score": 69.9}, {"top10_pct": 25.0}, {"top10_pct": 20.0}, {"total_holders": 999},
@@ -1871,7 +1885,10 @@ with tempfile.TemporaryDirectory() as d:
     check("recorded verdicts == recomputed on the survivor dict (sidecar 1/0/NA round-trips every band exactly)", rec_ok)
 scan_live = json.load(open(config.SCAN_PATH)) if os.path.exists(config.SCAN_PATH) else {}
 surv_live = [s_ for s_ in (scan_live.get("survivors") or []) if isinstance(s_, dict) and isinstance(s_.get("bands"), dict)]
-if surv_live and scan_live.get("band") in REG.names():
+if surv_live and scan_live.get("band") in REG.names() and scan_live.get("bands_hash") != STORE.bands_code_hash():
+    skip("recorded verdicts == recomputed on the committed latest_scan.json",
+         f"band semantics changed since this scan was recorded (bands_hash {scan_live.get('bands_hash')} != {STORE.bands_code_hash()}); re-arms on the next scan")
+elif surv_live and scan_live.get("band") in REG.names():
     mism = []
     for s_ in surv_live:
         f_ = {k: s_.get(k) for k in config.FEATURE_FIELDS}

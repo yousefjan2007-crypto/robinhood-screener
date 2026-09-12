@@ -65,6 +65,13 @@ class BandSpec:
     KIND: str                                   # 'candidate' | 'control'
     body: Callable = field(repr=False, compare=False)
     explainer: Optional[Callable] = field(default=None, repr=False, compare=False)
+    # Three-valued bands (the built-in hc family) run their body even when a REQUIRES field is
+    # None: screen.hc_checks already yields None per unknown check, and _all_or_none is a Kleene
+    # AND, so a definite miss (age 60 min) beside an unknown (LP status on a V3 pool) is False,
+    # not NA. Found on the first cloud run: 4/4 survivors were "NA" although every one failed
+    # the age check outright. Candidates keep the simple contract (any REQUIRES None -> None).
+    # In both cases an unknown can never make a band FIRE (True with a missing field -> None).
+    THREE_VALUED: bool = False
 
     def missing(self, feat: dict) -> list:
         f = feat or {}
@@ -72,18 +79,23 @@ class BandSpec:
 
     def verdict(self, feat: dict):
         f = feat or {}
-        if self.missing(f):
+        miss = self.missing(f)
+        if miss and not self.THREE_VALUED:
             return None
         try:
             r = self.body(f)
         except Exception:
             return None
-        if r is None or r is True or r is False:
-            return r
-        try:
-            return bool(r)
-        except Exception:
+        if r is None:
             return None
+        if r is not True and r is not False:
+            try:
+                r = bool(r)
+            except Exception:
+                return None
+        if r and miss:
+            return None                    # an unknown input can never fire a band
+        return r
 
     def explain(self, feat: dict) -> str:
         f = feat or {}
@@ -112,10 +124,15 @@ _HC_DATA = ("data/ledger.csv (solana A-vs-B scorecard, 16 A rows)", "$Cubrate po
 
 
 def _all_or_none(checks: dict):
+    """Three-valued AND over {True, False, None}: False if any check is False (a definite miss
+    is definite whatever else is unknown), None if nothing is False and something is unknown,
+    True only when every check is True."""
     vals = list(checks.values())
+    if any(v is False for v in vals):
+        return False
     if any(v is None for v in vals):
         return None
-    return all(vals)
+    return True
 
 
 def _hc_explain(feat: dict, drop: tuple = ()) -> str:
@@ -148,15 +165,17 @@ def _band_no_age(f):
 
 def _band_score60(f):
     c = screen.hc_checks(f)
-    c["score"] = f["score"] >= config.BAND_SCORE60_MIN
+    c["score"] = None if f.get("score") is None else f["score"] >= config.BAND_SCORE60_MIN
     return _all_or_none(c)
 
 
 def _band_holders500(f):
     c = screen.hc_checks(f)
-    if f.get("holders_source") != "blockscout":
-        return None                    # exact holder facts only; GT snapshots are up to 23 h stale
-    c["holders"] = f["total_holders"] >= config.BAND_HOLDERS500_MIN
+    # exact holder facts only; GT snapshots are up to 23 h stale -> unknown, never a number
+    if f.get("holders_source") != "blockscout" or f.get("total_holders") is None:
+        c["holders"] = None
+    else:
+        c["holders"] = f["total_holders"] >= config.BAND_HOLDERS500_MIN
     return _all_or_none(c)
 
 
@@ -183,10 +202,8 @@ def _band_top10_le15(f):
     c = screen.hc_checks(f)
     c.pop("top10", None)
     t = _top10_for_band(f)
-    others = _all_or_none(c)
-    if t is None or others is None:
-        return None
-    return others and t <= config.BAND_TOP10_LE15_MAX
+    c["top10_le15"] = None if t is None else t <= config.BAND_TOP10_LE15_MAX
+    return _all_or_none(c)
 
 
 def _explain_top10_le15(f):
@@ -203,9 +220,14 @@ def _explain_top10_le15(f):
 
 
 def _band_lp_burned_renounced(f):
-    return (f["owner_renounced"] is True
-            and f["lp_locked_pct"] >= config.BAND_LP_BURNED_MIN_PCT
-            and f["roundtrip_loss_pct"] <= config.BAND_ROUND_TRIP_LOSS_MAX_PCT)
+    c = {
+        "owner": None if f.get("owner_renounced") is None else f["owner_renounced"] is True,
+        "lp": None if f.get("lp_locked_pct") is None
+              else f["lp_locked_pct"] >= config.BAND_LP_BURNED_MIN_PCT,
+        "roundtrip": None if f.get("roundtrip_loss_pct") is None
+                     else f["roundtrip_loss_pct"] <= config.BAND_ROUND_TRIP_LOSS_MAX_PCT,
+    }
+    return _all_or_none(c)
 
 
 def _explain_lp_burned_renounced(f):
@@ -257,7 +279,7 @@ band_a_strict = _register(BandSpec(
     "holders/min and tx/holder rates, sell round-trip, whitelisted/verified template, LP known, "
     "dev holding, not sniped at creation). On solana this strict band was the best of 14 tested "
     "and every relaxation was worse; an unknown input is NA, never a silent False.",
-    _HC_REQUIRES, _HC_DATA, "candidate", _band_a_strict, _explain_a_strict))
+    _HC_REQUIRES, _HC_DATA, "candidate", _band_a_strict, _explain_a_strict, THREE_VALUED=True))
 
 band_no_age = _register(BandSpec(
     "band_no_age",
@@ -266,7 +288,7 @@ band_no_age = _register(BandSpec(
     "the early peak: solana winners peak ~4 h after entry, so an earlier entry could capture more "
     "of the move — or more of the rugs. Dropping 'age' alone is inert (holders/min implies it).",
     tuple(k for k in _HC_REQUIRES), _HC_DATA, "candidate", _band_no_age,
-    lambda f: _hc_explain(f, drop=("age", "holders_per_min"))))
+    lambda f: _hc_explain(f, drop=("age", "holders_per_min")), THREE_VALUED=True))
 
 band_score60 = _register(BandSpec(
     "band_score60",
@@ -275,7 +297,7 @@ band_score60 = _register(BandSpec(
     "floor is doing any work in the strict band or merely shrinking its n.",
     _HC_REQUIRES, _HC_DATA, "candidate", _band_score60,
     lambda f: ("score below %.0f; " % config.BAND_SCORE60_MIN
-               if f["score"] < config.BAND_SCORE60_MIN else "") + _hc_explain(f, drop=("score",))))
+               if f["score"] < config.BAND_SCORE60_MIN else "") + _hc_explain(f, drop=("score",)), THREE_VALUED=True))
 
 band_holders500 = _register(BandSpec(
     "band_holders500",
@@ -285,7 +307,7 @@ band_holders500 = _register(BandSpec(
     _HC_REQUIRES, _HC_DATA, "candidate", _band_holders500,
     lambda f: ("holders below %d; " % config.BAND_HOLDERS500_MIN
                if f["total_holders"] < config.BAND_HOLDERS500_MIN else "")
-    + _hc_explain(f, drop=("holders",))))
+    + _hc_explain(f, drop=("holders",)), THREE_VALUED=True))
 
 band_dev_score_ge70 = _register(BandSpec(
     "band_dev_score_ge70",
@@ -315,7 +337,7 @@ band_top10_le15 = _register(BandSpec(
     "Blockscout top-10 when available; GT's snapshot only while younger than "
     "BAND_HOLDERS_MAX_STALE_S (GT holder snapshots run 8 min..23 h stale); otherwise NA.",
     tuple(k for k in _HC_REQUIRES if k != "top10_pct"), _HC_DATA + ("GT /tokens/{a}/info",),
-    "candidate", _band_top10_le15, _explain_top10_le15))
+    "candidate", _band_top10_le15, _explain_top10_le15, THREE_VALUED=True))
 
 band_lp_burned_renounced = _register(BandSpec(
     "band_lp_burned_renounced",
@@ -325,7 +347,7 @@ band_lp_burned_renounced = _register(BandSpec(
     "whether survival is mostly contract hygiene rather than market shape.",
     ("owner_renounced", "lp_locked_pct", "roundtrip_loss_pct"),
     ("sources/rpc.py chain_facts_many", "MIZUKARA anchor"),
-    "candidate", _band_lp_burned_renounced, _explain_lp_burned_renounced))
+    "candidate", _band_lp_burned_renounced, _explain_lp_burned_renounced, THREE_VALUED=True))
 
 ctl_random_band = _register(BandSpec(
     "ctl_random_band",
@@ -606,12 +628,21 @@ if __name__ == "__main__":
     assert band_top10_le15.verdict(base) is False and band_top10_le15.verdict(dict(base, top10_pct=15.0)) is True
     assert band_lp_burned_renounced.verdict(dict(base, roundtrip_loss_pct=6.1)) is False
 
-    # 2. a dark REQUIRES field yields None for every band; explain names it
+    # 2. a dark REQUIRES field yields None for every band; explain names it. Three-valued bands
+    #    are tested on a fixture they FIRE on (a definite miss would rightly beat the unknown).
+    _fires = {"band_top10_le15": {"top10_pct": 15.0, "top10_pct_gt": 15.0},
+              "band_graduated_only": {"launchpad_completed_age_s": 3600.0}}
     for n, s in BUILTINS.items():
+        fx = dict(base, **_fires.get(n, {}))
+        if s.THREE_VALUED:
+            assert s.verdict(fx) is True, (n, "fixture must fire")
         for k in s.REQUIRES:
-            dark = dict(base); dark[k] = None
+            dark = dict(fx); dark[k] = None
             assert s.verdict(dark) is None, (n, k)
             assert s.explain(dark).startswith("NA: ") and k in s.explain(dark), (n, k)
+    # 2b. three-valued: a definite miss beside an unknown is False, never masked as NA
+    assert band_a_strict.verdict(dict(base, pair_age_min=60.0, lp_locked_pct=None)) is False
+    assert band_a_strict.verdict(dict(base, lp_locked_pct=None)) is None
     # a raising body is NA, never an exception
     boom = BandSpec("boom", "", ("score",), (), "candidate", lambda f: 1 / 0)
     assert boom.verdict(base) is None and boom.explain(base)

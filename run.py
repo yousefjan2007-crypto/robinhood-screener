@@ -501,7 +501,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         print(f"(dry run — would ledger {len(events)} event(s); nothing written)")
 
     # ── the point-in-time feature store + run log ─────────────────────────────────
-    scan = {"scan_ts": now_s, "trigger": trigger, "band": champion,
+    scan = {"scan_ts": now_s, "trigger": trigger, "band": champion, "bands_hash": STORE.bands_code_hash(),
             "champion": {"exit": exit_plan["name"], "entry_band": champion},
             "champion_na_frac": _round(champion_na_frac), "head": head, "cursor": new_cursor, "gap_blocks": gap,
             "discovered": len(order), "by_source": by_source, "quota_cuts": quota_cuts,

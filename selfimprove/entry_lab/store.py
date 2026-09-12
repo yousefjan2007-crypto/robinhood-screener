@@ -105,6 +105,29 @@ def pivot_verdicts(df):
     return out
 
 
+def bands_code_hash() -> str:
+    """sha256 over every source that decides a verdict (bands.py, screen.py, config.py and the
+    candidate modules). run.py stamps it into latest_scan.json as bands_hash so the look-ahead
+    guard in verify.py knows whether a recorded verdict was produced by the CURRENT semantics;
+    after a band change the guard skips once and re-arms on the next scan."""
+    import hashlib
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.abspath(os.path.join(here, "..", ".."))
+    paths = [os.path.join(here, "bands.py"), os.path.join(root, "screen.py"), os.path.join(root, "config.py")]
+    cdir = os.path.join(root, "selfimprove", "candidates")
+    if os.path.isdir(cdir):
+        paths += sorted(os.path.join(cdir, f) for f in os.listdir(cdir) if f.endswith(".py"))
+    h = hashlib.sha256()
+    for pth in paths:
+        try:
+            with open(pth, "rb") as fh:
+                h.update(os.path.basename(pth).encode())
+                h.update(fh.read())
+        except OSError:
+            h.update(b"?")
+    return h.hexdigest()[:16]
+
+
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as d:
