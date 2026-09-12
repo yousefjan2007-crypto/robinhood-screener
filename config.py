@@ -182,6 +182,9 @@ LAUNCH_SERVICE_MIN_CREATES = 20    # a launcher with this many prior Create even
 LAUNCHPAD_CREATOR_MAX_PRIOR_TOKENS = 10   # launcher wallets on Bankr are often apps/agents launching for many
                                    # users (CATGPT's launcher: 7 launches, 16.8k txs); the serial-deployer risk is
                                    # still caught by CREATOR_MAX_DEAD_FRAC over the launcher's PRIOR tokens
+SCANHOOD_BUDGET_PER_RUN = 24       # ScanHood answers in 0.3–7 s per token (measured 2026-09-12) and is a WEAK
+SCANHOOD_WORKERS = 4               # fallback (verdict / sellable / template); 56 sequential calls ate the whole
+                                   # 240 s budget in pass 1, so it is fetched concurrently, deepest liquidity first
 KYBER_ROUNDTRIP_BUDGET_PER_RUN = 8    # no-V2-pair tokens probed through Kyber (2 calls each at 1 Hz), liq-desc;
                                    # 12 put a Mac dry run at 170 s of the 200 s budget
 KYBER_PROBE_WETH_WEI = 10**16      # 0.01 WETH, same probe as the router legs

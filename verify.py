@@ -2445,6 +2445,26 @@ try:
 finally:
     SAFEM.kyber.route = _orig_route
 
+# ScanHood: concurrent, budgeted, deepest liquidity first; beyond the budget = not consulted (never dark)
+_orig_scan = SAFEM.scanhood.scan
+try:
+    _sc_calls = []
+    def _fake_scan(t):
+        _sc_calls.append(t)
+        if t.endswith("ee" * 20):
+            raise RuntimeError("boom")
+        return {"verdict": "OK", "sellable": True}
+    SAFEM.scanhood.scan = _fake_scan
+    _toks = ["0x" + c * 40 for c in "abcdef"]
+    _mk = {t: {"liq_usd": 1000.0 * (i + 1)} for i, t in enumerate(_toks)}
+    _sc = SAFEM._scanhood_many(_toks, _mk, 3)
+    check("ScanHood is fetched for at most the budget (3 of 6 tokens, the three deepest), concurrently; an exception marks "
+          "that token's scan as an error object; unbudgeted tokens are simply absent",
+          set(_sc) == set(_toks[3:]) and len(_sc_calls) == 3 and _sc["0x" + "e" * 40] is SAFEM._SCAN_ERROR
+          and _sc["0x" + "f" * 40] == {"verdict": "OK", "sellable": True}, str((sorted(_sc), _sc_calls)))
+finally:
+    SAFEM.scanhood.scan = _orig_scan
+
 # the recall fixture: CATGPT as measured 2026-09-12 (age 857 min, $10.9M liq, $9.2M vol24; pass-2 facts verbatim)
 _CAT_M = {"price_usd": 0.01744, "liq_usd": 10943245.36, "vol_h24": 9166859.69, "mcap": 17448744.0, "fdv": 17448744.0,
           "buys_h1": 915, "sells_h1": 1534, "buys_h24": 11202, "sells_h24": 21435, "pair_age_min": 856.97, "dex": "uniswap",

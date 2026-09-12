@@ -48,6 +48,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config                                                    # noqa: E402
 import http_client                                               # noqa: E402
 from http_client import is_absent, is_deferred                   # noqa: E402
+from concurrent.futures import ThreadPoolExecutor
 from sources import blockscout, dexscreener, geckoterminal, kyber, robinx, rpc, scanhood   # noqa: E402
 
 BLOCKSCOUT_HOST = "robinhoodchain.blockscout.com"
@@ -321,8 +322,32 @@ def _kyber_roundtrips(out: dict, facts: dict, markets: dict, budget: int | None)
             _mark(s, "kyber", dark=True)
 
 
+_SCAN_ERROR = object()
+
+
+def _scanhood_many(toks: list, markets: dict, budget: int | None) -> dict:
+    """ScanHood for at most `budget` tokens (deepest liquidity first), fetched concurrently: the
+    per-host throttle still paces the STARTS at SCANHOOD_RATE_HZ, but a slow answer (up to 7 s
+    measured) no longer blocks the next call. {token: scan | _SCAN_ERROR}; tokens beyond the
+    budget are absent from the dict (not consulted, never marked dark)."""
+    budget = config.SCANHOOD_BUDGET_PER_RUN if budget is None else budget
+    order = sorted(toks, key=lambda t: -float((markets.get(t) or {}).get("liq_usd") or 0))[: max(0, int(budget))]
+    if not order:
+        return {}
+
+    def one(t):
+        try:
+            return t, scanhood.scan(t)
+        except Exception as exc:
+            print(f"  [safety] {t[:10]}… scanhood failed: {exc}")
+            return t, _SCAN_ERROR
+    with ThreadPoolExecutor(max_workers=max(1, int(config.SCANHOOD_WORKERS))) as ex:
+        return dict(ex.map(one, order))
+
+
 def pass1_many(tokens: list, markets: dict, disc: dict, now_s: float,
-               chain_cache: dict | None = None, kyber_budget: int | None = None) -> dict:
+               chain_cache: dict | None = None, kyber_budget: int | None = None,
+               scanhood_budget: int | None = None) -> dict:
     """The FREE / batched pass for many tokens → {token_lower: safety dict, pass=1}.
     markets: {token_lower: dexscreener market} (a known pair skips the getPair leg);
     disc: {token_lower: discovery record} (may be absent for feed/watchlist tokens);
@@ -370,13 +395,15 @@ def pass1_many(tokens: list, markets: dict, disc: dict, now_s: float,
             print(f"  [safety] {t[:10]}… chain facts unreadable: {exc}")
             _mark(s, "rpc", dark=True)
     _kyber_roundtrips(out, facts, markets, kyber_budget)
+    scans = _scanhood_many(toks, markets, scanhood_budget)
     for t in toks:
         s = out[t]
-        try:
-            _apply_scan(s, scanhood.scan(t))
-        except Exception as exc:
-            print(f"  [safety] {t[:10]}… scanhood failed: {exc}")
+        if t not in scans:
+            continue                                   # beyond the budget: not consulted, not dark
+        if scans[t] is _SCAN_ERROR:
             _mark(s, "scanhood", dark=True)
+        else:
+            _apply_scan(s, scans[t])
         try:
             _apply_disc(s, disc.get(t))
         except Exception as exc:
