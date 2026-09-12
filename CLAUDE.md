@@ -42,7 +42,7 @@ RESEARCH_DRYRUN=1 bash selfimprove/research/run_research.sh   # plumbing only: n
 ```
 
 Mac launchd jobs (`launchd/`, labels `com.yousefjan.robinhood-*`, all exit 0): `dispatch`
-(StartInterval 300 → `gh workflow run robinhood-screener -f trigger=dispatch`), `livebook`
+(StartInterval 240 → `gh workflow run robinhood-screener -f trigger=dispatch`; a scan job runs ~5 min so runs go back to back), `livebook`
 (StartInterval 60, `livebook.py --tick`), `improve` (Sun 11:00, `run_improve.sh`), `research`
 (Sun 12:00, `run_research.sh`). The retired `robinhood-screener` / `robinhood-dashboard` labels
 must stay absent. `--send` on the two gates means **event alerts only** (PROMOTED / DEMOTED /
@@ -215,6 +215,9 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   surfaces as deferred after retries. `quotes.py` handles it; do not read it as death elsewhere.
 - **The workflow does `git add data/ docs/`** — anything new and non-ignored under `data/` is
   committed automatically; the livebook files, `cache/` and `data/backups/` are gitignored.
+- **Alerts go out EARLY in a run**: tokens the champion band selects on pass-1 facts get pass 2
+  first and are alerted before the rest of pass 2, the watchlist refresh and the forward update;
+  `latest_scan.json.stage_seconds.alert_sent` is the measured latency inside the run.
 - **Entry lag is 3–8 min by construction** (dispatch + run + commit + fetch); refusals past
   `MAX_ENTRY_LAG_S` land in `data/livebook_missed.jsonl`. Read `entry_lag_s` before trusting a
   live number.

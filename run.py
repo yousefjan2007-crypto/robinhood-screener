@@ -197,6 +197,7 @@ def _size_gates_only(market: dict) -> bool:
 def run(dry_run: bool = True, send: bool = False) -> list:
     now_s = time.time()                       # THE single wall-clock capture
     budget = _Budget(config.RUN_TIME_BUDGET_S)
+    stage_s: dict = {}                     # seconds since run start at the end of each stage
     http_client.reset_health()
     trigger = os.environ.get("TRIGGER") or ("schedule" if config.IS_CI else "manual")
 
@@ -257,7 +258,9 @@ def run(dry_run: bool = True, send: bool = False) -> list:
           f"[trigger {trigger}, head {head}]")
 
     # ── enrichment ───────────────────────────────────────────────────────────────
+    stage_s["discovery"] = round(budget.elapsed(), 1)
     res = dex.enrich_many(enrich_set, now_s) if enrich_set else {"ok": {}, "absent": set(), "deferred": set()}
+    stage_s["enrich"] = round(budget.elapsed(), 1)
     markets = res.get("ok", {})
     absent = set(res.get("absent", set()))
     deferred = set(res.get("deferred", set()))
@@ -321,6 +324,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     dmap = {t: (disc.get(t) or (recheck.get(t) or {}).get("disc") or (watch.get(t) or {}).get("disc") or {})
             for t in p1_tokens}
     s1 = SAFE.pass1_many(p1_tokens, markets, dmap, now_s, chain_cache=chain_cache) if p1_tokens else {}
+    stage_s["pass1"] = round(budget.elapsed(), 1)
     survivors1: list = []
     for t in p1_tokens:
         s = s1.get(t) or SAFE.empty_safety()
@@ -333,17 +337,64 @@ def run(dry_run: bool = True, send: bool = False) -> list:
             continue
         survivors1.append(t)
 
-    # ── pass 2: budgeted + threaded (fresh tokens by liq desc, then watch refreshes) ──
-    fresh = sorted((t for t in survivors1 if src_of.get(t) != "watchlist"),
+    # ── row builder (score, bands, tier) shared by the early-alert pass and the full pass ──
+    def _row_for(t, s):
+        m = markets[t]
+        ok, gates = screen.hard_gates(m, s)  # pass-2 facts can only add positive findings
+        if not ok:
+            return None, gates
+        score, comps = screen.soft_score(m, s)
+        first = t not in ledger_index
+        fs_ts = (ledger_index.get(t) or {}).get("first_sighting_ts") or (watch.get(t) or {}).get("first_sighting_ts")
+        age_s = 0.0 if first or not fs_ts else max(0.0, now_s - float(fs_ts))
+        feat = LAB.build_feat(t, m, s, score, first, age_s)
+        verdicts = LAB.evaluate_bands(feat, reg, champion)
+        tier = LAB.tier_for(True, verdicts, champion)
+        reason = LAB.champion_reason(feat, reg, champion, verdicts)
+        _, misses = screen.high_conviction(feat)
+        row = dict(feat)
+        row.update({"symbol": m.get("symbol", "?"), "url": m.get("url", ""), "gates_ok": True,
+                    "verdicts": verdicts, "feat": feat, "market": m, "score": score, "gates": gates,
+                    "sources_dark": list(s.get("sources_dark") or []), "deployer": s.get("deployer"),
+                    "tier": tier, "band": champion, "hc_misses": misses, "champion_reason": reason,
+                    "misses": len(misses), "safety_ts": s.get("safety_ts"), "comps": comps,
+                    "source": src_of.get(t), "bands": {k: (None if v is None else int(bool(v))) for k, v in verdicts.items()}})
+        return row, gates
+
+    cooldown = config.ALERT_COOLDOWN_HOURS * 3600
+    prior_true = {t: set((watch.get(t) or {}).get("bands_true") or []) for t in watch}
+
+    def _a_rows(rows_):
+        """The rows that would be alerted now: an A event (first sighting or promotion) outside the cooldown."""
+        by = {e["token"]: e for e in LAB.decide_events(rows_, ledger_index, now_s, champion, reg, prior_true=prior_true)}
+        out = []
+        for r in rows_:
+            e = by.get(r["token"])
+            if e and e["tier"] == "A" and e["event_kind"] in ("first_sighting", "promotion") \
+                    and now_s - float(state["alerted"].get(r["token"], 0)) >= cooldown:
+                out.append(r)
+        return out
+
+    # ── early alerts: tokens the champion band already selects on PASS-1 facts get pass 2 FIRST
+    #    and are alerted the moment their own facts are in — the rest of pass 2, the watchlist
+    #    refresh and the forward update no longer sit between a sighting and its alert
+    #    (measured 2026-09-12: alerts landed 4 min into a run, 5–10 min after the sighting) ──
+    rows1 = {}
+    for t in survivors1:
+        rows1[t], _g1 = _row_for(t, s1.get(t) or SAFE.empty_safety())
+    prio = [r["token"] for r in _a_rows([rows1[t] for t in survivors1 if rows1[t] is not None and rows1[t]["tier"] == "A"])]
+
+    # ── pass 2: prioritised, budgeted, threaded (early candidates, then fresh by liq, then watch refreshes) ──
+    fresh = sorted((t for t in survivors1 if src_of.get(t) != "watchlist" and t not in prio),
                    key=lambda t: -(markets[t].get("liq_usd") or 0))
-    watched = [t for t in survivors1 if src_of.get(t) == "watchlist"]
+    watched = [t for t in survivors1 if src_of.get(t) == "watchlist" and t not in prio]
     refresh_due = [t for t in watched
                    if now_s - float((watch.get(t) or {}).get("refreshed_ts") or 0) >= config.GT_INFO_REFRESH_S]
     refresh_due = refresh_due[: config.WATCH_REFRESH_PER_RUN]
     p2_budget = config.GT_INFO_BUDGET_PER_RUN
-    p2_list = fresh[:p2_budget] + refresh_due[: max(0, p2_budget - min(len(fresh), p2_budget)) + config.WATCH_REFRESH_PER_RUN]
-    p2_list = p2_list[: p2_budget + config.WATCH_REFRESH_PER_RUN]
-    deferred_by_stage["pass2_overflow"] = len([t for t in fresh if t not in p2_list])
+    p2_rest = fresh[:p2_budget] + refresh_due[: max(0, p2_budget - min(len(fresh), p2_budget)) + config.WATCH_REFRESH_PER_RUN]
+    p2_rest = p2_rest[: p2_budget + config.WATCH_REFRESH_PER_RUN]
+    deferred_by_stage["pass2_overflow"] = len([t for t in fresh if t not in p2_rest])
     safety: dict = {}
 
     def _p2(t):
@@ -354,10 +405,33 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         except Exception as exc:          # one bad token never kills the run
             print(f"  ! pass2({t[:10]}…) failed: {exc}")
             return t, None
-    with ThreadPoolExecutor(max_workers=config.PASS2_WORKERS) as ex:
-        for t, s2 in ex.map(_p2, p2_list):
-            if s2 is not None:
-                safety[t] = s2
+
+    def _run_p2(lst):
+        if not lst:
+            return
+        with ThreadPoolExecutor(max_workers=config.PASS2_WORKERS) as ex:
+            for t, s2 in ex.map(_p2, lst):
+                if s2 is not None:
+                    safety[t] = s2
+
+    _run_p2(prio)
+    for t in prio:
+        safety.setdefault(t, s1.get(t) or SAFE.empty_safety())   # a budget cut leaves pass-1 facts standing
+    stage_s["pass2_prio"] = round(budget.elapsed(), 1)
+    early_rows = [row for row, _g in (_row_for(t, safety[t]) for t in prio) if row is not None]
+    early_alerts = _a_rows(early_rows)[: config.ALERT_TOP_N]
+    early_alerted: set = set()
+    dark = sorted(http_client.degraded_hosts())
+    if early_alerts:
+        for r in early_alerts:
+            r["plan_line"] = CHAMP.describe_plan(exit_plan, r.get("price_usd") or 0.0, promoted=champ_state["exit"])
+        title, body = format_alert(early_alerts, degraded=dark, band=champion)
+        send_all(title, body, dry_run=not send)
+        early_alerted = {r["token"] for r in early_alerts}
+        stage_s["alert_sent"] = round(budget.elapsed(), 1)
+        print(f"  early alert: {', '.join(r['symbol'] for r in early_alerts)} at {stage_s['alert_sent']}s")
+    _run_p2(p2_rest)
+    stage_s["pass2"] = round(budget.elapsed(), 1)
     for t in survivors1:
         if t in safety:
             continue
@@ -375,31 +449,15 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     for t in survivors1:
         if t not in safety:
             continue
-        m, s = markets[t], safety[t]
-        ok, gates = screen.hard_gates(m, s)  # pass-2 facts can only add positive findings
-        if not ok:
+        row, gates = _row_for(t, safety[t])
+        if row is None:
             for k, v in gates.items():
                 if v is False:
                     pass1_rejects[k] = pass1_rejects.get(k, 0) + 1
             rejected.append(t); continue
-        score, comps = screen.soft_score(m, s)
-        first = t not in ledger_index
-        fs_ts = (ledger_index.get(t) or {}).get("first_sighting_ts") or (watch.get(t) or {}).get("first_sighting_ts")
-        age_s = 0.0 if first or not fs_ts else max(0.0, now_s - float(fs_ts))
-        feat = LAB.build_feat(t, m, s, score, first, age_s)
-        verdicts = LAB.evaluate_bands(feat, reg, champion)
-        tier = LAB.tier_for(True, verdicts, champion)
-        reason = LAB.champion_reason(feat, reg, champion, verdicts)
-        _, misses = screen.high_conviction(feat)
-        row = dict(feat)
-        row.update({"symbol": m.get("symbol", "?"), "url": m.get("url", ""), "gates_ok": True,
-                    "verdicts": verdicts, "feat": feat, "market": m, "score": score, "gates": gates,
-                    "sources_dark": list(s.get("sources_dark") or []), "deployer": s.get("deployer"),
-                    "tier": tier, "band": champion, "hc_misses": misses, "champion_reason": reason,
-                    "misses": len(misses), "safety_ts": s.get("safety_ts"), "comps": comps,
-                    "source": src_of.get(t), "bands": {k: (None if v is None else int(bool(v))) for k, v in verdicts.items()}})
         survivors.append(row)
     survivors.sort(key=lambda r: -r["score"])
+    stage_s["score"] = round(budget.elapsed(), 1)
     prior_true = {t: set((watch.get(t) or {}).get("bands_true") or []) for t in watch}
     events = LAB.decide_events(survivors, ledger_index, now_s, champion, reg, prior_true=prior_true)
     ev_by_token = {e["token"]: e for e in events}
@@ -420,17 +478,18 @@ def run(dry_run: bool = True, send: bool = False) -> list:
               f"age {r.get('pair_age_min') or 0:.0f}m [{r.get('event_kind') or '-'}]"
               + ("" if r["tier"] == "A" else f"  short of {champion}: {r['champion_reason'][:80]}"))
 
-    # ── alerts ───────────────────────────────────────────────────────────────────
-    cooldown = config.ALERT_COOLDOWN_HOURS * 3600
+    # ── alerts (whatever the early path did not already send) ────────────────────
     fresh_alerts = [r for r in a_tier[: config.ALERT_TOP_N]
                     if now_s - float(state["alerted"].get(r["token"], 0)) >= cooldown]
     dark = sorted(http_client.degraded_hosts())
     for r in fresh_alerts:
         r["plan_line"] = CHAMP.describe_plan(exit_plan, r.get("price_usd") or 0.0, promoted=champ_state["exit"])
-    if fresh_alerts:
-        title, body = format_alert(fresh_alerts, degraded=dark, band=champion)
+    to_send = [r for r in fresh_alerts if r["token"] not in early_alerted]
+    if to_send:
+        title, body = format_alert(to_send, degraded=dark, band=champion)
         send_all(title, body, dry_run=not send)
-    else:
+        stage_s.setdefault("alert_sent", round(budget.elapsed(), 1))
+    elif not early_alerted:
         print("no A-tier this run" + (" (sources dark: " + ", ".join(dark) + ")" if dark else ""))
     if dark and (now_s - float(state.get("degraded_alert_ts", 0)) >= config.DEGRADED_ALERT_COOLDOWN_HOURS * 3600):
         fields = sorted({f for r in survivors for f in SAFE.degraded_fields(r["feat"])})
@@ -467,6 +526,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         STORE.append_verdicts([{"event_seq": seqs[e["token"]], "token": e["token"], "alert_ts": now_s,
                                 "verdicts": e["verdicts"]} for e in events if e["token"] in seqs])
         filled, exits = ledger.update_forward(now_s, lambda toks: dex.forward_snapshot_many(toks, now_s))
+        stage_s["forward"] = round(budget.elapsed(), 1)
         if exits:
             t4, b4 = format_exit_alert(exits)
             send_all(t4, b4, dry_run=not send)
@@ -530,7 +590,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
             "survivors": [{k: _round(v) if isinstance(v, float) else v for k, v in r.items()
                            if k not in ("feat", "market", "verdicts", "comps")} for r in survivors],
             "plan": exit_plan, "health": http_client.health_snapshot(), "dark": dark,
-            "run_seconds": round(budget.elapsed(), 1)}
+            "run_seconds": round(budget.elapsed(), 1), "stage_seconds": stage_s}
     if not dry_run:
         _atomic_json(config.SCAN_PATH, scan)
         keep = [l for l in (_load_json_lines(config.RUN_LOG_PATH)) if now_s - float(l.get("scan_ts", 0)) < config.RUN_LOG_KEEP_S]

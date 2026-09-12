@@ -2493,6 +2493,16 @@ check("the LIVE champion is band_volume_early by a manual --set (evidence.manual
       _live["champion"] == "band_volume_early" and _live["previous"] == "band_a_strict"
       and (_live.get("evidence") or {}).get("manual") is True and (_live.get("evidence") or {}).get("reason")
       and config.DEFAULT_ENTRY_BAND == "band_a_strict", str(_live)[:200])
+_rs = _read(os.path.join(ROOT, "run.py"))
+check("early alerts: run.py sends the champion-band alert for pass-1-selected tokens BEFORE the remaining pass 2, the watchlist "
+      "refresh and the forward update; the later alert block never re-sends them; stage_seconds is written to the scan",
+      0 < _rs.index('early_alerted = {r["token"] for r in early_alerts}') < _rs.index("_run_p2(p2_rest)")
+      < _rs.index('to_send = [r for r in fresh_alerts if r["token"] not in early_alerted]')
+      < _rs.index("ledger.update_forward(") and '"stage_seconds": stage_s' in _rs)
+_wf = _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
+check("screener.yml: the scan job and the Pages job hold SEPARATE concurrency groups (a deploy never delays the next scan) "
+      "and pip is cached", "group: screener-scan" in _wf and "group: screener-pages" in _wf and "cache: pip" in _wf
+      and _wf.count("concurrency:") == 2)
 check("REFERENCE_TOKENS name the two winners and the registry lists the launchpad band as a candidate, never the champion",
       set(config.REFERENCE_TOKENS) == {"CATGPT", "ANTHROPIG"} and CHAMP == "band_a_strict"
       and any(e_["name"] == "band_launchpad_lenient" and e_["status"] == "candidate" for e_ in json.load(open(config.REGISTRY_PATH))["candidates"]))

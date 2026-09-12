@@ -23,12 +23,11 @@ permissions:
   pages: write               # publish docs/ via the Pages deploy action (exempt from the 10 builds/h limit)
   id-token: write
 
-concurrency:
-  group: screener
-  cancel-in-progress: false  # never interrupt a run mid-write; at most one queued run per group
-
 jobs:
   scan:
+    concurrency:
+      group: screener-scan
+      cancel-in-progress: false  # never interrupt a run mid-write; at most one queued run per group
     # Private-repo minutes would run out in ~2 days at this cadence: the scheduled path is
     # inert until the repo is public. Dispatch/manual runs are allowed either way.
     if: ${{ github.event_name != 'schedule' || github.event.repository.private == false }}
@@ -40,6 +39,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - run: pip install -r requirements.txt
       - name: Preflight (sources as seen from the runner IP; commits nothing)
         if: ${{ github.event.inputs.mode == 'preflight' }}
@@ -80,6 +80,11 @@ jobs:
   pages:
     needs: scan
     if: ${{ needs.scan.result == 'success' && github.event.inputs.mode != 'preflight' }}
+    # its own group: a deploy in flight must not delay the NEXT scan (measured 2026-09-12: the
+    # whole run took 400-610 s against a 300 s cadence, so alerts queued behind deploys)
+    concurrency:
+      group: screener-pages
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     environment:
       name: github-pages
