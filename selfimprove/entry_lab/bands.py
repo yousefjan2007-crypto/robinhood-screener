@@ -100,7 +100,9 @@ class BandSpec:
     def explain(self, feat: dict) -> str:
         f = feat or {}
         miss = self.missing(f)
-        if miss:
+        # a three-valued band with a definite miss explains the miss (the explainer lists it
+        # beside the unknowns); only a verdict of None is described as NA
+        if miss and (not self.THREE_VALUED or self.verdict(f) is None):
             return "NA: " + ", ".join(miss) + " unknown"
         if self.explainer is not None:
             try:
