@@ -46,67 +46,93 @@
   footer { color: #6e7681; font-size: 12px; margin: 26px 0 8px; line-height: 1.5; }
 </style></head><body>
 <h1>robinhood_screener <small style="color:#8b949e;font-size:13px;font-weight:400">Robinhood Chain · id 4663</small></h1>
-<div class="stamp">scanned 135 · enriched 109 · 4 passed gates · <span id="ago" data-ts="1789219611" data-stale="30">…</span></div>
-<div class="stamp">trigger manual · run 2.5 min · auto-reloads every 5&nbsp;min</div>
-<div class="stamp">runs in the last 24 h: <b>2</b> (dispatch 0 / schedule 0 / other 2) · median run 109s · A alerts 0</div>
+<div class="stamp">scanned 123 · enriched 97 · 6 passed gates · <span id="ago" data-ts="1789220563" data-stale="30">…</span></div>
+<div class="stamp">trigger dispatch · run 55s · auto-reloads every 5&nbsp;min</div>
+<div class="stamp">runs in the last 24 h: <b>3</b> (dispatch 1 / schedule 0 / other 2) · median run 70s · A alerts 0</div>
 <div class="stamp">entry band <b>band_a_strict</b> · exit plan <b>cfg_ladder_stop</b></div>
-<h2>Source health (this scan)</h2><div class="chips"><span class="chip ok" title="6 ok / 0 failed / 0 absent">dexscreener ok</span><span class="chip ok" title="8 ok / 0 failed / 0 absent">geckoterminal ok</span><span class="chip ok" title="6 ok / 0 failed / 0 absent">robinx ok</span><span class="chip ok" title="74 ok / 0 failed / 0 absent">blockscout ok</span><span class="chip ok" title="6 ok / 0 failed / 0 absent">rpc ok</span><span class="chip ok" title="8 ok / 0 failed / 0 absent">scanhood ok</span></div><p class="warn">champion band was NA (unknown inputs) on 100% of survivors this scan — an unknown is never A, so a dark source lowers the A count rather than faking one.</p>
+<h2>Source health (this scan)</h2><div class="chips"><span class="chip ok" title="6 ok / 0 failed / 0 absent">dexscreener ok</span><span class="chip ok" title="3 ok / 0 failed / 0 absent">geckoterminal ok</span><span class="chip ok" title="1 ok / 0 failed / 0 absent">robinx ok</span><span class="chip ok" title="8 ok / 0 failed / 0 absent">blockscout ok</span><span class="chip ok" title="5 ok / 0 failed / 0 absent">rpc ok</span><span class="chip ok" title="9 ok / 0 failed / 0 absent">scanhood ok</span></div>
 <h2>A-tier (alerted · band_a_strict)</h2><div class="empty">No A-tier coins this scan. Most scans have none — that is the filter doing its job, not a malfunction.</div>
 <h2>B-tier survivors (ledgered as the control, never alerted)</h2>
     <a class="card " href="https://dexscreener.com/robinhood/0x7c4fb4ecb838483139c1d4b995690a5399e6ad27846424ca195020e3a742b23c" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">PSTOCK</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); age below 90m (the &lt;90m window is where rugs live); holders/min above 8 (wallet-farm rate)">B</span>
-        <span class="score">66<small>/100</small></span></div>
+      <div class="row1"><span class="sym">PSTOCK</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; age below 90m (the &lt;90m window is where rugs live)">B</span>
+        <span class="score">67<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $30k</span><span>mcap $99k</span>
-        <span>vol24 $478k</span><span>age 70m</span>
+        <span>liq $24k</span><span>mcap $67k</span>
+        <span>vol24 $505k</span><span>age 86m</span>
       </div>
       <div class="row2">
         <span>holders 569 (blockscout)</span><span>top10 10%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
-      <div class="miss">short of band_a_strict: NA: roundtrip_loss_pct, lp_locked_pct unknown</div><div class="bands">bands: NA band_a_strict, band_dev_score_ge70, band_holders500, band_lp_burned_renounced</div>
+      <div class="miss">short of band_a_strict: NA: roundtrip_loss_pct, lp_locked_pct unknown</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_dev_score_ge70, band_lp_burned_renounced</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0xd7a742261a3804c96a52db93ac78982f2ce2c994" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">Dojo</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); age below 90m (the &lt;90m window is where rugs live); tx/holder/hr above 3 (bot churn)">B</span><span class="kind">first_sighting #3</span>
+      <div class="row1"><span class="sym">Dojo</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); age below 90m (the &lt;90m window is where rugs live); tx/holder/hr above 3 (bot churn)">B</span>
         <span class="score">62<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $65k</span><span>mcap $138k</span>
-        <span>vol24 $460k</span><span>age 67m</span>
+        <span>liq $73k</span><span>mcap $171k</span>
+        <span>vol24 $584k</span><span>age 83m</span>
       </div>
       <div class="row2">
         <span>holders 380 (blockscout)</span><span>top10 10%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
-      <div class="miss">short of band_a_strict: NA: roundtrip_loss_pct, dev_pct, lp_locked_pct unknown</div><div class="miss">dark: rpc</div><div class="bands">bands: NA band_a_strict, band_dev_score_ge70, band_graduated_only, band_holders500</div>
+      <div class="miss">short of band_a_strict: NA: roundtrip_loss_pct, dev_pct, lp_locked_pct unknown</div><div class="miss">dark: rpc</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_dev_score_ge70, band_graduated_only, band_lp_burned_renounced</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x99345d344ce0e0b55846092ca915795cafd24ad9" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">FOMO</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; age below 90m (the &lt;90m window is where rugs live)">B</span><span class="kind">first_sighting #4</span>
+      <div class="row1"><span class="sym">FOMO</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; age below 90m (the &lt;90m window is where rugs live)">B</span>
         <span class="score">60<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $22k</span><span>mcap $45k</span>
-        <span>vol24 $212k</span><span>age 60m</span>
+        <span>liq $21k</span><span>mcap $40k</span>
+        <span>vol24 $225k</span><span>age 76m</span>
       </div>
       <div class="row2">
         <span>holders 211 (blockscout)</span><span>top10 8%</span>
         <span>LP burned 100% (rpc_v2)</span><span>round-trip -3.0%</span>
       </div>
-      <div class="miss">short of band_a_strict: NA: dev_pct unknown</div><div class="bands">bands: ✓ band_lp_burned_renounced · NA band_a_strict, band_dev_score_ge70, band_graduated_only, band_holders500</div>
+      <div class="miss">short of band_a_strict: NA: dev_pct unknown</div><div class="bands">bands: ✓ band_lp_burned_renounced, ctl_inverse_band · NA band_dev_score_ge70, band_graduated_only</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x63951a43310d165cc906f075f3815947f2be39d7" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">DEGENFLY</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); age below 90m (the &lt;90m window is where rugs live); tx/holder/hr above 3 (bot churn)">B</span><span class="kind">first_sighting #6</span>
+        <span class="score">56<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $38k</span><span>mcap $68k</span>
+        <span>vol24 $254k</span><span>age 46m</span>
+      </div>
+      <div class="row2">
+        <span>holders 222 (blockscout)</span><span>top10 13%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_a_strict: NA: roundtrip_loss_pct, dev_pct, lp_locked_pct unknown</div><div class="miss">dark: rpc</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_dev_score_ge70, band_graduated_only, band_lp_burned_renounced</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x8d15028029171edc1c43a72d5175600acf43d69ddf1714213c31140212cfdf36" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">TOPBLAST</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); age below 90m (the &lt;90m window is where rugs live); holders/min above 8 (wallet-farm rate)">B</span><span class="kind">first_sighting #5</span>
-        <span class="score">28<small>/100</small></span></div>
+      <div class="row1"><span class="sym">TOPBLAST</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); age below 90m (the &lt;90m window is where rugs live); holders/min above 8 (wallet-farm rate)">B</span>
+        <span class="score">45<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $31k</span><span>mcap $113k</span>
-        <span>vol24 $68k</span><span>age 9m</span>
+        <span>liq $28k</span><span>mcap $88k</span>
+        <span>vol24 $121k</span><span>age 25m</span>
       </div>
       <div class="row2">
         <span>holders 418 (blockscout)</span><span>top10 16%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
-      <div class="miss">short of band_a_strict: NA: roundtrip_loss_pct, lp_locked_pct unknown</div><div class="bands">bands: ✓ band_graduated_only · NA band_a_strict, band_dev_score_ge70, band_holders500, band_lp_burned_renounced</div>
+      <div class="miss">short of band_a_strict: NA: roundtrip_loss_pct, lp_locked_pct unknown</div><div class="bands">bands: ✓ band_graduated_only, ctl_inverse_band · NA band_dev_score_ge70, band_lp_burned_renounced</div>
     </a>
-<h2>Discovery by source</h2><table><tr><th>source</th><th>discovered</th><th>quota cut</th></tr><tr><td>logs</td><td>80</td><td>·</td></tr><tr><td>watchlist</td><td>2</td><td>·</td></tr><tr><td>rechecks</td><td>22</td><td>·</td></tr><tr><td>feeds</td><td>31</td><td>·</td></tr></table><p class="note">absent (no such pair/token): 26</p><p class="note">pass-1 rejects by gate: liq_ok 98, vol_ok 4, top10_ok 1, rpc_available 1, owner_ok 1, creator_ok 1</p>
-<h2>Honest scorecard (A vs B)</h2><table><tr><th>tier</th><th>n</th><th>1h</th><th>6h</th><th>24h</th><th>7d</th></tr><tr><td>A (alerted)</td><td>0</td><td>·</td><td>·</td><td>·</td><td>·</td></tr><tr><td>B (silent control)</td><td>5</td><td><b>50%</b> / +30%<br><small>n=2 · dead 0%</small></td><td>·</td><td>·</td><td>·</td></tr></table><p class="note">cells = hit-rate / median return once a horizon matures; dead = return ≤ −99%. Promoted B rows stay in B (intention-to-treat).</p><p class="note">tier B: n=5 across 1 alert-day(s) · promoted-B n=5 · open 5 · rugged-after-passing-gates 0% · below 12 alert-days: not a bound</p><p class="note"><b>If tier A doesn't clearly beat tier B, the A-band is not adding signal.</b> A losing scorecard is the screen doing its job — telling you not to scale.</p>
+    <a class="card " href="https://dexscreener.com/robinhood/0x9259e04d3c399a26ae1436f24e310e4c4e1005f99214cb5690c42be8767fe823" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">PSTOCK</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); age below 90m (the &lt;90m window is where rugs live); unknown: sell round-trip above 8%">B</span>
+        <span class="score">30<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $44k</span><span>mcap $48k</span>
+        <span>vol24 $31k</span><span>age 85m</span>
+      </div>
+      <div class="row2">
+        <span>holders 43 (blockscout)</span><span>top10 16%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_a_strict: NA: roundtrip_loss_pct, dev_pct, lp_locked_pct unknown</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_dev_score_ge70, band_graduated_only, band_lp_burned_renounced</div>
+    </a>
+<h2>Discovery by source</h2><table><tr><th>source</th><th>discovered</th><th>quota cut</th></tr><tr><td>logs</td><td>80</td><td>·</td></tr><tr><td>watchlist</td><td>5</td><td>·</td></tr><tr><td>rechecks</td><td>0</td><td>·</td></tr><tr><td>feeds</td><td>38</td><td>·</td></tr></table><p class="note">absent (no such pair/token): 26</p><p class="note">pass-1 rejects by gate: liq_ok 79, vol_ok 10, sell_tax_ok 1, owner_ok 1, lp_ok 1</p>
+<h2>Honest scorecard (A vs B)</h2><table><tr><th>tier</th><th>n</th><th>1h</th><th>6h</th><th>24h</th><th>7d</th></tr><tr><td>A (alerted)</td><td>0</td><td>·</td><td>·</td><td>·</td><td>·</td></tr><tr><td>B (silent control)</td><td>6</td><td><b>50%</b> / +30%<br><small>n=2 · dead 0%</small></td><td>·</td><td>·</td><td>·</td></tr></table><p class="note">cells = hit-rate / median return once a horizon matures; dead = return ≤ −99%. Promoted B rows stay in B (intention-to-treat).</p><p class="note">tier B: n=6 across 1 alert-day(s) · promoted-B n=0 · open 6 · rugged-after-passing-gates 0% · below 12 alert-days: not a bound</p><p class="note"><b>If tier A doesn't clearly beat tier B, the A-band is not adding signal.</b> A losing scorecard is the screen doing its job — telling you not to scale.</p>
 <h2>Paper A-book (cloud, quotes only)</h2><p class="note">No paper fills yet — the A book opens a ~$10 paper position at a real quote for every A alert. Quotes only; nothing here touches keys or funds.</p><p class="note">Real automation is justified ONLY if this scorecard is repeatedly positive.</p>
 <h2>Live paper book (Mac, multi-policy)</h2><p class="note">The live paper book runs on the Mac; a summary is published weekly.</p>
 <footer>Probabilistic screen, NOT a guarantee. A-tier = best SURVIVAL odds under every gate, not predicted ROI. On this chain the raw control went to zero 96% of the time at 7d. Alerts + paper only; nothing here touches keys or funds. Not financial advice. Ranked by survival-quality score, NOT predicted ROI.</footer>
