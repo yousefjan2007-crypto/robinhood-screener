@@ -264,7 +264,7 @@ GT_INFO_REFRESH_S = 1800                 # watched tokens refresh pass-2 facts a
 SAFETY_REFRESH_S = 1800                  # ...and chain facts (one Multicall3 batch) at most this often
 WATCH_REFRESH_PER_RUN = 15               # pass-2 refreshes per run, closest-to-A first
 WATCH_MAX_GATE_FAILS = 2                 # consecutive hard-gate failures evict a watched token
-RUN_TIME_BUDGET_S = 200                  # GLOBAL: checked between tokens in every stage; cuts are
+RUN_TIME_BUDGET_S = 240                  # GLOBAL: checked between tokens in every stage; cuts are
                                          # listed in latest_scan.json.deferred_by_stage, never seen
 PASS2_WORKERS = 3                        # per-host throttle lock serialises each host anyway
 BAND_WATCH_WINDOW_S = 24 * 3600          # solana promotions arrived median 8.9h, max 26.2h after sighting
