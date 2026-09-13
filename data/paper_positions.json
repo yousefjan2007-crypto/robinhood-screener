@@ -1,6 +1,48 @@
 {
  "pending_buys": [],
  "positions": {
+  "0x00ee811463addf1db7aeadafada92b044dbf6e04:365": {
+   "alert_ts": 1789297329.4146576,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 8.146964996878905e-23,
+   "event_seq": 365,
+   "gas_usd": 0.07,
+   "impact_pct_open": 2.7165,
+   "opened_ts": 1789297329.4146576,
+   "pending_exits": [],
+   "plan": {
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "4THS",
+   "tier": "A",
+   "token": "0x00ee811463addf1db7aeadafada92b044dbf6e04",
+   "tokens_raw": 122745095920149281636352,
+   "tokens_remaining_raw": 122745095920149281636352,
+   "weth_px_usd_open": 2474.72
+  },
   "0x0df5c5e3f6458601de2383d6805bf0eaf6188d20:60": {
    "alert_ts": 1789238441.6522696,
    "champion_at_open": "cfg_ladder_stop",
