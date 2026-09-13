@@ -1,243 +1,302 @@
 {
-  "schema": 2,
-  "note": "ONE registry for kind in {band, policy}. Built-in bands live in entry_lab.bands; research candidates are modules under selfimprove/candidates/ imported ONLY through this list and only after bands.static_ok passes. Entries are never deleted (status 'retired' at most): every registration is a counted trial in selfimprove/trials.json and deflates every later DSR. Controls have status 'control' and are never eligible for promotion.",
-  "candidates": [
-    {
-      "name": "band_a_strict",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "champion",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "The default champion: every screen.hc_checks check True (score, exact top-10 and holder count from Blockscout, liquidity, creator prior launches, age >= 90 min, organic holders/min and tx/holder rates, sell round-trip, whitelisted/verified template, LP known, dev holding, not sniped at creation). On solana this strict band was the best of 14 tested and every relaxation was worse; an unknown input is NA, never a silent False.",
-      "requires": [
-        "score",
-        "liq_usd",
-        "pair_age_min",
-        "creator_prior_tokens",
-        "roundtrip_loss_pct",
-        "dev_pct",
-        "dev_sniped",
-        "total_holders",
-        "top10_pct",
-        "holders_source",
-        "buys_h1",
-        "sells_h1"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "band_no_age",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "candidate",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "band_a_strict without the age >= 90 min check (holders/min kept). Tests whether the age floor buys survival or only delays entry past the early peak: solana winners peak ~4 h after entry, so an earlier entry could capture more of the move, or more of the rugs.",
-      "requires": [
-        "score",
-        "liq_usd",
-        "pair_age_min",
-        "creator_prior_tokens",
-        "roundtrip_loss_pct",
-        "dev_pct",
-        "dev_sniped",
-        "total_holders",
-        "top10_pct",
-        "holders_source",
-        "buys_h1",
-        "sells_h1"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "band_score60",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "candidate",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "band_a_strict with the soft-score floor lowered from HC_MIN_SCORE to BAND_SCORE60_MIN. The soft score was anti-predictive for upside on solana; this measures whether the score floor is doing any work in the strict band or merely shrinking its n.",
-      "requires": [
-        "score",
-        "liq_usd",
-        "pair_age_min",
-        "creator_prior_tokens",
-        "roundtrip_loss_pct",
-        "dev_pct",
-        "dev_sniped",
-        "total_holders",
-        "top10_pct",
-        "holders_source",
-        "buys_h1",
-        "sells_h1"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "band_holders500",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "candidate",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "band_a_strict with the exact holder floor lowered to BAND_HOLDERS500_MIN (Blockscout count only, contracts excluded). Robinhood Chain is younger and thinner than solana; a 1000-holder floor may be unreachable inside the 24 h window for most survivors.",
-      "requires": [
-        "score",
-        "liq_usd",
-        "pair_age_min",
-        "creator_prior_tokens",
-        "roundtrip_loss_pct",
-        "dev_pct",
-        "dev_sniped",
-        "total_holders",
-        "top10_pct",
-        "holders_source",
-        "buys_h1",
-        "sells_h1"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "band_dev_score_ge70",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "candidate",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "RobinX's free deployer score >= BAND_DEV_SCORE_MIN (their own webhook threshold). A pure deployer-reputation band, kept because the proven-dev hypothesis was retired on evidence (P1 was a look-ahead bug; 27 of 27 $10M deployers were distinct) and this is the cheapest honest way to keep testing 'the dev matters' against a gate-matched control.",
-      "requires": [
-        "creator_score"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "band_graduated_only",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "candidate",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "Launchpad graduation completed within BAND_GRADUATED_MAX_AGE_S (GT launchpad_details / Flap progress). The pump.fun-migration analogue: on solana the migration instant was the one structural event every winner shared, and 60% of rugs collapsed < 20 min after it.",
-      "requires": [
-        "launchpad_completed",
-        "launchpad_completed_age_s"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "band_top10_le15",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "candidate",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "band_a_strict with a tighter top-10 concentration cap (BAND_TOP10_LE15_MAX). Exact Blockscout top-10 when available; GT's snapshot only while younger than BAND_HOLDERS_MAX_STALE_S (GT holder snapshots run 8 min..23 h stale); otherwise NA.",
-      "requires": [
-        "score",
-        "liq_usd",
-        "pair_age_min",
-        "creator_prior_tokens",
-        "roundtrip_loss_pct",
-        "dev_pct",
-        "dev_sniped",
-        "total_holders",
-        "holders_source",
-        "buys_h1",
-        "sells_h1"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "band_lp_burned_renounced",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "candidate",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "Pure chain-truth band: owner renounced, LP burned >= BAND_LP_BURNED_MIN_PCT, sell round-trip <= BAND_ROUND_TRIP_LOSS_MAX_PCT, the three facts read directly by eth_call and never from an aggregator (GoPlus and ScanHood both got MIZUKARA's LP wrong). Tests whether survival is mostly contract hygiene rather than market shape.",
-      "requires": [
-        "owner_renounced",
-        "lp_locked_pct",
-        "roundtrip_loss_pct"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "ctl_random_band",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "control",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "NEGATIVE CONTROL. Selects a sha256-chosen BAND_CTL_RANDOM_RATE share of tokens and fires at a per-token deterministic delay U(0, BAND_WATCH_WINDOW_S), so its firing instants are spread over the window like a maturation band's. Must fail every gate; if it does not, the apparatus is measuring itself.",
-      "requires": [
-        "token",
-        "sighting_age_s"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "ctl_inverse_band",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "control",
-      "registered_ts": 0.0,
-      "registered_at_event_seq": 0,
-      "nominated_at_event_seq": null,
-      "rationale": "NEGATIVE CONTROL, audit column only: the champion's complement, computed by runtime.evaluate_bands as (None if champion verdict is None else not champion verdict) and recomputed on the fly by the scorecard. If the inverse beats the champion, the champion is anti-selecting.",
-      "requires": [],
-      "proposal": null
-    },
-    {
-      "name": "band_launchpad_lenient",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "candidate",
-      "registered_ts": 1789222264.0,
-      "registered_at_event_seq": 7,
-      "nominated_at_event_seq": null,
-      "rationale": "Pre-declared 2026-09-12 from the two reference winners (CATGPT, ANTHROPIG: Bankr/Doppler launches on Uniswap V4). On the launchpad the dev holding, the launcher's prior count and the creation-tx snipe are unanswerable for app/agent-launched tokens, so this band drops exactly those three hc checks THERE and equals band_a_strict everywhere else. Tests whether the strict band's dev/creator checks cost recall on the chain's dominant launchpad.",
-      "requires": [
-        "score",
-        "liq_usd",
-        "pair_age_min",
-        "roundtrip_loss_pct",
-        "total_holders",
-        "top10_pct",
-        "holders_source",
-        "buys_h1",
-        "sells_h1"
-      ],
-      "proposal": null
-    },
-    {
-      "name": "band_volume_early",
-      "kind": "band",
-      "module": "entry_lab.bands",
-      "status": "candidate",
-      "registered_ts": 1789229359.0,
-      "registered_at_event_seq": 41,
-      "nominated_at_event_seq": null,
-      "rationale": "The operator's thesis, pre-declared 2026-09-12: get in EARLY (pool age <= 30 min, mcap <= $2M) on a coin that already trades heavily (hour-1 volume >= $50k, liq >= $10k) with buyers dominating (buys >= 2x sells). Measured at sighting on the day's 40 survivors: FRONTIER (23x), ROBOJENSEN (3.7x), DEGENFLY (3.3x) all had buys >= 2x sells while every balanced-flow sighting went flat or to zero (n=9, in-sample). A hypothesis the ledger will judge \u2014 it is the alerted band by manual --set, and the demotion test reverts it to band_a_strict if the selection lift over the same-day, same-age pool is not positive.",
-      "requires": [
-        "pair_age_min",
-        "vol_h1",
-        "liq_usd",
-        "buys_h1",
-        "sells_h1",
-        "mcap"
-      ],
-      "proposal": null
-    }
-  ]
+ "schema": 2,
+ "note": "ONE registry for kind in {band, policy}. Built-in bands live in entry_lab.bands; research candidates are modules under selfimprove/candidates/ imported ONLY through this list and only after bands.static_ok passes. Entries are never deleted (status 'retired' at most): every registration is a counted trial in selfimprove/trials.json and deflates every later DSR. Controls have status 'control' and are never eligible for promotion.",
+ "candidates": [
+  {
+   "name": "band_a_strict",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "champion",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "The default champion: every screen.hc_checks check True (score, exact top-10 and holder count from Blockscout, liquidity, creator prior launches, age >= 90 min, organic holders/min and tx/holder rates, sell round-trip, whitelisted/verified template, LP known, dev holding, not sniped at creation). On solana this strict band was the best of 14 tested and every relaxation was worse; an unknown input is NA, never a silent False.",
+   "requires": [
+    "score",
+    "liq_usd",
+    "pair_age_min",
+    "creator_prior_tokens",
+    "roundtrip_loss_pct",
+    "dev_pct",
+    "dev_sniped",
+    "total_holders",
+    "top10_pct",
+    "holders_source",
+    "buys_h1",
+    "sells_h1"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_no_age",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "band_a_strict without the age >= 90 min check (holders/min kept). Tests whether the age floor buys survival or only delays entry past the early peak: solana winners peak ~4 h after entry, so an earlier entry could capture more of the move, or more of the rugs.",
+   "requires": [
+    "score",
+    "liq_usd",
+    "pair_age_min",
+    "creator_prior_tokens",
+    "roundtrip_loss_pct",
+    "dev_pct",
+    "dev_sniped",
+    "total_holders",
+    "top10_pct",
+    "holders_source",
+    "buys_h1",
+    "sells_h1"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_score60",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "band_a_strict with the soft-score floor lowered from HC_MIN_SCORE to BAND_SCORE60_MIN. The soft score was anti-predictive for upside on solana; this measures whether the score floor is doing any work in the strict band or merely shrinking its n.",
+   "requires": [
+    "score",
+    "liq_usd",
+    "pair_age_min",
+    "creator_prior_tokens",
+    "roundtrip_loss_pct",
+    "dev_pct",
+    "dev_sniped",
+    "total_holders",
+    "top10_pct",
+    "holders_source",
+    "buys_h1",
+    "sells_h1"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_holders500",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "band_a_strict with the exact holder floor lowered to BAND_HOLDERS500_MIN (Blockscout count only, contracts excluded). Robinhood Chain is younger and thinner than solana; a 1000-holder floor may be unreachable inside the 24 h window for most survivors.",
+   "requires": [
+    "score",
+    "liq_usd",
+    "pair_age_min",
+    "creator_prior_tokens",
+    "roundtrip_loss_pct",
+    "dev_pct",
+    "dev_sniped",
+    "total_holders",
+    "top10_pct",
+    "holders_source",
+    "buys_h1",
+    "sells_h1"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_dev_score_ge70",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "RobinX's free deployer score >= BAND_DEV_SCORE_MIN (their own webhook threshold). A pure deployer-reputation band, kept because the proven-dev hypothesis was retired on evidence (P1 was a look-ahead bug; 27 of 27 $10M deployers were distinct) and this is the cheapest honest way to keep testing 'the dev matters' against a gate-matched control.",
+   "requires": [
+    "creator_score"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_graduated_only",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "Launchpad graduation completed within BAND_GRADUATED_MAX_AGE_S (GT launchpad_details / Flap progress). The pump.fun-migration analogue: on solana the migration instant was the one structural event every winner shared, and 60% of rugs collapsed < 20 min after it.",
+   "requires": [
+    "launchpad_completed",
+    "launchpad_completed_age_s"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_top10_le15",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "band_a_strict with a tighter top-10 concentration cap (BAND_TOP10_LE15_MAX). Exact Blockscout top-10 when available; GT's snapshot only while younger than BAND_HOLDERS_MAX_STALE_S (GT holder snapshots run 8 min..23 h stale); otherwise NA.",
+   "requires": [
+    "score",
+    "liq_usd",
+    "pair_age_min",
+    "creator_prior_tokens",
+    "roundtrip_loss_pct",
+    "dev_pct",
+    "dev_sniped",
+    "total_holders",
+    "holders_source",
+    "buys_h1",
+    "sells_h1"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_lp_burned_renounced",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "Pure chain-truth band: owner renounced, LP burned >= BAND_LP_BURNED_MIN_PCT, sell round-trip <= BAND_ROUND_TRIP_LOSS_MAX_PCT, the three facts read directly by eth_call and never from an aggregator (GoPlus and ScanHood both got MIZUKARA's LP wrong). Tests whether survival is mostly contract hygiene rather than market shape.",
+   "requires": [
+    "owner_renounced",
+    "lp_locked_pct",
+    "roundtrip_loss_pct"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "ctl_random_band",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "control",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "NEGATIVE CONTROL. Selects a sha256-chosen BAND_CTL_RANDOM_RATE share of tokens and fires at a per-token deterministic delay U(0, BAND_WATCH_WINDOW_S), so its firing instants are spread over the window like a maturation band's. Must fail every gate; if it does not, the apparatus is measuring itself.",
+   "requires": [
+    "token",
+    "sighting_age_s"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "ctl_inverse_band",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "control",
+   "registered_ts": 0.0,
+   "registered_at_event_seq": 0,
+   "nominated_at_event_seq": null,
+   "rationale": "NEGATIVE CONTROL, audit column only: the champion's complement, computed by runtime.evaluate_bands as (None if champion verdict is None else not champion verdict) and recomputed on the fly by the scorecard. If the inverse beats the champion, the champion is anti-selecting.",
+   "requires": [],
+   "proposal": null
+  },
+  {
+   "name": "band_launchpad_lenient",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 1789222264.0,
+   "registered_at_event_seq": 7,
+   "nominated_at_event_seq": null,
+   "rationale": "Pre-declared 2026-09-12 from the two reference winners (CATGPT, ANTHROPIG: Bankr/Doppler launches on Uniswap V4). On the launchpad the dev holding, the launcher's prior count and the creation-tx snipe are unanswerable for app/agent-launched tokens, so this band drops exactly those three hc checks THERE and equals band_a_strict everywhere else. Tests whether the strict band's dev/creator checks cost recall on the chain's dominant launchpad.",
+   "requires": [
+    "score",
+    "liq_usd",
+    "pair_age_min",
+    "roundtrip_loss_pct",
+    "total_holders",
+    "top10_pct",
+    "holders_source",
+    "buys_h1",
+    "sells_h1"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_volume_early",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 1789229359.0,
+   "registered_at_event_seq": 41,
+   "nominated_at_event_seq": null,
+   "rationale": "The operator's thesis, pre-declared 2026-09-12: get in EARLY (pool age <= 30 min, mcap <= $2M) on a coin that already trades heavily (hour-1 volume >= $50k, liq >= $10k) with buyers dominating (buys >= 2x sells). Measured at sighting on the day's 40 survivors: FRONTIER (23x), ROBOJENSEN (3.7x), DEGENFLY (3.3x) all had buys >= 2x sells while every balanced-flow sighting went flat or to zero (n=9, in-sample). A hypothesis the ledger will judge \u2014 it is the alerted band by manual --set, and the demotion test reverts it to band_a_strict if the selection lift over the same-day, same-age pool is not positive.",
+   "requires": [
+    "pair_age_min",
+    "vol_h1",
+    "liq_usd",
+    "buys_h1",
+    "sells_h1",
+    "mcap"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_gmgn_clean",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 1789260843.335,
+   "registered_at_event_seq": 207,
+   "nominated_at_event_seq": null,
+   "rationale": "band_a_strict plus GMGN's behavioural wallet tags (bundler wallets / holders <= 0.10, no wash-trading flag). On solana the bundler RATIO was the one signal separating the $Cubrate wallet farm (1.42) from organic coins (0.00-0.01). NA when GMGN is dark.",
+   "requires": [
+    "score",
+    "liq_usd",
+    "pair_age_min",
+    "creator_prior_tokens",
+    "roundtrip_loss_pct",
+    "dev_pct",
+    "dev_sniped",
+    "total_holders",
+    "top10_pct",
+    "holders_source",
+    "buys_h1",
+    "sells_h1",
+    "gmgn_bundler_ratio",
+    "gmgn_is_wash_trading"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_new_creation",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 1789260843.335,
+   "registered_at_event_seq": 207,
+   "nominated_at_event_seq": null,
+   "rationale": "GMGN Trenches' NEW column as a band: a priced pair <= 15 min old with the liquidity floor and a known sell round trip, unconditioned on flow (band_volume_early adds the volume condition). The base rate is the hypothesis under test.",
+   "requires": [
+    "pair_age_min",
+    "liq_usd",
+    "roundtrip_loss_pct"
+   ],
+   "proposal": null
+  },
+  {
+   "name": "band_almost_bonded",
+   "kind": "band",
+   "module": "entry_lab.bands",
+   "status": "candidate",
+   "registered_ts": 1789260843.335,
+   "registered_at_event_seq": 207,
+   "nominated_at_event_seq": null,
+   "rationale": "GMGN Trenches' ALMOST-BONDED column as a band: GMGN curve progress in [0.5, 1.0) on a launch not yet completed, priced, liquidity floor, known round trip. Tests the buy-the-curve-before-migration entry; NA without a GMGN progress reading.",
+   "requires": [
+    "gmgn_progress",
+    "liq_usd",
+    "roundtrip_loss_pct"
+   ],
+   "proposal": null
+  }
+ ]
 }
