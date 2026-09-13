@@ -46,19 +46,32 @@
   footer { color: #6e7681; font-size: 12px; margin: 26px 0 8px; line-height: 1.5; }
 </style></head><body>
 <h1>robinhood_screener <small style="color:#8b949e;font-size:13px;font-weight:400">Robinhood Chain · id 4663</small></h1>
-<div class="stamp">scanned 300 · enriched 108 · 74 passed gates · <span id="ago" data-ts="1789316712" data-stale="30">…</span></div>
-<div class="stamp">trigger dispatch · run 3.6 min · auto-reloads every 5&nbsp;min</div>
-<div class="stamp">runs in the last 24 h: <b>309</b> (dispatch 307 / schedule 2) · median run 103s · A alerts 34 · 15 run(s) hit the time budget</div>
+<div class="stamp">scanned 300 · enriched 137 · 117 passed gates · <span id="ago" data-ts="1789316951" data-stale="30">…</span></div>
+<div class="stamp">trigger dispatch · run 3.9 min · auto-reloads every 5&nbsp;min</div>
+<div class="stamp">runs in the last 24 h: <b>310</b> (dispatch 308 / schedule 2) · median run 103s · A alerts 34 · 15 run(s) hit the time budget</div>
 <div class="stamp">entry band <b>band_volume_early</b> · exit plan <b>cfg_ladder_stop</b></div>
-<h2>Source health (this scan)</h2><div class="chips"><span class="chip ok" title="16 ok / 0 failed / 0 absent">kyber ok</span><span class="chip ok" title="26 ok / 0 failed / 0 absent">dexscreener ok</span><span class="chip ok" title="10 ok / 0 failed / 0 absent">geckoterminal ok</span><span class="chip ok" title="8 ok / 0 failed / 0 absent">robinx ok</span><span class="chip deg" title="57 ok / 2 failed / 0 absent, last HTTP 500">blockscout degraded</span><span class="chip ok" title="9 ok / 0 failed / 0 absent">rpc ok</span><span class="chip ok" title="25 ok / 0 failed / 0 absent">scanhood ok</span></div>
+<h2>Source health (this scan)</h2><div class="chips"><span class="chip ok" title="16 ok / 0 failed / 0 absent">kyber ok</span><span class="chip ok" title="26 ok / 0 failed / 0 absent">dexscreener ok</span><span class="chip ok" title="12 ok / 0 failed / 1 absent">geckoterminal ok</span><span class="chip ok" title="10 ok / 0 failed / 0 absent">robinx ok</span><span class="chip deg" title="68 ok / 8 failed / 0 absent, last HTTP 500">blockscout degraded</span><span class="chip ok" title="9 ok / 0 failed / 0 absent">rpc ok</span><span class="chip ok" title="25 ok / 0 failed / 0 absent">scanhood ok</span></div>
 <h2>A-tier (alerted · band_volume_early)</h2><div class="empty">No A-tier coins this scan. Most scans have none — that is the filter doing its job, not a malfunction.</div>
 <h2>B-tier survivors (ledgered as the control, never alerted)</h2>
+    <a class="card " href="https://dexscreener.com/robinhood/0x74d4410011883ef6cb72c1e1671b8081ead47b294689e8355abe1f01d657e6f6" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">CHINAPAD</span><span class="badge b" title="holders/min above 8 (wallet-farm rate); tx/holder/hr above 3 (bot churn); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
+        <span class="score">78<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $71k</span><span>mcap $585k</span>
+        <span>vol24 $2.4M</span><span>age 2.2h</span>
+      </div>
+      <div class="row2">
+        <span>holders 2216 (blockscout)</span><span>top10 11%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
+    </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x52d8b52cc2f638300d9825eca6e4ef6aceb4a423" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">PERPSPAD</span><span class="badge b" title="contract template not whitelisted/verified; unknown: dev holds more than 2%">B</span>
         <span class="score">77<small>/100</small></span></div>
       <div class="row2">
         <span>liq $277k</span><span>mcap $4.1M</span>
-        <span>vol24 $24.2M</span><span>age 1.2d</span>
+        <span>vol24 $24.1M</span><span>age 1.2d</span>
       </div>
       <div class="row2">
         <span>holders 3025 (blockscout)</span><span>top10 3%</span>
@@ -66,25 +79,12 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); mcap above $2,000,000 (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ band_lp_burned_renounced, ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
     </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x2954c406b6dbe9cd025c27b0abeb5d2f6a3d16a95cb0d703514f5d2ec753cd70" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">LLM</span><span class="badge b" title="unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
-        <span class="score">76<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $45k</span><span>mcap $230k</span>
-        <span>vol24 $4.1M</span><span>age 19.4h</span>
-      </div>
-      <div class="row2">
-        <span>holders 1654 (blockscout)</span><span>top10 9%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_a_strict, band_almost_bonded, band_dev_score_ge70, band_gmgn_clean</div>
-    </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x7aad4a20e73c6dce1dff13086e1f283572ef47af8bbddae6b491d9075641cacc" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">YOINK</span><span class="badge b" title="holders/min above 8 (wallet-farm rate); unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
         <span class="score">76<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $68k</span><span>mcap $544k</span>
-        <span>vol24 $3.2M</span><span>age 2.7h</span>
+        <span>liq $67k</span><span>mcap $515k</span>
+        <span>vol24 $3.2M</span><span>age 2.8h</span>
       </div>
       <div class="row2">
         <span>holders 3067 (blockscout)</span><span>top10 13%</span>
@@ -92,38 +92,51 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x0542feea93ec2441c44eb531e7407d0b1f5547394a80f7a037549e9b51cd9cef" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">奶蛙</span><span class="badge b" title="unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
-        <span class="score">75<small>/100</small></span></div>
+    <a class="card " href="https://dexscreener.com/robinhood/0x2954c406b6dbe9cd025c27b0abeb5d2f6a3d16a95cb0d703514f5d2ec753cd70" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">LLM</span><span class="badge b" title="unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
+        <span class="score">76<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $45k</span><span>mcap $309k</span>
-        <span>vol24 $4.7M</span><span>age 9.6h</span>
+        <span>liq $47k</span><span>mcap $244k</span>
+        <span>vol24 $4.1M</span><span>age 19.5h</span>
       </div>
       <div class="row2">
-        <span>holders 2078 (blockscout)</span><span>top10 16%</span>
+        <span>holders 1654 (blockscout)</span><span>top10 9%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_a_strict, band_almost_bonded, band_dev_score_ge70, band_gmgn_clean</div>
     </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x8999bac12892b3ab6734645b2d043d8325a8f32c3f9a6b8696df4f0d4fc83ef1" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">中国制造</span><span class="badge b" title="liq below $25,000; unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
-        <span class="score">75<small>/100</small></span></div>
+    <a class="card " href="https://dexscreener.com/robinhood/0x1e00ef659b5688da0781705cc04adbd98eca4502c94beab01ea7cf3c3badae73" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">FILL</span><span class="badge b" title="creator has more than 1 prior launch(es); unknown: sell round-trip above 8%; contract template not whitelisted/verified; unknown: LP status unknown">B</span>
+        <span class="score">76<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $15k</span><span>mcap $33k</span>
-        <span>vol24 $1.1M</span><span>age 6.2h</span>
+        <span>liq $108k</span><span>mcap $124k</span>
+        <span>vol24 $5.1M</span><span>age 23.3h</span>
       </div>
       <div class="row2">
-        <span>holders 1018 (blockscout)</span><span>top10 14%</span>
+        <span>holders 1848 (blockscout)</span><span>top10 2%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0xfaf0d4093602eb2d7f80ce7ba50cffaeece9c5d546b6df363107779e5ff553aa" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">CC</span><span class="badge b" title="liq below $25,000; unknown: sell round-trip above 8%; unknown: LP status unknown; dev holds more than 2%">B</span>
+        <span class="score">75<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $12k</span><span>mcap $16k</span>
+        <span>vol24 $1.0M</span><span>age 13.5h</span>
+      </div>
+      <div class="row2">
+        <span>holders 1086 (blockscout)</span><span>top10 9%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x0c61eea18f6a20dd0d83b79a8e70dfc1f9102f21117e64d4a732bed261e52d0f" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">ARENA</span><span class="badge b" title="liq below $25,000; unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
-        <span class="score">74<small>/100</small></span></div>
+        <span class="score">75<small>/100</small></span></div>
       <div class="row2">
         <span>liq $16k</span><span>mcap $30k</span>
-        <span>vol24 $1.7M</span><span>age 15.7h</span>
+        <span>vol24 $1.7M</span><span>age 15.8h</span>
       </div>
       <div class="row2">
         <span>holders 1071 (blockscout)</span><span>top10 12%</span>
@@ -131,31 +144,57 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0xc5cd525fd8c96def4dc307e182425d52484567fd0e6fe96a2e76de4639cf766a" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">Optimist</span><span class="badge b" title="holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev holds more than 2%">B</span>
-        <span class="score">74<small>/100</small></span></div>
+    <a class="card " href="https://dexscreener.com/robinhood/0x8999bac12892b3ab6734645b2d043d8325a8f32c3f9a6b8696df4f0d4fc83ef1" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">中国制造</span><span class="badge b" title="liq below $25,000; unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
+        <span class="score">75<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $129k</span><span>mcap $309k</span>
-        <span>vol24 $1.1M</span><span>age 9.3h</span>
+        <span>liq $16k</span><span>mcap $37k</span>
+        <span>vol24 $1.1M</span><span>age 6.3h</span>
       </div>
       <div class="row2">
-        <span>holders 642 (blockscout)</span><span>top10 11%</span>
+        <span>holders 1018 (blockscout)</span><span>top10 14%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x0542feea93ec2441c44eb531e7407d0b1f5547394a80f7a037549e9b51cd9cef" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">奶蛙</span><span class="badge b" title="unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
+        <span class="score">74<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $44k</span><span>mcap $295k</span>
+        <span>vol24 $4.7M</span><span>age 9.7h</span>
+      </div>
+      <div class="row2">
+        <span>holders 2078 (blockscout)</span><span>top10 16%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_a_strict, band_almost_bonded, band_dev_score_ge70, band_gmgn_clean</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x9ee0e829fcdec07734e5e669f6292440b102e49d8ac191f1805281d2c6eed775" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">TWINE</span><span class="badge b" title="unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
-        <span class="score">73<small>/100</small></span></div>
+        <span class="score">74<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $79k</span><span>mcap $715k</span>
-        <span>vol24 $10.1M</span><span>age 20.8h</span>
+        <span>liq $78k</span><span>mcap $709k</span>
+        <span>vol24 $10.1M</span><span>age 20.9h</span>
       </div>
       <div class="row2">
         <span>holders 2882 (blockscout)</span><span>top10 12%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ band_graduated_only, ctl_inverse_band · NA band_a_strict, band_almost_bonded, band_dev_score_ge70, band_gmgn_clean</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0xc5cd525fd8c96def4dc307e182425d52484567fd0e6fe96a2e76de4639cf766a" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">Optimist</span><span class="badge b" title="holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev holds more than 2%">B</span>
+        <span class="score">74<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $129k</span><span>mcap $309k</span>
+        <span>vol24 $1.1M</span><span>age 9.4h</span>
+      </div>
+      <div class="row2">
+        <span>holders 642 (blockscout)</span><span>top10 11%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x20d946cf06524552d56d4c4cfd5e68ba16427c476f5764a7ecfde676a2d0c3b1" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">FLYTOWN</span><span class="badge b" title="unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev holds more than 2%; unknown: dev bought in the creation tx">B</span>
@@ -170,11 +209,24 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_a_strict, band_almost_bonded, band_dev_score_ge70, band_gmgn_clean</div>
     </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0xace9a312dc2a7cb79dcadf91b452cd42dd1879d031a3360050cc082757f40624" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">RUFUS</span><span class="badge b" title="holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
+        <span class="score">72<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $20k</span><span>mcap $68k</span>
+        <span>vol24 $774k</span><span>age 1.2d</span>
+      </div>
+      <div class="row2">
+        <span>holders 979 (blockscout)</span><span>top10 9%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
+    </a>
     <a class="card " href="https://dexscreener.com/robinhood/0xce9717f198556ac865a3996cd75879aadfc046838e854dd8641b61f6a8a2003c" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">FOMOBRAIN</span><span class="badge b" title="unknown: LP status unknown">B</span>
         <span class="score">71<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $39k</span><span>mcap $178k</span>
+        <span>liq $35k</span><span>mcap $145k</span>
         <span>vol24 $1.0M</span><span>age 1.1d</span>
       </div>
       <div class="row2">
@@ -183,25 +235,12 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_a_strict, band_almost_bonded, band_dev_score_ge70, band_gmgn_clean</div>
     </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0xe97abd22c8bdbe4f8df83eea92a20a7837f76f1d5e6c3be9720d7d20e7f9d21c" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">SOUP</span><span class="badge b" title="holders below 1000 (or not exact); liq below $25,000; unknown: creator has more than 1 prior launch(es); age below 90m (the &lt;90m window is where rugs live)">B</span>
-        <span class="score">70<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $18k</span><span>mcap $49k</span>
-        <span>vol24 $2.5M</span><span>age 51m</span>
-      </div>
-      <div class="row2">
-        <span>holders 884 (blockscout)</span><span>top10 18%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ band_graduated_only, ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
-    </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x7c10ec07217e762fc14f23a512a82d8776991208bfd16e5c47f16d2ec2eb226d" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">PERPSPAD</span><span class="badge b" title="liq below $25,000; unknown: sell round-trip above 8%; unknown: LP status unknown; dev holds more than 2%">B</span>
         <span class="score">70<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $14k</span><span>mcap $21k</span>
-        <span>vol24 $128k</span><span>age 1.3d</span>
+        <span>liq $13k</span><span>mcap $18k</span>
+        <span>vol24 $127k</span><span>age 1.3d</span>
       </div>
       <div class="row2">
         <span>holders 1022 (blockscout)</span><span>top10 12%</span>
@@ -209,25 +248,51 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x966c5213b20f0a88ae8cb7b30ba0a239a868d54755ff02405cf025f2f0ab5e66" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">Orus</span><span class="badge b" title="score below 70.0; liq below $25,000; unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
+    <a class="card " href="https://dexscreener.com/robinhood/0x0423fcbbfb7b8d443177d6843dd2f175c5928fe7d6e93aa163ea6f2958714e29" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">SPAWN</span><span class="badge b" title="score below 70.0; unknown: sell round-trip above 8%; unknown: LP status unknown; dev holds more than 2%">B</span>
         <span class="score">69<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $23k</span><span>mcap $63k</span>
-        <span>vol24 $211k</span><span>age 3.1d</span>
+        <span>liq $34k</span><span>mcap $132k</span>
+        <span>vol24 $878k</span><span>age 1.6d</span>
+      </div>
+      <div class="row2">
+        <span>holders 1488 (blockscout)</span><span>top10 12%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0xdd9d3825136b7d2728082115ff21596a1f696fcfb99e85ecc9daca58286cb897" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">UNITY</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
+        <span class="score">64<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $10k</span><span>mcap $13k</span>
+        <span>vol24 $1.4M</span><span>age 19.6h</span>
+      </div>
+      <div class="row2">
+        <span>holders 728 (blockscout)</span><span>top10 17%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x966c5213b20f0a88ae8cb7b30ba0a239a868d54755ff02405cf025f2f0ab5e66" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">Orus</span><span class="badge b" title="score below 70.0; liq below $25,000; unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
+        <span class="score">64<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $22k</span><span>mcap $55k</span>
+        <span>vol24 $212k</span><span>age 3.1d</span>
       </div>
       <div class="row2">
         <span>holders 1140 (blockscout)</span><span>top10 15%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000</div><div class="bands">bands: ✓ ctl_inverse_band, ctl_random_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band, ctl_random_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0xd0bde1502cd5cc8727f9f4e472d3b24e12848068ec7b7d9e0d4957f8eb2a27ea" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">UP</span><span class="badge b" title="score below 70.0; creator has more than 1 prior launch(es); unknown: LP status unknown; dev holds more than 2%">B</span>
         <span class="score">62<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $59k</span><span>mcap $398k</span>
-        <span>vol24 $1.2M</span><span>age 3.6d</span>
+        <span>liq $59k</span><span>mcap $393k</span>
+        <span>vol24 $1.1M</span><span>age 3.6d</span>
       </div>
       <div class="row2">
         <span>holders 1985 (blockscout)</span><span>top10 10%</span>
@@ -235,12 +300,51 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x4d66f889b335628d92ced5e53c2b177185c41fa78b0ed46e3ce875f632b025e0" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">delusional</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
+        <span class="score">61<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $99k</span><span>mcap $154k</span>
+        <span>vol24 $778k</span><span>age 23.7h</span>
+      </div>
+      <div class="row2">
+        <span>holders 462 (blockscout)</span><span>top10 6%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x3bf9a08a357b8bfdb452c4c9e758ba40e551cae12be8ab4a354dab93e85bb068" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">ROVER</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%">B</span>
+        <span class="score">58<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $26k</span><span>mcap $25k</span>
+        <span>vol24 $270k</span><span>age 21.8h</span>
+      </div>
+      <div class="row2">
+        <span>holders 60 (blockscout)</span><span>top10 13%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x75e35ae055e42c1535fded9f9058e8ad11961491600ad221f8ce5e23f221d3d7" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">MICRO</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
+        <span class="score">57<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $14k</span><span>mcap $16k</span>
+        <span>vol24 $54k</span><span>age 15.4h</span>
+      </div>
+      <div class="row2">
+        <span>holders 21 (blockscout)</span><span>top10 2%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+    </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x7168a329ed16fd676e75254bcd94d5f81595d4988b8229482e285f20ea389537" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">FAM</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
         <span class="score">57<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $30k</span><span>mcap $108k</span>
-        <span>vol24 $526k</span><span>age 13.3h</span>
+        <span>liq $29k</span><span>mcap $97k</span>
+        <span>vol24 $527k</span><span>age 13.4h</span>
       </div>
       <div class="row2">
         <span>holders 424 (blockscout)</span><span>top10 19%</span>
@@ -248,12 +352,38 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x9c109717cf1b3603f53f526c2cca25863d836e274ef3eb9c36a5483a2af7c388" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">FLIPPY</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
+        <span class="score">57<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $19k</span><span>mcap $21k</span>
+        <span>vol24 $125k</span><span>age 20.7h</span>
+      </div>
+      <div class="row2">
+        <span>holders 26 (blockscout)</span><span>top10 0%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x7c81a56a5b3a0c884210579af989350afa5bbf067af8958de2c6c9514375d0cf" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">BENEFITS</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); creator has more than 1 prior launch(es); unknown: sell round-trip above 8%">B</span>
+        <span class="score">56<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $27k</span><span>mcap $27k</span>
+        <span>vol24 $224k</span><span>age 17.7h</span>
+      </div>
+      <div class="row2">
+        <span>holders 21 (blockscout)</span><span>top10 3%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_gmgn_clean, band_graduated_only, band_new_creation</div>
+    </a>
     <a class="card " href="https://dexscreener.com/robinhood/0xc08c208a8bf53008da38fad200c3d8033f234418a6e895720a17a73090935c83" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">MOSS</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
         <span class="score">56<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $51k</span><span>mcap $279k</span>
-        <span>vol24 $723k</span><span>age 20.6h</span>
+        <span>liq $51k</span><span>mcap $280k</span>
+        <span>vol24 $725k</span><span>age 20.6h</span>
       </div>
       <div class="row2">
         <span>holders 536 (blockscout)</span><span>top10 15%</span>
@@ -261,12 +391,25 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x3f033ab3aa52c91240563225a67171b15088202b2a6024290eb103a7a31421e0" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">PRINT</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
+        <span class="score">55<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $18k</span><span>mcap $21k</span>
+        <span>vol24 $86k</span><span>age 15.3h</span>
+      </div>
+      <div class="row2">
+        <span>holders 56 (blockscout)</span><span>top10 9%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+    </a>
     <a class="card " href="https://dexscreener.com/robinhood/0xe1381f5c4fde404ab0286f52b7a18bb0612e074a6cf05fcf2a47fd5d5394cd53" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">PVECOIN</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); creator has more than 1 prior launch(es); unknown: sell round-trip above 8%">B</span>
         <span class="score">55<small>/100</small></span></div>
       <div class="row2">
         <span>liq $27k</span><span>mcap $27k</span>
-        <span>vol24 $278k</span><span>age 17.5h</span>
+        <span>vol24 $278k</span><span>age 17.6h</span>
       </div>
       <div class="row2">
         <span>holders 49 (blockscout)</span><span>top10 7%</span>
@@ -274,18 +417,18 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
     </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x3f033ab3aa52c91240563225a67171b15088202b2a6024290eb103a7a31421e0" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">PRINT</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
+    <a class="card " href="https://dexscreener.com/robinhood/0x44feaa52afe8a83c89b1372cc52d0d1ba013e5c2275156d10b6e834ac21c062b" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">SMA</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
         <span class="score">55<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $18k</span><span>mcap $21k</span>
-        <span>vol24 $86k</span><span>age 15.2h</span>
+        <span>liq $21k</span><span>mcap $49k</span>
+        <span>vol24 $301k</span><span>age 1.0d</span>
       </div>
       <div class="row2">
-        <span>holders 56 (blockscout)</span><span>top10 9%</span>
+        <span>holders 343 (blockscout)</span><span>top10 14%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0xf7224670269dbbc9b6d7a602fbf6b6c82a4c128af728e017c5a9e5fd70f66a26" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">PIE</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
@@ -300,15 +443,15 @@
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
     </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x3bf9a08a357b8bfdb452c4c9e758ba40e551cae12be8ab4a354dab93e85bb068" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">ROVER</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%">B</span>
+    <a class="card " href="https://dexscreener.com/robinhood/0x03f264f97fcd018623cd0a48d7bd6f2c34e4d825a97837f619129a7bf0503259" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">STUPIDINU</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
         <span class="score">54<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $26k</span><span>mcap $25k</span>
-        <span>vol24 $270k</span><span>age 21.8h</span>
+        <span>liq $54k</span><span>mcap $75k</span>
+        <span>vol24 $276k</span><span>age 1.1d</span>
       </div>
       <div class="row2">
-        <span>holders 60 (blockscout)</span><span>top10 13%</span>
+        <span>holders 354 (blockscout)</span><span>top10 14%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
@@ -318,23 +461,10 @@
         <span class="score">54<small>/100</small></span></div>
       <div class="row2">
         <span>liq $26k</span><span>mcap $26k</span>
-        <span>vol24 $130k</span><span>age 18.4h</span>
+        <span>vol24 $130k</span><span>age 18.5h</span>
       </div>
       <div class="row2">
         <span>holders 130 (blockscout)</span><span>top10 10%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x14341221436285824e39986b99a058fde5372db42f9fdd3a5ee3ddbe00d15ebb" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">LIFE</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%">B</span>
-        <span class="score">53<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $69k</span><span>mcap $96k</span>
-        <span>vol24 $276k</span><span>age 1.1d</span>
-      </div>
-      <div class="row2">
-        <span>holders 86 (blockscout)</span><span>top10 14%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
@@ -343,24 +473,63 @@
       <div class="row1"><span class="sym">LONGCAT</span><span class="badge b" title="score below 70.0; unknown: creator has more than 1 prior launch(es); unknown: LP status unknown; unknown: dev holds more than 2%">B</span>
         <span class="score">53<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $1.8M</span><span>mcap $2.7M</span>
+        <span>liq $1.8M</span><span>mcap $2.6M</span>
         <span>vol24 $2.6M</span><span>age 1.2d</span>
       </div>
       <div class="row2">
         <span>holders 1669 (blockscout)</span><span>top10 7%</span>
-        <span>LP burned unknown</span><span>round-trip 2.4%</span>
+        <span>LP burned unknown</span><span>round-trip 2.5%</span>
       </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); mcap above $2,000,000 (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; mcap above $2,000,000 (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0xe7022cd18a11eb5250c42dcac93b138ed46233b8384d05cfe4146c499659f729" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">ANTHROPIGX</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
+        <span class="score">52<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $24k</span><span>mcap $24k</span>
+        <span>vol24 $114k</span><span>age 21.5h</span>
+      </div>
+      <div class="row2">
+        <span>holders 65 (blockscout)</span><span>top10 12%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x04f9f653f1692bbffeda87a5436aded3e9c0bc65e0bd929747a3a64b67c1312e" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">FLYAI</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
-        <span class="score">51<small>/100</small></span></div>
+        <span class="score">52<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $39k</span><span>mcap $204k</span>
-        <span>vol24 $411k</span><span>age 1.1d</span>
+        <span>liq $37k</span><span>mcap $191k</span>
+        <span>vol24 $403k</span><span>age 1.1d</span>
       </div>
       <div class="row2">
         <span>holders 656 (blockscout)</span><span>top10 17%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0x14341221436285824e39986b99a058fde5372db42f9fdd3a5ee3ddbe00d15ebb" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">LIFE</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%">B</span>
+        <span class="score">52<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $69k</span><span>mcap $96k</span>
+        <span>vol24 $268k</span><span>age 1.1d</span>
+      </div>
+      <div class="row2">
+        <span>holders 86 (blockscout)</span><span>top10 14%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0xc930174a14975ebeaeaa13ffd1994debadcb8224efabe88c01c66057dd4e7000" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">DOTMATH</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
+        <span class="score">49<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $42k</span><span>mcap $203k</span>
+        <span>vol24 $382k</span><span>age 1.9d</span>
+      </div>
+      <div class="row2">
+        <span>holders 696 (blockscout)</span><span>top10 10%</span>
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
@@ -369,20 +538,33 @@
       <div class="row1"><span class="sym">ANTHROPIG</span><span class="badge b" title="score below 70.0; creator has more than 1 prior launch(es); unknown: LP status unknown; unknown: dev holds more than 2%">B</span>
         <span class="score">48<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $2.2M</span><span>mcap $3.4M</span>
-        <span>vol24 $2.2M</span><span>age 1.7d</span>
+        <span>liq $2.1M</span><span>mcap $3.2M</span>
+        <span>vol24 $2.1M</span><span>age 1.7d</span>
       </div>
       <div class="row2">
         <span>holders 2757 (blockscout)</span><span>top10 3%</span>
-        <span>LP burned unknown</span><span>round-trip 1.8%</span>
+        <span>LP burned unknown</span><span>round-trip 3.2%</span>
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); mcap above $2,000,000 (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
+    </a>
+    <a class="card " href="https://dexscreener.com/robinhood/0xc48b277a5bd9ade03647584bc643235fc67e61041a811f82c677c349b3f5aec8" target="_blank" rel="noopener">
+      <div class="row1"><span class="sym">BRCG</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
+        <span class="score">48<small>/100</small></span></div>
+      <div class="row2">
+        <span>liq $27k</span><span>mcap $86k</span>
+        <span>vol24 $118k</span><span>age 4.5h</span>
+      </div>
+      <div class="row2">
+        <span>holders 322 (blockscout)</span><span>top10 14%</span>
+        <span>LP burned unknown</span><span>round-trip ?</span>
+      </div>
+      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
     </a>
     <a class="card " href="https://dexscreener.com/robinhood/0x037dea9a1851a87f997c42cc9bf18659675f642d01d28fc7b1cc94695a0ad54c" target="_blank" rel="noopener">
       <div class="row1"><span class="sym">DOGE-1</span><span class="badge b" title="score below 70.0; unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev bought in the creation tx">B</span>
         <span class="score">48<small>/100</small></span></div>
       <div class="row2">
-        <span>liq $29k</span><span>mcap $93k</span>
+        <span>liq $29k</span><span>mcap $96k</span>
         <span>vol24 $140k</span><span>age 11.1d</span>
       </div>
       <div class="row2">
@@ -390,191 +572,9 @@
         <span>LP burned unknown</span><span>round-trip ?</span>
       </div>
       <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x6f638b29e275cab8f584df0a4c6a045922217aed8747f2459eedb034abb31ac7" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">FLYBRAIN</span><span class="badge b" title="score below 70.0; unknown: LP status unknown">B</span>
-        <span class="score">46<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $251k</span><span>mcap $9.4M</span>
-        <span>vol24 $902k</span><span>age 2.9d</span>
-      </div>
-      <div class="row2">
-        <span>holders 10365 (blockscout)</span><span>top10 7%</span>
-        <span>LP burned unknown</span><span>round-trip 2.0%</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; mcap above $2,000,000 (not early)</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x17f34a62d4b4687d5cbd9fd81fa88cfff154fec38a7e307c8c80860bd175f7c1" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">EXAMCN</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
-        <span class="score">45<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $51k</span><span>mcap $299k</span>
-        <span>vol24 $391k</span><span>age 2.1d</span>
-      </div>
-      <div class="row2">
-        <span>holders 818 (blockscout)</span><span>top10 18%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x4cb61eace9155def3794461562828b1d0e02add2927f0ced4f2416fb218d8789" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">O1BOT</span><span class="badge b" title="score below 70.0; unknown: sell round-trip above 8%; unknown: LP status unknown; unknown: dev holds more than 2%">B</span>
-        <span class="score">45<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $97k</span><span>mcap $618k</span>
-        <span>vol24 $384k</span><span>age 5.9d</span>
-      </div>
-      <div class="row2">
-        <span>holders 2354 (blockscout)</span><span>top10 9%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x4b7c86491df95f366b31217b2950d2c5136a2f19b6879613eac73d0e69092a1a" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">MEME</span><span class="badge b" title="score below 70.0; unknown: LP status unknown; unknown: dev holds more than 2%">B</span>
-        <span class="score">44<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $874k</span><span>mcap $52.0M</span>
-        <span>vol24 $4.0M</span><span>age 8.3d</span>
-      </div>
-      <div class="row2">
-        <span>holders 30922 (blockscout)</span><span>top10 8%</span>
-        <span>LP burned unknown</span><span>round-trip 0.6%</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; mcap above $2,000,000 (not early)</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0xdf2974873277085977152b1c72384d7787048bf6c4adaee744e92e02b59a5e05" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">FAFO</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); creator has more than 1 prior launch(es); unknown: sell round-trip above 8%">B</span>
-        <span class="score">43<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $28k</span><span>mcap $28k</span>
-        <span>vol24 $33k</span><span>age 2.2h</span>
-      </div>
-      <div class="row2">
-        <span>holders 30 (blockscout)</span><span>top10 14%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_gmgn_clean, band_graduated_only, band_new_creation</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x932d1eb8d0ebbacc02c0d2233e39db18e86ea368d9680cd3185430cea4efa765" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">scpinu</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
-        <span class="score">42<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $62k</span><span>mcap $580k</span>
-        <span>vol24 $557k</span><span>age 4.9h</span>
-      </div>
-      <div class="row2">
-        <span>holders 253 (blockscout)</span><span>top10 8%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x7e271c400427ecb727f5fbb27dec69254bce7c4219e95e3535d0ed128f79648a" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">INU</span><span class="badge b" title="score below 70.0; unknown: LP status unknown; unknown: dev holds more than 2%; unknown: dev bought in the creation tx">B</span>
-        <span class="score">41<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $503k</span><span>mcap $2.9M</span>
-        <span>vol24 $1.7M</span><span>age 2.6d</span>
-      </div>
-      <div class="row2">
-        <span>holders 1696 (blockscout)</span><span>top10 9%</span>
-        <span>LP burned unknown</span><span>round-trip 3.1%</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; mcap above $2,000,000 (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_gmgn_clean, band_graduated_only, band_new_creation</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x22f2ca3bbeabc3761afa72a6d25e64693f89362588ea1442ec235aebc184a215" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">BOEINU</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
-        <span class="score">40<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $20k</span><span>mcap $20k</span>
-        <span>vol24 $24k</span><span>age 10.1h</span>
-      </div>
-      <div class="row2">
-        <span>holders 11 (blockscout)</span><span>top10 1%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0xff0aa5f0acd38204bcf7113cc8027b7269b34c675248129fff74371d7d2197b9" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">CME</span><span class="badge b" title="score below 70.0; unknown: creator has more than 1 prior launch(es); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
-        <span class="score">39<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $160k</span><span>mcap $3.0M</span>
-        <span>vol24 $330k</span><span>age 5.6d</span>
-      </div>
-      <div class="row2">
-        <span>holders 5657 (blockscout)</span><span>top10 15%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; mcap above $2,000,000 (not early)</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x8a107cb1a6d50471d7db9faee815b52a83c60862017f6347c448877754313dcd" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">ROBDOG</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
-        <span class="score">39<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $50k</span><span>mcap $438k</span>
-        <span>vol24 $272k</span><span>age 1.1d</span>
-      </div>
-      <div class="row2">
-        <span>holders 316 (blockscout)</span><span>top10 10%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x13c339deb9ea2f31a6616e89aa097940667d77fa5de2de063f7bcf04b75dd8e5" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">MONEY</span><span class="badge b" title="score below 70.0; unknown: creator has more than 1 prior launch(es); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
-        <span class="score">38<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $121k</span><span>mcap $2.2M</span>
-        <span>vol24 $723k</span><span>age 1.9d</span>
-      </div>
-      <div class="row2">
-        <span>holders 1139 (blockscout)</span><span>top10 19%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); mcap above $2,000,000 (not early); buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0xe86ec212e18223b4d74e222083094469b3a06fd370ffaec35e5a8598e47d9481" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">DELMAN</span><span class="badge b" title="score below 70.0; holders below 1000 (or not exact); liq below $25,000; unknown: sell round-trip above 8%">B</span>
-        <span class="score">38<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $20k</span><span>mcap $20k</span>
-        <span>vol24 $24k</span><span>age 20.6h</span>
-      </div>
-      <div class="row2">
-        <span>holders 7 (blockscout)</span><span>top10 3%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0x77579758389d931f6a78368ce9be551711eb3b1d61adc841fb7a746ff5867620" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">ZORDI</span><span class="badge b" title="score below 70.0; liq below $25,000; unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
-        <span class="score">38<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $24k</span><span>mcap $69k</span>
-        <span>vol24 $46k</span><span>age 9.7d</span>
-      </div>
-      <div class="row2">
-        <span>holders 1466 (blockscout)</span><span>top10 14%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_lp_burned_renounced</div>
-    </a>
-    <a class="card " href="https://dexscreener.com/robinhood/0xb299893eaf009c9325b788a84c1dd85501a24f78228e4a94769be52326f0919b" target="_blank" rel="noopener">
-      <div class="row1"><span class="sym">PENPE</span><span class="badge b" title="score below 70.0; unknown: creator has more than 1 prior launch(es); unknown: sell round-trip above 8%; unknown: LP status unknown">B</span>
-        <span class="score">38<small>/100</small></span></div>
-      <div class="row2">
-        <span>liq $84k</span><span>mcap $1.1M</span>
-        <span>vol24 $506k</span><span>age 3.1d</span>
-      </div>
-      <div class="row2">
-        <span>holders 1057 (blockscout)</span><span>top10 13%</span>
-        <span>LP burned unknown</span><span>round-trip ?</span>
-      </div>
-      <div class="miss">short of band_volume_early: age above 30m (not early); hour-1 volume below $50,000; buys below 2x sells in hour 1</div><div class="bands">bands: ✓ ctl_inverse_band · NA band_almost_bonded, band_dev_score_ge70, band_gmgn_clean, band_graduated_only</div>
-    </a><p class="note">… and 34 more (see latest_scan.json)</p>
-<h2>Discovery by source</h2><table><tr><th>source</th><th>discovered</th><th>quota cut</th></tr><tr><td>logs</td><td>189</td><td>·</td></tr><tr><td>watchlist</td><td>71</td><td>89</td></tr><tr><td>rechecks</td><td>40</td><td>·</td></tr><tr><td>feeds</td><td>0</td><td>·</td></tr></table><p class="note">absent (no such pair/token): 191</p><p class="note">pass-1 rejects by gate: vol_ok 18, liq_ok 8, creator_ok 4, lp_ok 2, dev_ok 2, sell_tax_ok 1, rpc_available 1, infra_or_stock 1</p>
-<h2>Honest scorecard (A vs B)</h2><table><tr><th>tier</th><th>n</th><th>1h</th><th>6h</th><th>24h</th><th>7d</th></tr><tr><td>A (alerted)</td><td>34</td><td><b>55%</b> / +11%<br><small>n=33 · dead 0%</small></td><td><b>52%</b> / +11%<br><small>n=29 · dead 3%</small></td><td>·</td><td>·</td></tr><tr><td>B (silent control)</td><td>447</td><td><b>34%</b> / -7%<br><small>n=414 · dead 2%</small></td><td><b>27%</b> / -15%<br><small>n=324 · dead 2%</small></td><td><b>12%</b> / -46%<br><small>n=40 · dead 8%</small></td><td>·</td></tr></table><p class="note">cells = hit-rate / median return once a horizon matures; dead = return ≤ −99%. Promoted B rows stay in B (intention-to-treat).</p><p class="note">tier A: n=34 across 2 alert-day(s) · open 34 · rugged-after-passing-gates 15% · below 12 alert-days: not a bound</p><p class="note">tier B: n=447 across 2 alert-day(s) · promoted-B n=7 · open 447 · rugged-after-passing-gates 5% · below 12 alert-days: not a bound</p><p class="note">quote-integrity: 1 row(s) terminally SUSPECT (implied supply moved &gt;1.5x vs entry) — excluded above, not "still maturing".</p><p class="note"><b>If tier A doesn't clearly beat tier B, the A-band is not adding signal.</b> A losing scorecard is the screen doing its job — telling you not to scale.</p>
+    </a><p class="note">… and 77 more (see latest_scan.json)</p>
+<h2>Discovery by source</h2><table><tr><th>source</th><th>discovered</th><th>quota cut</th></tr><tr><td>logs</td><td>144</td><td>·</td></tr><tr><td>watchlist</td><td>116</td><td>44</td></tr><tr><td>rechecks</td><td>40</td><td>·</td></tr><tr><td>feeds</td><td>0</td><td>·</td></tr></table><p class="note">absent (no such pair/token): 163</p><p class="note">pass-1 rejects by gate: vol_ok 12, liq_ok 5, creator_ok 2, dev_ok 1, blockscout_available 1</p>
+<h2>Honest scorecard (A vs B)</h2><table><tr><th>tier</th><th>n</th><th>1h</th><th>6h</th><th>24h</th><th>7d</th></tr><tr><td>A (alerted)</td><td>34</td><td><b>55%</b> / +11%<br><small>n=33 · dead 0%</small></td><td><b>52%</b> / +11%<br><small>n=29 · dead 3%</small></td><td>·</td><td>·</td></tr><tr><td>B (silent control)</td><td>449</td><td><b>34%</b> / -7%<br><small>n=417 · dead 2%</small></td><td><b>27%</b> / -15%<br><small>n=324 · dead 2%</small></td><td><b>12%</b> / -46%<br><small>n=40 · dead 8%</small></td><td>·</td></tr></table><p class="note">cells = hit-rate / median return once a horizon matures; dead = return ≤ −99%. Promoted B rows stay in B (intention-to-treat).</p><p class="note">tier A: n=34 across 2 alert-day(s) · open 34 · rugged-after-passing-gates 15% · below 12 alert-days: not a bound</p><p class="note">tier B: n=449 across 2 alert-day(s) · promoted-B n=7 · open 449 · rugged-after-passing-gates 5% · below 12 alert-days: not a bound</p><p class="note">quote-integrity: 1 row(s) terminally SUSPECT (implied supply moved &gt;1.5x vs entry) — excluded above, not "still maturing".</p><p class="note"><b>If tier A doesn't clearly beat tier B, the A-band is not adding signal.</b> A losing scorecard is the screen doing its job — telling you not to scale.</p>
 <h2>Paper A-book (cloud, quotes only)</h2><table><tr><th>positions</th><td>19 open · 13 closed</td></tr><tr><th>fills</th><td>34 buys · 0 sells</td></tr><tr><th>cost (all)</th><td>$320</td></tr><tr><th>realized (all)</th><td>$301</td></tr><tr><th>closed P&L</th><td>$44 on $130 (+34%)</td></tr><tr><th>mean entry impact</th><td>23.40% (n=32)</td></tr><tr><th>gas charged</th><td>$4.41</td></tr></table><p class="note">Paper fills at real aggregator quotes with slippage and L2 gas charged; realized includes only executed exits, open positions are NOT marked to market here.</p><p class="note"><b>Real automation is justified ONLY if this scorecard is repeatedly positive.</b></p>
 <h2>Live paper book (Mac, multi-policy)</h2><p class="stamp">as of 2026-09-13 · champion cfg_ladder_stop · 65 positions across 2 day(s)</p><table><tr><th>policy</th><th>n</th><th>mean</th><th>day-clustered 2.5% LB</th></tr><tr class="pos"><td>sell_30m</td><td>65</td><td>+120%</td><td>+72%</td></tr><tr><td>cfg_ladder_trail30_6h</td><td>65</td><td>-7%</td><td>-8%</td></tr><tr><td>sell_15m</td><td>65</td><td>-6%</td><td>-13%</td></tr><tr><td>tp2_half_trail30</td><td>65</td><td>+42%</td><td>-16%</td></tr><tr><td>sell_1h</td><td>65</td><td>-29%</td><td>-29%</td></tr><tr><td>cfg_ladder</td><td>65</td><td>-34%</td><td>-37%</td></tr><tr><td>cfg_ladder_stop</td><td>64</td><td>-37%</td><td>-40%</td></tr><tr><td>tp2_half_stop50_6h</td><td>65</td><td>-53%</td><td>-55%</td></tr><tr><td>trail_30</td><td>65</td><td>+106%</td><td>-83%</td></tr><tr><td>stop_30</td><td>65</td><td>-70%</td><td>-92%</td></tr><tr><td>stop_50</td><td>64</td><td>-77%</td><td>-92%</td></tr><tr><td>trail_50</td><td>64</td><td>+37%</td><td>-92%</td></tr><tr><td>hold_to_end</td><td>65</td><td>-75%</td><td>-100%</td></tr><tr><td>sell_2h</td><td>65</td><td>-52%</td><td>-100%</td></tr><tr><td>sell_3h</td><td>65</td><td>-31%</td><td>-100%</td></tr><tr><td>sell_6h</td><td>65</td><td>-75%</td><td>-100%</td></tr><tr class="ctl"><td>ctl_exit_immediately (control)</td><td>65</td><td>-24%</td><td>-30%</td></tr><tr class="ctl"><td>ctl_random_exit (control)</td><td>65</td><td>-7%</td><td>-46%</td></tr></table><p class="note">Weekly livebook digest from the Mac (improve.py --summary-json). Bounds are day-clustered bootstrap 2.5th percentiles; a bound from fewer than 12 clusters is not a bound. Not financial advice.</p><p class="note">The decision criterion is the day-clustered 2.5th-percentile lower bound, never the mean; a control that clears it means the apparatus is measuring itself.</p>
 <footer>Probabilistic screen, NOT a guarantee. A-tier = best SURVIVAL odds under every gate, not predicted ROI. On this chain the raw control went to zero 96% of the time at 7d. Alerts + paper only; nothing here touches keys or funds. Not financial advice. Ranked by survival-quality score, NOT predicted ROI.</footer>
