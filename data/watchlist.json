@@ -84,7 +84,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789310680.5411367,
   "symbol": "FLYAI"
  },
@@ -690,7 +690,7 @@
    "gt_verified": true,
    "holders_source": "blockscout",
    "holders_updated_age_s": 2575.555102825165,
-   "honeypot": null,
+   "honeypot": false,
    "insider_networks_pct": null,
    "insider_pct": null,
    "is_proxy": false,
@@ -704,17 +704,19 @@
    "mint_authority_active": null,
    "owner_renounced": null,
    "owner_state": "no_owner_fn",
-   "pass": 2,
+   "pass": 1,
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789307265.5551028,
-   "scanhood_sellable": null,
-   "scanhood_verdict": null,
+   "safety_ts": 1789314391.5018096,
+   "scanhood_sellable": true,
+   "scanhood_verdict": "DANGER",
    "sniper_swaps_first_blocks": null,
    "sources_dark": [],
    "sources_used": [
-    "rpc"
+    "rpc",
+    "scanhood",
+    "disc"
    ],
    "template_name": null,
    "top10_pct": 18.617198174720453,
@@ -724,8 +726,8 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789307265.5551028,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "MONEY"
  },
  "0x0a9e85d44d20133bd12a5f30f24c88f91aabd0bc": {
@@ -1122,17 +1124,17 @@
    "status": "ok"
   },
   "disc": {
-   "block": 62061848,
+   "block": 62068422,
    "creator": null,
    "hook": "0x0000000000000000000000000000000000000000",
    "kind": "pool_v4",
    "launchpad": null,
-   "log_index": 160,
+   "log_index": 51,
    "numeraire": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
    "pair": null,
-   "pool_id": "0xbd7559677d11a05dca5f4c5287f708d8168c86f6faba1ceffa6810cbf08f9395",
+   "pool_id": "0x0536171b3001c61c4c9e94773df9524edc93bcb0ff058e117fdee2fb08fa8caa",
    "token": "0x10451fe3d11cfdb44492331b0c73fb7c361b9dcf",
-   "tx": "0x542d4c6cb5e625e1b63cb9d8a888410a0d0652fc59621cf9c8f885791fb5d578"
+   "tx": "0x6c0aada042ef2ee5c783664509b766cb073e7d2d660598992c233a92779e357b"
   },
   "first_sighting_ts": 1789311864.094738,
   "gate_fails": 0,
@@ -1151,18 +1153,18 @@
    "gt_score": 40.63492063492063,
    "gt_verified": false,
    "holders_source": "blockscout",
-   "holders_updated_age_s": 0.0,
+   "holders_updated_age_s": 73.50180959701538,
    "honeypot": null,
    "insider_networks_pct": null,
    "insider_pct": null,
    "is_proxy": false,
    "is_scam": false,
    "launchpad_completed": true,
-   "launchpad_completed_age_s": 1681.851259469986,
+   "launchpad_completed_age_s": 2751.5018095970154,
    "launchpad_graduation_pct": 100.0,
    "lp_check_source": null,
    "lp_locked_pct": null,
-   "lp_share_pct": 52.38583414669929,
+   "lp_share_pct": 52.38019540637427,
    "mint_authority_active": null,
    "owner_renounced": null,
    "owner_state": "no_owner_fn",
@@ -1170,7 +1172,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789313321.8512595,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": null,
    "scanhood_verdict": null,
    "sniper_swaps_first_blocks": null,
@@ -1183,15 +1185,15 @@
     "robinx"
    ],
    "template_name": null,
-   "top10_pct": 15.872105291766776,
-   "top10_pct_gt": 49.1216,
-   "total_holders": 563,
-   "tx_per_holder_total": 35.3712,
+   "top10_pct": 15.267386040347402,
+   "top10_pct_gt": 45.4973,
+   "total_holders": 583,
+   "tx_per_holder_total": 36.1372,
    "verified_source": true
   },
-  "misses": 10,
-  "refreshed_ts": 1789313321.8512595,
-  "safety_ts": 1789313321.8512595,
+  "misses": 9,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "PONSORA"
  },
  "0x133913959a566728f83316f6fb9086fb1274a0db": {
@@ -1280,7 +1282,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789291507.873942,
   "symbol": "ARENA"
  },
@@ -1555,7 +1557,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789300992.150366,
   "symbol": "PERPSPAD"
  },
@@ -1626,9 +1628,9 @@
    "owner_state": "protocol",
    "pass": 1,
    "risk_score": null,
-   "roundtrip_loss_pct": 2.8855,
+   "roundtrip_loss_pct": 2.387,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -1647,8 +1649,8 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "LONGCAT"
  },
  "0x16391c40e85fb2246a2c8c17bfa2594c5d3ef84b": {
@@ -1720,13 +1722,15 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789310680.5411367,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
    "sources_dark": [],
    "sources_used": [
-    "rpc"
+    "rpc",
+    "scanhood",
+    "disc"
    ],
    "template_name": null,
    "top10_pct": 14.62479967117455,
@@ -1736,8 +1740,8 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789310680.5411367,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "GRASS"
  },
  "0x168661c52e5922288dfb2b3f323b6cf90eb21e18": {
@@ -1807,9 +1811,9 @@
    "owner_state": "protocol",
    "pass": 1,
    "risk_score": null,
-   "roundtrip_loss_pct": 2.3572,
+   "roundtrip_loss_pct": 0.544,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -1828,8 +1832,8 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "STRATEGY"
  },
  "0x16ae0448e4eb22c4afefc881f8aa47d1acb7a87e": {
@@ -2106,7 +2110,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789262112.3327794,
   "symbol": "PRINT"
  },
@@ -2195,7 +2199,7 @@
    "verified_source": true
   },
   "misses": 3,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789241831.21144,
   "symbol": "ROVER"
  },
@@ -2826,7 +2830,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -2846,8 +2850,8 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "IF"
  },
  "0x2550d0e7a538e0d12359b926531e980245e7b448": {
@@ -3470,13 +3474,15 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789310680.5411367,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
    "sources_dark": [],
    "sources_used": [
-    "rpc"
+    "rpc",
+    "scanhood",
+    "disc"
    ],
    "template_name": null,
    "top10_pct": 16.06763623886585,
@@ -3486,8 +3492,8 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789310680.5411367,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "TWO"
  },
  "0x2f219c706e052dc25372a0c59dcc2afe0cab12f3": {
@@ -3648,7 +3654,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -3668,8 +3674,8 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "SWOLE"
  },
  "0x30a8be3b46a1802f33b20b988e86f8f2c7c61e18": {
@@ -3917,7 +3923,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": 0.2266,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -3934,8 +3940,8 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "HOOD"
  },
  "0x33242b42288b0a9aa0fdd49625c617ebe5474a35": {
@@ -4209,7 +4215,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789272871.2229853,
   "symbol": "DANGER"
  },
@@ -4280,9 +4286,9 @@
    "owner_state": "protocol",
    "pass": 1,
    "risk_score": null,
-   "roundtrip_loss_pct": 3.4682,
+   "roundtrip_loss_pct": 3.3559,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -4301,8 +4307,8 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "ANTHROPIG"
  },
  "0x35a79120e07bae083045d44b8349c5d47f37ac13": {
@@ -4391,7 +4397,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789274529.3864062,
   "symbol": "CC"
  },
@@ -4574,7 +4580,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789266056.6540916,
   "symbol": "KERF"
  },
@@ -4645,9 +4651,9 @@
    "owner_state": "protocol",
    "pass": 1,
    "risk_score": null,
-   "roundtrip_loss_pct": 0.6177,
+   "roundtrip_loss_pct": 0.3446,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -4666,8 +4672,8 @@
    "verified_source": true
   },
   "misses": 3,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "MEME"
  },
  "0x386d41889640f23990db1a1eb470bb46c7f24d3b": {
@@ -5580,7 +5586,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789274529.3864062,
   "symbol": "DOGE-1"
  },
@@ -5763,7 +5769,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789253454.7842042,
   "symbol": "KEEPTHINKING"
  },
@@ -6225,7 +6231,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789263869.2023268,
   "symbol": "SPAWN"
  },
@@ -6393,7 +6399,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789306775.1882682,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -6401,7 +6407,9 @@
     "rpc"
    ],
    "sources_used": [
-    "rpc"
+    "rpc",
+    "scanhood",
+    "disc"
    ],
    "template_name": null,
    "top10_pct": 13.354546223540495,
@@ -6411,8 +6419,8 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789306775.1882682,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "LIGER"
  },
  "0x4280b228c08dc003649cb9366dd70f0f7c74c74d": {
@@ -6578,7 +6586,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -6596,8 +6604,8 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "SCHIFFY"
  },
  "0x42d288fc92d042c4e8b441464093a3b141b11e18": {
@@ -7127,98 +7135,9 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789303901.981829,
   "symbol": "BENEFITS"
- },
- "0x462dff4be800c77a61e69dc2ea6010e4237f674d": {
-  "bands_true": [
-   "ctl_inverse_band"
-  ],
-  "chain_facts": {
-   "burned_raw": null,
-   "decimals": 18,
-   "honeypot": null,
-   "lp_check_source": "unknown",
-   "lp_locked_pct": null,
-   "lp_total_raw": null,
-   "owner_state": "no_owner_fn",
-   "pair": null,
-   "roundtrip_loss_pct": null,
-   "route": "none",
-   "sources_used": [
-    "rpc"
-   ],
-   "status": "ok"
-  },
-  "disc": {
-   "block": 62058376,
-   "creator": null,
-   "hook": "0x0000000000000000000000000000000000000000",
-   "kind": "pool_v4",
-   "launchpad": null,
-   "log_index": 31,
-   "numeraire": "0x0000000000000000000000000000000000000000",
-   "pair": null,
-   "pool_id": "0xf447cd04112ae0292adb9c3d38057948f509c994fffd46c047e718f1319dddb6",
-   "token": "0x462dff4be800c77a61e69dc2ea6010e4237f674d",
-   "tx": "0xa3320393c41234b10f8876e7b8e22918156bb756fa331ffd222398ce8b350ff8"
-  },
-  "first_sighting_ts": 1789227513.7764676,
-  "gate_fails": 0,
-  "last_gates_ok": true,
-  "last_safety": {
-   "buys_per_buyer_m5": null,
-   "creator_dead_frac": null,
-   "creator_prior_tokens": 0,
-   "creator_score": null,
-   "danger_risks": [],
-   "deployer": "0xa73cb3d1dfe7f71763a0cdc171aba786d527a9e4",
-   "dev_pct": 0.0,
-   "dev_sniped": false,
-   "freeze_authority_active": null,
-   "graph_insiders": null,
-   "gt_score": 48.340425531914896,
-   "gt_verified": false,
-   "holders_source": "blockscout",
-   "holders_updated_age_s": 207.7764675617218,
-   "honeypot": false,
-   "insider_networks_pct": null,
-   "insider_pct": null,
-   "is_proxy": false,
-   "is_scam": false,
-   "launchpad_completed": true,
-   "launchpad_completed_age_s": 4142.776467561722,
-   "launchpad_graduation_pct": 100.0,
-   "lp_check_source": null,
-   "lp_locked_pct": null,
-   "lp_share_pct": 27.91248614684339,
-   "mint_authority_active": null,
-   "owner_renounced": null,
-   "owner_state": "no_owner_fn",
-   "pass": 1,
-   "risk_score": null,
-   "roundtrip_loss_pct": 5.4064,
-   "rugged": null,
-   "safety_ts": 1789307020.371639,
-   "scanhood_sellable": true,
-   "scanhood_verdict": "PASS",
-   "sniper_swaps_first_blocks": null,
-   "sources_dark": [],
-   "sources_used": [
-    "rpc"
-   ],
-   "template_name": null,
-   "top10_pct": 10.367368077991308,
-   "top10_pct_gt": 26.4339,
-   "total_holders": 1531,
-   "tx_per_holder_total": 20.4664,
-   "verified_source": true
-  },
-  "misses": 1,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789307020.371639,
-  "symbol": "SWARM"
  },
  "0x46b6995b02b1e3afa39033243999e00d739615f1": {
   "bands_true": [
@@ -7305,7 +7224,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789267502.1549304,
   "symbol": "RUFUS"
  },
@@ -7483,7 +7402,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789240614.606481,
   "symbol": "ANTHROPIGX"
  },
@@ -7751,7 +7670,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789309686.4472432,
   "symbol": "HEDGE"
  },
@@ -7870,17 +7789,17 @@
    "status": "ok"
   },
   "disc": {
-   "block": 62066615,
+   "block": 62068689,
    "creator": null,
    "hook": "0x0000000000000000000000000000000000000000",
    "kind": "pool_v4",
    "launchpad": null,
-   "log_index": 28,
+   "log_index": 75,
    "numeraire": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
    "pair": null,
-   "pool_id": "0xef114e516a61e47971e74c3ab0eb8b88f5b96fea39edc2febb088f1f58825991",
+   "pool_id": "0x92357fb906f6805706dd9b08843e22a4027957d1125035834b7d0b4cc8df8aa7",
    "token": "0x4b455ee2689b7ee65cff13011a33d406c27dcaa3",
-   "tx": "0x061cdbafde4a28272b63e054bd477ec4528190a51f27e38d9157569385efcdc2"
+   "tx": "0x67b77871bb4f7b03006a94743c3dda4d93afddd7d46d7d0075ea519bcbb14ecd"
   },
   "first_sighting_ts": 1789309440.481155,
   "gate_fails": 0,
@@ -7899,18 +7818,18 @@
    "gt_score": 47.74603174603175,
    "gt_verified": false,
    "holders_source": "blockscout",
-   "holders_updated_age_s": 743.4688055515289,
+   "holders_updated_age_s": 380.5018095970154,
    "honeypot": null,
    "insider_networks_pct": null,
    "insider_pct": null,
    "is_proxy": false,
    "is_scam": false,
    "launchpad_completed": true,
-   "launchpad_completed_age_s": 4630.468805551529,
+   "launchpad_completed_age_s": 5217.501809597015,
    "launchpad_graduation_pct": 100.0,
    "lp_check_source": null,
    "lp_locked_pct": null,
-   "lp_share_pct": 38.551025168830144,
+   "lp_share_pct": 40.399638730108244,
    "mint_authority_active": null,
    "owner_renounced": null,
    "owner_state": "no_owner_fn",
@@ -7918,7 +7837,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": null,
    "scanhood_verdict": null,
    "sniper_swaps_first_blocks": null,
@@ -7931,15 +7850,15 @@
     "robinx"
    ],
    "template_name": null,
-   "top10_pct": 10.283074092343849,
-   "top10_pct_gt": 28.9788,
-   "total_holders": 1728,
-   "tx_per_holder_total": 20.5671,
+   "top10_pct": 10.684510447690894,
+   "top10_pct_gt": 28.443,
+   "total_holders": 1912,
+   "tx_per_holder_total": 17.1621,
    "verified_source": true
   },
-  "misses": 7,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "misses": 6,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "CHINAPAD"
  },
  "0x4b4729f5fe8a7a880e238d9d0ac61abff37e1e18": {
@@ -8198,7 +8117,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": 2.0186,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -8216,8 +8135,8 @@
    "verified_source": true
   },
   "misses": 2,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "FLYBRAIN"
  },
  "0x4ed2692f5e108724a919de5fcbf267f231d5e333": {
@@ -8584,7 +8503,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789257784.5930543,
   "symbol": "par"
  },
@@ -8673,7 +8592,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789261448.9967127,
   "symbol": "MICRO"
  },
@@ -9125,7 +9044,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789249821.2758086,
   "symbol": "UP"
  },
@@ -9785,7 +9704,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789237801.304501,
   "symbol": "AMDL"
  },
@@ -10147,7 +10066,7 @@
    "verified_source": true
   },
   "misses": 1,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789243765.849158,
   "symbol": "FOMOBRAIN"
  },
@@ -10220,7 +10139,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": 3.4747,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -10238,8 +10157,8 @@
    "verified_source": null
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "ICOIN"
  },
  "0x5da49da4de267c1091566133e2cfcef204e81e18": {
@@ -10515,9 +10434,100 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789302503.3959098,
   "symbol": "BANKLESS"
+ },
+ "0x601c29752e68bfff7113751c7d6b6655494d07ae": {
+  "bands_true": [
+   "ctl_inverse_band"
+  ],
+  "chain_facts": {
+   "burned_raw": null,
+   "decimals": 18,
+   "honeypot": null,
+   "lp_check_source": "unknown",
+   "lp_locked_pct": null,
+   "lp_total_raw": null,
+   "owner_state": "no_owner_fn",
+   "pair": null,
+   "roundtrip_loss_pct": null,
+   "route": "none",
+   "sources_used": [
+    "rpc"
+   ],
+   "status": "ok"
+  },
+  "disc": {
+   "block": 62071531,
+   "creator": "0xbd98898ef101b7d4b7e248b4fe2a29420dad7dab",
+   "kind": "pons_create",
+   "launchpad": "pons",
+   "log_index": 225,
+   "pair": null,
+   "pool_id": "0x00000000000000000000000067c68af3fe93415dba2be65b61836b1fa81dd778",
+   "token": "0x601c29752e68bfff7113751c7d6b6655494d07ae",
+   "tx": "0x5eb603f5813a48a5f631495f37419f1fafd171795ebef89ed2172aa20dca98b6"
+  },
+  "first_sighting_ts": 1789314391.5018096,
+  "gate_fails": 0,
+  "last_gates_ok": true,
+  "last_safety": {
+   "buys_per_buyer_m5": null,
+   "creator_dead_frac": null,
+   "creator_prior_tokens": 1,
+   "creator_score": null,
+   "danger_risks": [],
+   "deployer": "0xbd98898ef101b7d4b7e248b4fe2a29420dad7dab",
+   "dev_pct": 0.0,
+   "dev_sniped": null,
+   "freeze_authority_active": null,
+   "graph_insiders": null,
+   "gt_score": 13.617021276595745,
+   "gt_verified": false,
+   "holders_source": "blockscout",
+   "holders_updated_age_s": null,
+   "honeypot": null,
+   "insider_networks_pct": null,
+   "insider_pct": null,
+   "is_proxy": false,
+   "is_scam": false,
+   "launchpad_completed": null,
+   "launchpad_completed_age_s": null,
+   "launchpad_graduation_pct": null,
+   "lp_check_source": null,
+   "lp_locked_pct": null,
+   "lp_share_pct": null,
+   "mint_authority_active": null,
+   "owner_renounced": null,
+   "owner_state": "no_owner_fn",
+   "pass": 2,
+   "risk_score": null,
+   "roundtrip_loss_pct": null,
+   "rugged": null,
+   "safety_ts": 1789314391.5018096,
+   "scanhood_sellable": null,
+   "scanhood_verdict": null,
+   "sniper_swaps_first_blocks": null,
+   "sources_dark": [],
+   "sources_used": [
+    "rpc",
+    "disc",
+    "geckoterminal",
+    "blockscout",
+    "robinx"
+   ],
+   "template_name": null,
+   "top10_pct": null,
+   "top10_pct_gt": null,
+   "total_holders": 114,
+   "tx_per_holder_total": 0.0,
+   "verified_source": true
+  },
+  "misses": 10,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
+  "symbol": "DUO"
  },
  "0x61752da5a4c354ec73646fa2135930a2e59ef94c": {
   "bands_true": [
@@ -10604,7 +10614,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789290779.4331746,
   "symbol": "STREAM"
  },
@@ -11064,7 +11074,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789242311.986372,
   "symbol": "LOG"
  },
@@ -11230,9 +11240,9 @@
    "owner_state": "protocol",
    "pass": 1,
    "risk_score": null,
-   "roundtrip_loss_pct": 2.9246,
+   "roundtrip_loss_pct": 2.3306,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -11251,8 +11261,8 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "INU"
  },
  "0x64e5a24c3fd1065dc322a80d3da519b419ce76bc": {
@@ -11524,7 +11534,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789241099.7898664,
   "symbol": "FUEL"
  },
@@ -11892,7 +11902,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789298303.3427982,
   "symbol": "MOSS"
  },
@@ -12071,7 +12081,7 @@
    "verified_source": true
   },
   "misses": 5,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789242801.9340758,
   "symbol": "DELMAN"
  },
@@ -12695,7 +12705,7 @@
    "verified_source": true
   },
   "misses": 3,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789307020.371639,
   "symbol": "LLM"
  },
@@ -14612,7 +14622,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789291384.6647506,
   "symbol": "FOMO"
  },
@@ -14896,100 +14906,6 @@
   "safety_ts": 1789313804.4688056,
   "symbol": "HMM"
  },
- "0x80da497590578ea69d7cd085b7d3ada4f9e71e18": {
-  "bands_true": [
-   "ctl_inverse_band"
-  ],
-  "chain_facts": {
-   "burned_raw": null,
-   "decimals": 18,
-   "honeypot": null,
-   "lp_check_source": "unknown",
-   "lp_locked_pct": null,
-   "lp_total_raw": null,
-   "owner_state": "protocol",
-   "pair": null,
-   "roundtrip_loss_pct": null,
-   "route": "none",
-   "sources_used": [
-    "rpc"
-   ],
-   "status": "ok"
-  },
-  "disc": {
-   "block": 61191152,
-   "creator": "0x6c54aacdc7ec60a110191d01e1065001897c262e",
-   "hook": "0x4e3468951d49f2eea976ed0d6e75ffcb44a9a544",
-   "kind": "longlaunch_create",
-   "launchpad": "bankr",
-   "log_index": 60,
-   "numeraire": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
-   "pair": null,
-   "pool_id": "0xd6ce5cb47ba58ff055e191e6c70b2466cd944c15bc53ff6f2646f6c29b0e115d",
-   "token": "0x80da497590578ea69d7cd085b7d3ada4f9e71e18",
-   "tx": "0xec2a735c288036cfe9d47fbf145be25fd346a33b5f3fbaad2cc816fb5be68e83"
-  },
-  "first_sighting_ts": 1789227816.0743055,
-  "gate_fails": 0,
-  "last_gates_ok": true,
-  "last_safety": {
-   "buys_per_buyer_m5": null,
-   "creator_dead_frac": null,
-   "creator_prior_tokens": null,
-   "creator_score": null,
-   "danger_risks": [],
-   "deployer": "0x6c54aacdc7ec60a110191d01e1065001897c262e",
-   "dev_pct": null,
-   "dev_sniped": null,
-   "freeze_authority_active": null,
-   "graph_insiders": null,
-   "gt_score": 32.13617021276596,
-   "gt_verified": false,
-   "holders_source": "blockscout",
-   "holders_updated_age_s": 68163.17208862305,
-   "honeypot": null,
-   "insider_networks_pct": null,
-   "insider_pct": null,
-   "is_proxy": true,
-   "is_scam": false,
-   "launchpad_completed": null,
-   "launchpad_completed_age_s": null,
-   "launchpad_graduation_pct": null,
-   "lp_check_source": "v4_launchpad:bankr",
-   "lp_locked_pct": null,
-   "lp_share_pct": 99.68235983291613,
-   "mint_authority_active": null,
-   "owner_renounced": false,
-   "owner_state": "protocol",
-   "pass": 2,
-   "risk_score": null,
-   "roundtrip_loss_pct": null,
-   "rugged": null,
-   "safety_ts": 1789302938.1720886,
-   "scanhood_sellable": null,
-   "scanhood_verdict": null,
-   "sniper_swaps_first_blocks": null,
-   "sources_dark": [],
-   "sources_used": [
-    "rpc",
-    "disc",
-    "geckoterminal",
-    "blockscout",
-    "robinx",
-    "launch_service"
-   ],
-   "template_name": "DopplerERC20V1",
-   "top10_pct": 0.3176401670838744,
-   "top10_pct_gt": 99.99,
-   "total_holders": 16,
-   "tx_per_holder_total": 315.0625,
-   "verified_source": true
-  },
-  "misses": 7,
-  "refreshed_ts": 1789302938.1720886,
-  "safety_ts": 1789302938.1720886,
-  "symbol": "ACTUALINU"
- },
  "0x812486eaea648819853f8e372dc9f1516c7868bd": {
   "bands_true": [
    "band_dev_score_ge70",
@@ -15058,15 +14974,16 @@
    "owner_state": "no_owner_fn",
    "pass": 1,
    "risk_score": null,
-   "roundtrip_loss_pct": 1.1225,
+   "roundtrip_loss_pct": 2.1755,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
    "sources_dark": [],
    "sources_used": [
     "rpc",
+    "kyber",
     "scanhood",
     "disc"
    ],
@@ -15078,8 +14995,8 @@
    "verified_source": true
   },
   "misses": 2,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "UBIK"
  },
  "0x817fcba0f1b32b1425ca12a1d5414eec7bf11e18": {
@@ -17439,9 +17356,9 @@
    "owner_state": "protocol",
    "pass": 1,
    "risk_score": null,
-   "roundtrip_loss_pct": 0.5571,
+   "roundtrip_loss_pct": 0.8538,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -17460,9 +17377,197 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "BONER"
+ },
+ "0x990fb9d2986458788e3cb71ab4b3ad49213e1e18": {
+  "bands_true": [
+   "ctl_inverse_band"
+  ],
+  "chain_facts": {
+   "burned_raw": null,
+   "decimals": 18,
+   "honeypot": null,
+   "lp_check_source": "unknown",
+   "lp_locked_pct": null,
+   "lp_total_raw": null,
+   "owner_state": "protocol",
+   "pair": null,
+   "roundtrip_loss_pct": null,
+   "route": "none",
+   "sources_used": [
+    "rpc"
+   ],
+   "status": "ok"
+  },
+  "disc": {
+   "block": 62069503,
+   "creator": null,
+   "hook": "0x0000000000000000000000000000000000000000",
+   "kind": "pool_v4",
+   "launchpad": null,
+   "log_index": 146,
+   "numeraire": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+   "pair": null,
+   "pool_id": "0xc0acdcbb5face5f112b4c1cd2a2acd94983b1d664c84cc7623e5b03373fda63a",
+   "token": "0x990fb9d2986458788e3cb71ab4b3ad49213e1e18",
+   "tx": "0x81b696ffc3700b106c7dfa5515e9a3eb14979ba8fcde1572007e1f415aa980cd"
+  },
+  "first_sighting_ts": 1789314391.5018096,
+  "gate_fails": 0,
+  "last_gates_ok": true,
+  "last_safety": {
+   "buys_per_buyer_m5": null,
+   "creator_dead_frac": null,
+   "creator_prior_tokens": null,
+   "creator_score": null,
+   "danger_risks": [],
+   "deployer": null,
+   "dev_pct": null,
+   "dev_sniped": null,
+   "freeze_authority_active": null,
+   "graph_insiders": null,
+   "gt_score": 40.736507936507934,
+   "gt_verified": false,
+   "holders_source": "blockscout",
+   "holders_updated_age_s": 6494.501809597015,
+   "honeypot": false,
+   "insider_networks_pct": null,
+   "insider_pct": null,
+   "is_proxy": true,
+   "is_scam": false,
+   "launchpad_completed": null,
+   "launchpad_completed_age_s": null,
+   "launchpad_graduation_pct": null,
+   "lp_check_source": null,
+   "lp_locked_pct": null,
+   "lp_share_pct": 88.68579676330125,
+   "mint_authority_active": null,
+   "owner_renounced": false,
+   "owner_state": "protocol",
+   "pass": 2,
+   "risk_score": null,
+   "roundtrip_loss_pct": null,
+   "rugged": null,
+   "safety_ts": 1789314391.5018096,
+   "scanhood_sellable": true,
+   "scanhood_verdict": "DANGER",
+   "sniper_swaps_first_blocks": null,
+   "sources_dark": [
+    "blockscout"
+   ],
+   "sources_used": [
+    "rpc",
+    "scanhood",
+    "disc",
+    "geckoterminal",
+    "blockscout"
+   ],
+   "template_name": "DopplerERC20V1",
+   "top10_pct": 5.448255811041148,
+   "top10_pct_gt": 81.6523,
+   "total_holders": 558,
+   "tx_per_holder_total": 112.0143,
+   "verified_source": true
+  },
+  "misses": 8,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
+  "symbol": "FROGE"
+ },
+ "0x99478cb513d6ff274f2df5ab34dadacc3928f8bf": {
+  "bands_true": [
+   "ctl_inverse_band"
+  ],
+  "chain_facts": {
+   "burned_raw": null,
+   "decimals": 18,
+   "honeypot": null,
+   "lp_check_source": "unknown",
+   "lp_locked_pct": null,
+   "lp_total_raw": null,
+   "owner_state": "no_owner_fn",
+   "pair": null,
+   "roundtrip_loss_pct": null,
+   "route": "none",
+   "sources_used": [
+    "rpc"
+   ],
+   "status": "ok"
+  },
+  "disc": {
+   "block": 62070637,
+   "creator": null,
+   "hook": "0x0000000000000000000000000000000000000000",
+   "kind": "pool_v4",
+   "launchpad": null,
+   "log_index": 62,
+   "numeraire": "0x0000000000000000000000000000000000000000",
+   "pair": null,
+   "pool_id": "0xe33aff7d11e297b348ef455247b77efa7f2e92501911cee3687d0b6d6e06f865",
+   "token": "0x99478cb513d6ff274f2df5ab34dadacc3928f8bf",
+   "tx": "0x14272fb6a08513cb1700d6ccfc7fce991b43c0c3ce968126833f5d88adc5ba45"
+  },
+  "first_sighting_ts": 1789314391.5018096,
+  "gate_fails": 0,
+  "last_gates_ok": true,
+  "last_safety": {
+   "buys_per_buyer_m5": null,
+   "creator_dead_frac": null,
+   "creator_prior_tokens": 0,
+   "creator_score": null,
+   "danger_risks": [],
+   "deployer": "0xeed4e46d3c80513954beccfc1d52a99507f41a47",
+   "dev_pct": null,
+   "dev_sniped": null,
+   "freeze_authority_active": null,
+   "graph_insiders": null,
+   "gt_score": 13.617021276595745,
+   "gt_verified": false,
+   "holders_source": "blockscout",
+   "holders_updated_age_s": null,
+   "honeypot": null,
+   "insider_networks_pct": null,
+   "insider_pct": null,
+   "is_proxy": false,
+   "is_scam": false,
+   "launchpad_completed": null,
+   "launchpad_completed_age_s": null,
+   "launchpad_graduation_pct": null,
+   "lp_check_source": null,
+   "lp_locked_pct": null,
+   "lp_share_pct": 51.1155278889959,
+   "mint_authority_active": null,
+   "owner_renounced": null,
+   "owner_state": "no_owner_fn",
+   "pass": 2,
+   "risk_score": null,
+   "roundtrip_loss_pct": null,
+   "rugged": null,
+   "safety_ts": 1789314391.5018096,
+   "scanhood_sellable": null,
+   "scanhood_verdict": null,
+   "sniper_swaps_first_blocks": null,
+   "sources_dark": [],
+   "sources_used": [
+    "rpc",
+    "disc",
+    "geckoterminal",
+    "blockscout",
+    "robinx"
+   ],
+   "template_name": null,
+   "top10_pct": 35.836157719703834,
+   "top10_pct_gt": null,
+   "total_holders": 55,
+   "tx_per_holder_total": 1.3273,
+   "verified_source": false
+  },
+  "misses": 11,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
+  "symbol": "COW"
  },
  "0x9c978be81c1edc2b5e974eb8fa103f9d0c8d8a76": {
   "bands_true": [
@@ -18261,7 +18366,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": 0.6512,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -18279,8 +18384,8 @@
    "verified_source": false
   },
   "misses": 2,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "PERPSPAD"
  },
  "0xa4a7e7957e9d5835b098b0565c56030069f305ad": {
@@ -19086,7 +19191,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -19104,8 +19209,8 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "SHROOM"
  },
  "0xab528169dcc80d68837a33b1e2b866bb7d7ee301": {
@@ -19364,7 +19469,7 @@
    "verified_source": true
   },
   "misses": 3,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789307020.371639,
   "symbol": "LIFE"
  },
@@ -19816,7 +19921,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789310897.0401168,
   "symbol": "SLUICE"
  },
@@ -20215,8 +20320,8 @@
    "tx": "0x1162bdc86dbc7ae16483c6988a5b077ae3eb76950636bf2342473f8ce2269536"
   },
   "first_sighting_ts": 1789238441.6522696,
-  "gate_fails": 0,
-  "last_gates_ok": true,
+  "gate_fails": 1,
+  "last_gates_ok": false,
   "last_safety": {
    "buys_per_buyer_m5": null,
    "creator_dead_frac": null,
@@ -20266,7 +20371,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789238441.6522696,
   "symbol": "VRCAT"
  },
@@ -20815,7 +20920,7 @@
    "verified_source": true
   },
   "misses": 3,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789290401.2154307,
   "symbol": "\u5976\u86d9"
  },
@@ -23182,7 +23287,7 @@
    "risk_score": null,
    "roundtrip_loss_pct": 3.3028,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "CAUTION",
    "sniper_swaps_first_blocks": null,
@@ -23200,8 +23305,8 @@
    "verified_source": true
   },
   "misses": 3,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "SAYLORMOON"
  },
  "0xd1b35bce1d0b28ccc485d163ddf66dd9cfa51e18": {
@@ -24563,9 +24668,9 @@
    "owner_state": "protocol",
    "pass": 1,
    "risk_score": null,
-   "roundtrip_loss_pct": 0.7237,
+   "roundtrip_loss_pct": 0.7573,
    "rugged": null,
-   "safety_ts": 1789313804.4688056,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
@@ -24584,8 +24689,8 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "MOO"
  },
  "0xd9e82b01fbd8eb7a59d456fef3b56d39d90caa47": {
@@ -25402,7 +25507,7 @@
    "verified_source": true
   },
   "misses": 3,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789307020.371639,
   "symbol": "TWINE"
  },
@@ -25586,7 +25691,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789302022.8154914,
   "symbol": "\u4e2d\u56fd\u5236\u9020"
  },
@@ -25675,7 +25780,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789299268.453156,
   "symbol": "FLYTOWN"
  },
@@ -25953,7 +26058,7 @@
    "verified_source": true
   },
   "misses": 3,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789274289.0164533,
   "symbol": "DMND"
  },
@@ -27038,6 +27143,99 @@
   "safety_ts": 1789256395.9223075,
   "symbol": "PRIV"
  },
+ "0xee512d0dd922a037e05bddfcb563b2c26697ed5c": {
+  "bands_true": [
+   "ctl_inverse_band"
+  ],
+  "chain_facts": {
+   "burned_raw": null,
+   "decimals": 18,
+   "honeypot": null,
+   "lp_check_source": "unknown",
+   "lp_locked_pct": null,
+   "lp_total_raw": null,
+   "owner_state": "no_owner_fn",
+   "pair": null,
+   "roundtrip_loss_pct": null,
+   "route": "none",
+   "sources_used": [
+    "rpc"
+   ],
+   "status": "ok"
+  },
+  "disc": {
+   "block": 62068504,
+   "creator": null,
+   "hook": "0x0000000000000000000000000000000000000000",
+   "kind": "pool_v4",
+   "launchpad": null,
+   "log_index": 202,
+   "numeraire": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+   "pair": null,
+   "pool_id": "0x270f779128a748755525b0276f80dc049eed3435a655d2baed488b7d886c627c",
+   "token": "0xee512d0dd922a037e05bddfcb563b2c26697ed5c",
+   "tx": "0xf13dc2dfc9a24b7d933958ceeaa33dabf136a236e3eeb134ea808db83c4c8126"
+  },
+  "first_sighting_ts": 1789314391.5018096,
+  "gate_fails": 0,
+  "last_gates_ok": true,
+  "last_safety": {
+   "buys_per_buyer_m5": null,
+   "creator_dead_frac": null,
+   "creator_prior_tokens": 0,
+   "creator_score": null,
+   "danger_risks": [],
+   "deployer": "0x22725d5fee53b4e714fa1aa3fba4da1309f1b475",
+   "dev_pct": null,
+   "dev_sniped": null,
+   "freeze_authority_active": null,
+   "graph_insiders": null,
+   "gt_score": 18.995744680851065,
+   "gt_verified": false,
+   "holders_source": "blockscout",
+   "holders_updated_age_s": null,
+   "honeypot": null,
+   "insider_networks_pct": null,
+   "insider_pct": null,
+   "is_proxy": false,
+   "is_scam": false,
+   "launchpad_completed": null,
+   "launchpad_completed_age_s": null,
+   "launchpad_graduation_pct": null,
+   "lp_check_source": null,
+   "lp_locked_pct": null,
+   "lp_share_pct": 41.42614280361695,
+   "mint_authority_active": null,
+   "owner_renounced": null,
+   "owner_state": "no_owner_fn",
+   "pass": 2,
+   "risk_score": null,
+   "roundtrip_loss_pct": null,
+   "rugged": null,
+   "safety_ts": 1789314391.5018096,
+   "scanhood_sellable": null,
+   "scanhood_verdict": null,
+   "sniper_swaps_first_blocks": null,
+   "sources_dark": [],
+   "sources_used": [
+    "rpc",
+    "disc",
+    "geckoterminal",
+    "blockscout",
+    "robinx"
+   ],
+   "template_name": null,
+   "top10_pct": 15.071698210227348,
+   "top10_pct_gt": null,
+   "total_holders": 104,
+   "tx_per_holder_total": 3.3269,
+   "verified_source": false
+  },
+  "misses": 9,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
+  "symbol": "GOATSEN"
+ },
  "0xee5576fa1bcaa380e591d01245f406f3f384eb01": {
   "bands_true": [
    "band_dev_score_ge70",
@@ -27108,13 +27306,15 @@
    "risk_score": null,
    "roundtrip_loss_pct": null,
    "rugged": null,
-   "safety_ts": 1789311864.094738,
+   "safety_ts": 1789314391.5018096,
    "scanhood_sellable": true,
    "scanhood_verdict": "PASS",
    "sniper_swaps_first_blocks": null,
    "sources_dark": [],
    "sources_used": [
-    "rpc"
+    "rpc",
+    "scanhood",
+    "disc"
    ],
    "template_name": null,
    "top10_pct": 8.992616386746215,
@@ -27124,8 +27324,8 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
-  "safety_ts": 1789311864.094738,
+  "refreshed_ts": 1789314391.5018096,
+  "safety_ts": 1789314391.5018096,
   "symbol": "DTF"
  },
  "0xef080b5d9a58fc84ea04a15d0d1824b2c622fdeb": {
@@ -28398,7 +28598,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789312834.8674011,
   "symbol": "YOINK"
  },
@@ -28853,7 +29053,7 @@
    "verified_source": true
   },
   "misses": 4,
-  "refreshed_ts": 1789313804.4688056,
+  "refreshed_ts": 1789314391.5018096,
   "safety_ts": 1789250547.3480012,
   "symbol": "UDAI"
  },
