@@ -886,13 +886,13 @@
   "0x9fe9b3f0bc972772a94c623147141952d7e27777:176": {
    "alert_ts": 1789253212.2526207,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1789314772.4141276,
    "cost_usd": 10.0,
    "entry_px_usd": 9.188994379184045e-22,
    "event_seq": 176,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": -121.7248,
    "opened_ts": 1789253212.2526207,
    "pending_exits": [],
@@ -917,12 +917,12 @@
     "trail": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 13.629105565524322,
+   "realized_usd": 15.901230231150086,
    "symbol": "FX AEGIS",
    "tier": "A",
    "token": "0x9fe9b3f0bc972772a94c623147141952d7e27777",
    "tokens_raw": 10882583650995737198592,
-   "tokens_remaining_raw": 5441291825497868599296,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2521.14
   },
   "0xa55e7b522db501fabbff6d0a188d0edd0c011ec7:286": {
@@ -1218,6 +1218,48 @@
    "tokens_raw": 97150822738589057548288,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2524.14
+  },
+  "0xe31e15be631aed0fa52ef796a07714ab9be250e9:464": {
+   "alert_ts": 1789314772.4141276,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 4.837494978767189e-22,
+   "event_seq": 464,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.0203,
+   "opened_ts": 1789314772.4141276,
+   "pending_exits": [],
+   "plan": {
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "SOUPCOIN",
+   "tier": "A",
+   "token": "0xe31e15be631aed0fa52ef796a07714ab9be250e9",
+   "tokens_raw": 20671856082315663900672,
+   "tokens_remaining_raw": 20671856082315663900672,
+   "weth_px_usd_open": 2490.17
   },
   "0xe9128c7544d1b04b62baa7767975a6bd888b285f:107": {
    "alert_ts": 1789242311.986372,
