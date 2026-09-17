@@ -718,6 +718,27 @@ check("allowlist_ok rejects config.py/screen.py/run.py/alerts.py/champion.json/r
       "_template.py/data/x (the research branch cannot touch the champion)",
       all(not AL.allowlist_ok([p])[0] for p in rej) and AL.allowlist_ok(rej)[1] == rej)
 
+# post-merge pin (Phase 4 and Phase 5 each independently grew a `flow` schema for policies.py —
+# Phase 4 placed its copy between POLICIES and _POLICY_KEYS, Phase 5 placed its copy near the
+# schema comment above POLICIES — and the rebase resolution kept only Phase 5's copy). An AST
+# walk of the TOP-LEVEL body only, so a name reused inside a function or the __main__ smoke test
+# never trips this.
+_pol_top_names: dict = {}
+for _stmt in _tree(os.path.join(ROOT, "selfimprove", "policies.py")).body:
+    if isinstance(_stmt, ast.FunctionDef):
+        _pol_top_names[_stmt.name] = _pol_top_names.get(_stmt.name, 0) + 1
+    elif isinstance(_stmt, ast.Assign):
+        for _t in _stmt.targets:
+            if isinstance(_t, ast.Name):
+                _pol_top_names[_t.id] = _pol_top_names.get(_t.id, 0) + 1
+_FLOW_HELPERS = ("FLOW_FEATURES", "flow_policy_names", "flow_from_market", "trail_active",
+                 "flow_step", "flow_state_init")
+check("policies.py defines each of FLOW_FEATURES/flow_policy_names/flow_from_market/trail_active/"
+      "flow_step/flow_state_init exactly once at module scope (the duplicate-copy trap two "
+      "independent branches hit at the same time)",
+      all(_pol_top_names.get(_n) == 1 for _n in _FLOW_HELPERS),
+      str({_n: _pol_top_names.get(_n, 0) for _n in _FLOW_HELPERS}))
+
 
 # ═══════════════════════════════════════════════════════════════════════════════════
 section("B. screen.py — hard gates fail closed only on positive findings; A never on unknowns")
@@ -1977,7 +1998,17 @@ try:
               and POL.flow_from_market(dict(_m5, liq_usd=5e4)) == {"vol_m5": 12.5, "buys_m5": 7, "sells_m5": 2, "vol_h1": 300.0,
                                                                   "buys_h1": 40, "sells_h1": 10, "liq_usd": 5e4})
         _reset(d)
-        POL.POLICIES["fx_flow_probe"] = {"trail": 0.30, "flow": {"fixture": True}}   # test-only; popped in the finally below
+        # post-merge fix: under Phase 4 alone `flow` was inert plumbing (no flow_step existed), so
+        # this fixture used a placeholder {"fixture": True} to mark "a flow-schema policy exists"
+        # for the wiring test below. Post-rebase, `_step_policy` actually calls POL.flow_step on
+        # any policy carrying a `flow` dict, which indexes real FLOW_KEYS (vol_floor_frac,
+        # min_txns_m5, buy_share_max, weak_ticks) — the placeholder raised KeyError. This is a
+        # deliberately inert-but-valid flow config (a floor of 0.0 and a min-txns/weak-ticks
+        # threshold no tick here reaches), so flow_step runs cleanly and never itself closes the
+        # position: the assertions below still rely on the untouched 0.30 trail to close both
+        # positions at 0.5x, exactly as before the rebase.
+        POL.POLICIES["fx_flow_probe"] = {"trail": 0.30, "flow": {"buy_share_max": 0.0, "weak_ticks": 10 ** 9,
+                                                                 "vol_floor_frac": 0.0, "min_txns_m5": 10 ** 9}}   # test-only; popped in the finally below
         try:
             TF1, TF2 = "0x" + "0" * 36 + "f1a1", "0x" + "0" * 36 + "f1a2"
             nd_flow0 = dex_calls["n"]
