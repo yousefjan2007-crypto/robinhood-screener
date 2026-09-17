@@ -1954,6 +1954,21 @@ rate = n_sel / 10_000
 check(f"ctl_random_band rate within ±2 pp of {config.BAND_CTL_RANDOM_RATE} on 10,000 addresses and process-stable (sha256, pinned)",
       abs(rate - config.BAND_CTL_RANDOM_RATE) <= 0.02 and B.random_control_params("0x" + "ab" * 20) == (False, 62357.833739732814)
       and B.random_control_params("0x" + "AB" * 20) == B.random_control_params("0x" + "ab" * 20), str(rate))
+# the control must FIRE on the rows the system actually records. run.py writes first-sighting
+# verdicts at sighting_age_s = 0 and controls are barred from opening a band_fire row, so the old
+# per-token firing DELAY made it return 0 on 672/672 committed verdict rows — an inert control
+# cannot make failure visible, which is the only job it has.
+n_true_ctl, n_na_ctl = 0, 0
+for i in range(2_000):
+    tok = "0x" + hashlib.sha256(f"ctl-live-{i}".encode()).hexdigest()[:40]
+    v_ = LAB.evaluate_bands(dict(good, token=tok, sighting_age_s=0.0), REG, CHAMP)["ctl_random_band"]
+    n_true_ctl += v_ is True
+    n_na_ctl += v_ is None
+rate_ctl = n_true_ctl / 2_000
+check(f"ctl_random_band through evaluate_bands at sighting_age_s = 0 (what run.py records): coverage 1.0 and "
+      f"a True rate of {config.BAND_CTL_RANDOM_RATE} ± 0.02 over 2,000 tokens — never the inert 0/672",
+      n_na_ctl == 0 and abs(rate_ctl - config.BAND_CTL_RANDOM_RATE) <= 0.02 and n_true_ctl > 0,
+      f"rate {rate_ctl} na {n_na_ctl}")
 vd = LAB.evaluate_bands(good, REG, CHAMP)
 vna = LAB.evaluate_bands(dict(good, score=None), REG, CHAMP)
 check("ctl_inverse_band is computed on the fly in evaluate_bands (== not champion; None when the champion is None) "

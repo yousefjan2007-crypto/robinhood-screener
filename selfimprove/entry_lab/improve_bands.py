@@ -25,8 +25,8 @@ Guards, none optional:
     rule (BAND_FWD_MIN_SELECTED / BAND_FWD_MIN_DAYS), not by when the cron happens to run, so it
     is not a sequential test. A failed nominee is cleared and sits out
     BAND_RENOMINATE_COOLDOWN_DAYS.
-  * Two NEGATIVE CONTROLS are scored on the same rows. ctl_random_band fires on a sha256-chosen 10%
-    at a per-token delay spread like a maturation band's; ctl_inverse_band is the champion's
+  * Two NEGATIVE CONTROLS are scored on the same rows. ctl_random_band fires at evaluation for a
+    sha256-chosen 10% (its old per-token delay made it inert — see bands.py); ctl_inverse_band is the champion's
     complement, recomputed on the fly. A control clearing ANY bar voids the run: no number from a
     void run may be quoted. So does a miscalibrated resampler (the champion's within-stratum
     shuffled false-positive rate above BAND_SHUFFLE_MAX_FP), a champion NA on > 20% of rows, and a

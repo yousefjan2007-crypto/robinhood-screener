@@ -11,10 +11,14 @@ the sidecar (entry_lab/store.py) so bands are compared on IDENTICAL forward retu
 WHY A FAMILY, WHY CONTROLS. On solana the strict band was the best of 14 bands tested and every
 relaxation was worse (n=16 A rows — hold it loosely). Each band registered here is a counted
 trial (selfimprove/trials.json only grows) and deflates every later Deflated-Sharpe gate. The
-controls exist so that failure is VISIBLE: ctl_random_band selects a sha256-chosen 10% of tokens
-at a per-token deterministic delay spread over the 24 h watch window — the same firing-instant
-profile as a maturation band — and ctl_inverse_band is the champion's complement. If a control
-clears the gate, the apparatus is measuring itself and the run is void.
+controls exist so that failure is VISIBLE: ctl_random_band fires AT EVALUATION for a sha256-chosen
+10% of tokens, and ctl_inverse_band is the champion's complement. If a control clears the gate, the
+apparatus is measuring itself and the run is void. (It once also waited a per-token deterministic
+delay spread over the 24 h watch window, to mimic a maturation band's firing instants. That made it
+inert: run.py records first-sighting verdicts at sighting_age_s = 0 and controls may not open a
+band_fire row, so the delayed control returned 0 on 672 of 672 committed verdict rows. Changed
+2026-09-17 — config.BAND_CTL_RANDOM_CHANGED_ON; verdicts recorded before that date carry no
+evidence about it, and the scorecard says so rather than the history being rewritten.)
 
 WHY THE STATIC CHECK. A research candidate is Python written by a headless model on a branch.
 static_ok() walks the AST: only an import allowlist, no wall-clock / RNG / network / subprocess /
@@ -256,8 +260,12 @@ def random_control_params(token: str) -> tuple:
 
 
 def _ctl_random_band(f):
-    selected, delay_s = random_control_params(f["token"])
-    return bool(selected and f["sighting_age_s"] >= delay_s)
+    """Fires AT EVALUATION for the sha256-selected share — the delay from random_control_params is
+    deliberately not applied. run.py records first-sighting verdicts at sighting_age_s = 0 and
+    controls are barred from opening a band_fire row (runtime.decide_events), so a delayed control
+    returned 0 on 672 of 672 committed verdict rows. An inert control cannot make failure visible,
+    which is the only job it has. random_control_params is unchanged and still pinned by verify."""
+    return bool(random_control_params(f["token"])[0])
 
 
 def _ctl_inverse_band(f):
@@ -834,9 +842,11 @@ if __name__ == "__main__":
             fired_at_zero += 1
     rate = n_sel / 10_000
     print(f"  ctl_random_band: {rate:.4f} selected at window end (target {config.BAND_CTL_RANDOM_RATE}); "
-          f"{fired_at_zero} fired at age 0")
+          f"{fired_at_zero} fired at age 0 (the age is not read — changed {config.BAND_CTL_RANDOM_CHANGED_ON})")
     assert abs(rate - config.BAND_CTL_RANDOM_RATE) <= 0.02
-    assert fired_at_zero < n_sel * 0.05
+    # the control fires at EVALUATION: run.py records first-sighting verdicts at age 0, so a control
+    # that waited for its delay was inert (0 of 672 committed rows)
+    assert fired_at_zero == n_sel, (fired_at_zero, n_sel)
     sel, delay = random_control_params("0x" + "AB" * 20)
     assert random_control_params("0x" + "ab" * 20) == (sel, delay), "case-insensitive, stable"
     # pinned value: any change here means the control was re-rolled
