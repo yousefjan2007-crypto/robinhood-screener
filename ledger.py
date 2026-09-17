@@ -36,6 +36,7 @@ bookkeeping — never in any scoring path.
 """
 from __future__ import annotations
 
+import csv
 import json
 import os
 import time
@@ -114,6 +115,48 @@ def next_event_seq(led: pd.DataFrame) -> int:
         return 1
     s = pd.to_numeric(led["event_seq"], errors="coerce").dropna()
     return int(s.max()) + 1 if len(s) else 1
+
+
+def origin_max_event_seq(rel: str = "data/ledger.csv") -> int | None:
+    """max(event_seq) in `origin/main`'s ledger, or None when it cannot be read — for ANY
+    reason (no git, no remote ref, no such blob, a malformed column).
+
+    PRINT-ONLY, and deliberately narrow. DESIGN.md's rule is that every Mac reader of committed
+    data reads the ff-merged worktree and only the 60 s livebook reads `git show origin/main:`;
+    this does not soften that. The worktree stays the source of every row scored. This one read
+    exists because the offline labs (backfill, evaluate) are run by hand against a tree the
+    cloud keeper has usually moved past by a few events, and a result is easier to trust when
+    the run says out loud how far behind its input was. It is never an input to a decision, so
+    it never fails a run: unreadable is None and the caller stays quiet.
+    """
+    try:
+        from selfimprove.publish import origin_blob
+        txt = origin_blob(rel, config.ROOT)
+        if not txt:
+            return None
+        rows = list(csv.DictReader(txt.splitlines()))
+        seqs = []
+        for r in rows:
+            try:
+                seqs.append(int(float(r.get("event_seq"))))
+            except (TypeError, ValueError):
+                continue
+        return max(seqs) if seqs else None
+    except Exception:
+        return None
+
+
+def warn_if_behind_origin(led: pd.DataFrame, where: str) -> int | None:
+    """Print a WARNING when origin/main's ledger carries events this copy does not. Returns
+    origin's max event_seq (None when unknown). The ONE staleness line both offline labs use,
+    so they cannot drift apart in what they claim about their own input."""
+    local = next_event_seq(led) - 1
+    remote = origin_max_event_seq()
+    if remote is not None and remote > local:
+        print(f"  [{where}] WARNING: origin/main's ledger is at event_seq {remote}, this worktree "
+              f"at {local} — {remote - local} newer event(s) are NOT read here. `git merge "
+              f"--ff-only origin/main` first if you want them; nothing below sees them.")
+    return remote
 
 
 def index(led: pd.DataFrame) -> dict:

@@ -67,6 +67,7 @@ def _ledger_entry_prices() -> dict:
     try:
         import ledger as LED
         led = LED.load()
+        LED.warn_if_behind_origin(led, "evaluate")    # print-only; the worktree stays the source
         out: dict = {}
         for tok, seq, p in zip(led["token"], led["event_seq"], led["entry_price"]):
             t = str(tok).lower()
@@ -77,8 +78,22 @@ def _ledger_entry_prices() -> dict:
             except (TypeError, ValueError):
                 pass
         return out
-    except Exception:
+    except Exception as e:
+        # An unreadable ledger is not an empty one. Say so: with no entry prices every record
+        # below is UNMATCHED and dropped, and a silent {} would read as "no paths priced yet".
+        print(f"  [evaluate] WARNING ledger unreadable ({type(e).__name__}: {e}) — no entry "
+              f"prices, so every path record will count as unmatched and be dropped.")
         return {}
+
+
+def _has_entry(ledger_entry: dict, token: str, event_seq) -> bool:
+    """Is this record's row in the ledger at all, under either key?"""
+    if token in ledger_entry:
+        return True
+    try:
+        return (token, int(float(event_seq))) in ledger_entry
+    except (TypeError, ValueError):
+        return False
 
 
 def _lookup_entry(ledger_entry: dict, token: str, event_seq) -> float | None:
@@ -91,16 +106,29 @@ def _lookup_entry(ledger_entry: dict, token: str, event_seq) -> float | None:
     return ledger_entry.get(token)
 
 
+LAST_LOAD_STATS: dict = {}     # what the last load_paths() read, kept, and threw away
+
+
 def load_paths(path: str | None = None, ledger_entry: dict | None = None) -> list:
     """paths.jsonl records, SANITIZED (2026-09 audit on solana — both modes were found live):
     - bars with v == 0 are dropped: a dead pool can print phantom highs on zero-volume
       bars (STABLECAT showed an 804x high nobody could have transacted at);
     - a record is dropped wholesale when its entry disagrees with the ledger's
       Dexscreener entry price by > config.PATHS_MISPRICED_TOL (3x): GeckoTerminal picked a
-      mispriced thin pool (Girlet's was 71x off, inflating every multiple by 71x).
+      mispriced thin pool (Girlet's was 71x off, inflating every multiple by 71x);
+    - a record with NO ledger row at either key is dropped and counted as `n_unmatched`.
+      It used to be kept: the mispriced gate needs a ledger price to compare against, so a
+      record the ledger has never heard of sailed past the one check that exists to catch a
+      wrong pool. An unmatchable record is also unattributable — it cannot be assigned a tier,
+      a band or an alert day — so keeping it would put unexplained rows into a bound. Dropped
+      and COUNTED: the count is the evidence that the drop happened, exactly as `deferred` is.
     ledger_entry is injectable for tests ({token: price} and/or {(token, event_seq): price});
-    None loads the real ledger."""
+    None loads the real ledger. The counts land in LAST_LOAD_STATS and main() prints them."""
     p = path or PATHS
+    stats = {"n_read": 0, "n_kept": 0, "n_unmatched": 0, "n_mispriced": 0,
+             "n_no_entry": 0, "n_no_bars": 0}
+    LAST_LOAD_STATS.clear()
+    LAST_LOAD_STATS.update(stats)
     if not os.path.exists(p):
         return []
     if ledger_entry is None:
@@ -113,15 +141,22 @@ def load_paths(path: str | None = None, ledger_entry: dict | None = None) -> lis
                 r = json.loads(line)
             except Exception:
                 continue
+            stats["n_read"] += 1
             try:
                 entry = float(r.get("entry", 0) or 0)
             except (TypeError, ValueError):
+                stats["n_no_entry"] += 1
                 continue
             if entry <= 0:
+                stats["n_no_entry"] += 1
                 continue
             token = str(r.get("token") or "").lower()
+            if not _has_entry(ledger_entry, token, r.get("event_seq")):
+                stats["n_unmatched"] += 1
+                continue
             le = _lookup_entry(ledger_entry, token, r.get("event_seq"))
             if le and le > 0 and not (1.0 / tol <= entry / le <= tol):
+                stats["n_mispriced"] += 1
                 continue
             # drop only bars whose volume is literally ZERO (phantom prints). A bar
             # with v=None had no volume element in the feed at all — "missing" is not
@@ -130,6 +165,10 @@ def load_paths(path: str | None = None, ledger_entry: dict | None = None) -> lis
                     if isinstance(b, dict) and (b.get("v") is None or b["v"] > 0)]
             if bars:
                 out.append(dict(r, token=token, bars=bars, n_bars=len(bars)))
+                stats["n_kept"] += 1
+            else:
+                stats["n_no_bars"] += 1
+    LAST_LOAD_STATS.update(stats)
     return out
 
 
@@ -302,12 +341,23 @@ def table(rows: list, label: str, n_trials: int) -> None:
 
 def main() -> None:
     rows = load_paths()
+    st = dict(LAST_LOAD_STATS)
+    print(f"paths.jsonl: read {st.get('n_read', 0)}, kept {st.get('n_kept', 0)}  "
+          f"(dropped: unmatched {st.get('n_unmatched', 0)}, mispriced > "
+          f"{config.PATHS_MISPRICED_TOL:g}x {st.get('n_mispriced', 0)}, no entry "
+          f"{st.get('n_no_entry', 0)}, no usable bar {st.get('n_no_bars', 0)})")
+    if st.get("n_unmatched"):
+        print(f"  {st['n_unmatched']} record(s) have no ledger row at either key — they cannot be "
+              f"gate-checked against a Dexscreener entry price or attributed to a tier, so they "
+              f"are dropped, not scored. Stale cache against a rotated ledger is the usual cause.")
     if not rows:
         print(f"no paths yet — run `python3 selfimprove/backfill.py` first ({PATHS})")
         return
     n_trials = bump_trials(list(POL.POLICIES))
     print(f"priced rows: {len(rows)}   policies this run: {len(POL.POLICIES)}   "
           f"cumulative trials: {n_trials}")
+    if rows:
+        print(f"  page depth used: {dict(Counter(r.get('pages') for r in rows))}")
     table(rows, "ALL priced alerts", n_trials)
     fine = [r for r in rows if r.get("res") == "1m"]
     if fine:
@@ -381,6 +431,8 @@ def _selftest() -> None:
              "bars": [bar(0, 1, 1, 1, 1)]},                      # no entry → dropped
             {"token": "0xdd", "event_seq": 4, "entry": 2.5, "alert_ts": 1.0, "res": "1m", "tier": "A",
              "bars": [bar(0, 1, 1, 1, 1)]},                      # 2.5x: inside the 3x tolerance
+            {"token": "0xee", "event_seq": 5, "entry": 1.0, "alert_ts": 1.0, "res": "1m", "tier": "A",
+             "bars": [bar(0, 1, 1, 1, 1)]},                      # no ledger row → unmatched
         ]
         with open(p, "w") as fh:
             for r in recs:
@@ -390,9 +442,11 @@ def _selftest() -> None:
                                           ("0xdd", 4): 1.0})
         toks = [r["token"] for r in got]
         print(f"  load_paths: kept {toks}; 0xaa bars after sanitizing = {got[0]['n_bars']} "
-              f"(v=0 dropped, v=None kept)")
+              f"(v=0 dropped, v=None kept); dropped {LAST_LOAD_STATS}")
         assert toks == ["0xaa", "0xdd"] and got[0]["n_bars"] == 2
         assert got[0]["bars"][0]["v"] is None
+        assert (LAST_LOAD_STATS["n_unmatched"], LAST_LOAD_STATS["n_mispriced"],
+                LAST_LOAD_STATS["n_no_entry"]) == (1, 1, 1), LAST_LOAD_STATS
 
     # 5. the paired reality check on a NOISE universe: 12 zero-skill policies over 240 rows
     # must NOT come out significant, even though the best of them looks good on its own

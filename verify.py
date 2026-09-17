@@ -3432,4 +3432,87 @@ finally:
 check("…and the finest resolution tried for that alert is minute/1, not minute/15",
       _seen_tf and _seen_tf[0] == ("minute", 1), str(_seen_tf))
 
+# ── 5. the ledger-of-record guard: print-only, and it lives in ledger.py ────────────
+# The lab reads the ff-merged worktree (DESIGN.md:22 — only the 60 s livebook reads
+# origin/main). The keeper commits every few minutes, so an offline run is nearly always a few
+# rows behind; that is not an error, it is a number that belongs next to the result. It must
+# stay OUT of the scoring modules: scorecard.py reading origin/main would make a gate's answer
+# depend on fetch timing.
+check("ledger.origin_max_event_seq() exists, answers int-or-None and never raises",
+      callable(getattr(LED, "origin_max_event_seq", None))
+      and (LED.origin_max_event_seq() is None or isinstance(LED.origin_max_event_seq(), int)))
+_sc_src = _read(os.path.join(ROOT, "selfimprove", "entry_lab", "scorecard.py"))
+check("the staleness helper is NOT in the entry-band scorecard (a scoring module may not read origin/main)",
+      "origin_blob" not in _sc_src and "origin_max_event_seq" not in _sc_src)
+_led_fix = pd.DataFrame([{"token": "0xaa", "event_seq": "7", "alert_ts": "1.0"}]).reindex(columns=LED.COLUMNS)
+_led_orig_omes = LED.origin_max_event_seq
+try:
+    LED.origin_max_event_seq = lambda *a, **k: 9
+    _r1, _o1 = _capture(LED.warn_if_behind_origin, _led_fix, "verify")
+    LED.origin_max_event_seq = lambda *a, **k: 7
+    _r2, _o2 = _capture(LED.warn_if_behind_origin, _led_fix, "verify")
+    LED.origin_max_event_seq = lambda *a, **k: None
+    _r3, _o3 = _capture(LED.warn_if_behind_origin, _led_fix, "verify")
+finally:
+    LED.origin_max_event_seq = _led_orig_omes
+check("warn_if_behind_origin WARNs only when origin/main is genuinely ahead, names both seqs, and is silent "
+      "when level or unreadable",
+      "WARNING" in _o1 and "9" in _o1 and "7" in _o1 and _o2 == "" and _o3 == "" and (_r1, _r2, _r3) == (9, 7, None),
+      f"{_o1!r} {_o2!r} {_o3!r}")
+
+# ── 6. backfill: --since, the banner, and `pages` beside `res` in the record ────────
+from selfimprove import backfill as BF                  # noqa: E402
+
+_bf_orig_out, _bf_orig_fetch = BF.OUT, PA.fetch_path
+with tempfile.TemporaryDirectory() as _d:
+    _bf_led = os.path.join(_d, "ledger.csv")
+    _bf_now = 1_789_600_000.0
+    LED.save(pd.DataFrame([
+        {"token": "0x" + "11" * 20, "symbol": "NEW", "tier": "B", "event_seq": "801",
+         "alert_ts": str(_bf_now - 2 * 86400)},
+        {"token": "0x" + "22" * 20, "symbol": "OLD", "tier": "B", "event_seq": "802",
+         "alert_ts": str(_bf_now - 30 * 86400)},
+    ]).reindex(columns=LED.COLUMNS), _bf_led)
+    try:
+        BF.OUT = os.path.join(_d, "paths.jsonl")
+        PA.fetch_path = lambda token, alert_ts, now_s: {
+            "status": "ok", "res": "1m", "pool": _POOLP, "entry": 1.0, "pages": 3,
+            "bars": [{"ts": alert_ts, "o": 1.0, "h": 2.0, "l": 0.5, "c": 1.5, "v": 1.0}],
+            "n_before": 0}
+        _bf_stats, _bf_out = _capture(BF.run, _bf_now, _bf_led, None, 5)
+        _bf_recs = [json.loads(ln) for ln in open(BF.OUT)]
+    finally:
+        BF.OUT, PA.fetch_path = _bf_orig_out, _bf_orig_fetch
+check("backfill --since=<days> keeps only rows alerted inside the window (newest-first), "
+      "leaving the rest untouched for a later pass",
+      _bf_stats["ok"] == 1 and len(_bf_recs) == 1 and _bf_recs[0]["symbol"] == "NEW", str(_bf_stats))
+check("the backfill record carries `pages` beside `res` (a row covered only by page 4 rests on a different "
+      "call budget than one the newest page covered)",
+      _bf_recs[0]["res"] == "1m" and _bf_recs[0]["pages"] == 3, str(_bf_recs[0]))
+check("backfill prints the ledger it is reading, its row count and its max event_seq before spending a call",
+      _bf_led in _bf_out and "802" in _bf_out and "max event_seq" in _bf_out, _bf_out[:400])
+
+# ── 7. evaluate: an unmatched record is DROPPED and COUNTED, never silently ungated ─
+from selfimprove import evaluate as EVA                 # noqa: E402
+
+with tempfile.TemporaryDirectory() as _d:
+    _ev_p = os.path.join(_d, "paths.jsonl")
+    with open(_ev_p, "w") as fh:
+        for _r in [
+            {"token": "0xaa", "event_seq": 1, "entry": 1.0, "alert_ts": 1.0, "res": "1m", "pages": 1,
+             "tier": "A", "bars": [{"ts": 0, "o": 1, "h": 1, "l": 1, "c": 1, "v": 1.0}]},
+            {"token": "0xzz", "event_seq": 9, "entry": 1.0, "alert_ts": 1.0, "res": "1m", "pages": 1,
+             "tier": "A", "bars": [{"ts": 0, "o": 1, "h": 1, "l": 1, "c": 1, "v": 1.0}]},
+            {"token": "0xbb", "event_seq": 2, "entry": 71.0, "alert_ts": 1.0, "res": "1m", "pages": 1,
+             "tier": "A", "bars": [{"ts": 0, "o": 71, "h": 71, "l": 71, "c": 71, "v": 1.0}]},
+        ]:
+            fh.write(json.dumps(_r) + "\n")
+    _ev_rows = EVA.load_paths(_ev_p, ledger_entry={"0xaa": 1.0, "0xbb": 1.0})
+check("load_paths DROPS a record with no ledger row at either key and counts it as n_unmatched — it can no "
+      "longer slip past the 3x mispriced gate by having nothing to compare against",
+      [r["token"] for r in _ev_rows] == ["0xaa"]
+      and EVA.LAST_LOAD_STATS["n_unmatched"] == 1 and EVA.LAST_LOAD_STATS["n_mispriced"] == 1
+      and EVA.LAST_LOAD_STATS["n_kept"] == 1,
+      f"{[r['token'] for r in _ev_rows]} {EVA.LAST_LOAD_STATS}")
+
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")

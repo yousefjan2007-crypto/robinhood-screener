@@ -5,20 +5,28 @@ PORTED from solana_screener/selfimprove/backfill.py (2026-09-12): the ledger is 
 `ledger.load()` (token/symbol/tier/alert_ts/event_seq columns — `token`, never `mint`), the
 clock is read ONCE in main and threaded into `paths.fetch_path(token, alert_ts, now_s)`.
 
-RUN IT REPEATEDLY. GeckoTerminal's free tier is a hard 30 calls/min PER IP and on the Mac that
-IP is shared with solana-listener / -livebook / the solana backfill and this project's own
-2-minute launchd job, so http_client holds this host at config.GECKOTERMINAL_RATE_HZ_MAC
-(0.25 Hz). Budget: ~3 calls per row (1 pools + up to 2 OHLCV) at 4 s each ≈ 12 s/row ≈ 200 min
-per 1,000 rows — this is a background job, not something to wait on. A single pass will still
-leave rows `deferred` (429s from the other jobs' bursts). Deferred rows are NOT written as
-failures — they are simply absent from the output, so the next pass retries exactly them and
-nothing else. Two or three passes converge. Never interpret a missing row as a dead token; see
-paths.fetch_path.
+RUN IT BY HAND, REPEATEDLY, NEVER FROM A SCHEDULER. GeckoTerminal's free tier is a hard 30
+calls/min PER IP and on the Mac that IP is shared with solana-listener / -livebook / the solana
+backfill and this project's own jobs, so http_client holds this host at
+config.GECKOTERMINAL_RATE_HZ_MAC (0.25 Hz). Budget: ~1 pools call + up to config.PATHS_MAX_PAGES
+OHLCV calls per resolution tried, at 4 s each ≈ 12–20 s/row — this is a background job, not
+something to wait on, and a job that ran unattended would starve every other GT reader on this
+machine. A single pass will still leave rows `deferred` (429s from the other jobs' bursts).
+Deferred rows are NOT written as failures — they are simply absent from the output, so the next
+pass retries exactly them and nothing else. Two or three passes converge. Never interpret a
+missing row as a dead token; see paths.fetch_path.
+
+`--since=<days>` restricts the pass to rows alerted inside the window (newest first, as always).
+The recent cohort is where the fine resolutions still exist: paging reaches ~2.8 days at 1m, so
+a 5-day pass is the set for which an ORDERED answer is even possible, and spending the budget
+there first is the difference between 1m bars and 1h bars on the rows that matter.
 
 Output: cache/paths.jsonl (regenerable, gitignored via cache/), one record per priced row:
-    {token, symbol, tier, event_seq, alert_ts, res, entry, n_bars, bars:[{ts,o,h,l,c,v}, ...]}
+    {token, symbol, tier, event_seq, alert_ts, res, pages, entry, n_bars, bars:[{ts,o,h,l,c,v}]}
 `res` is the bar resolution actually used (1m / 15m / 1h) and MUST be carried into any analysis —
-an hour-long bar cannot resolve a token that peaks four minutes after the alert.
+an hour-long bar cannot resolve a token that peaks four minutes after the alert. `pages` is how
+many OHLCV pages that resolution needed; a row reached only on page 4 of a backward walk rests
+on a different call budget than one the newest page covered.
 
 A ledger token can carry several rows (first_sighting → band_fire → promotion, each at its own
 alert_ts and entry), so the resume key is `event_seq` — the ledger's forward-only key — falling
@@ -66,10 +74,11 @@ def _done() -> set:
     return got
 
 
-def _rows(ledger_path: str | None) -> list:
+def _rows(led, now_s: float, since_days: float | None = None) -> list:
     """Ledger rows as plain dicts with a numeric alert_ts, newest first (finest resolution
-    still available). A row with no usable alert_ts is data, not a crash: skipped."""
-    led = LED.load(ledger_path)
+    still available). A row with no usable alert_ts is data, not a crash: skipped.
+    `since_days` keeps only rows alerted at or after now_s - since_days*86400."""
+    floor = None if not since_days else float(now_s) - float(since_days) * 86400.0
     rows = []
     for _, r in led.iterrows():
         try:
@@ -78,6 +87,8 @@ def _rows(ledger_path: str | None) -> list:
             continue
         if not (a > 0) or str(r["alert_ts"]) in _EMPTY:
             continue
+        if floor is not None and a < floor:
+            continue
         rows.append({"token": str(r["token"]).lower(), "symbol": str(r.get("symbol") or ""),
                      "tier": str(r.get("tier") or ""), "event_seq": r.get("event_seq"),
                      "alert_ts": a})
@@ -85,10 +96,21 @@ def _rows(ledger_path: str | None) -> list:
     return rows
 
 
-def run(now_s: float, ledger_path: str | None = None, limit: int | None = None) -> dict:
+def run(now_s: float, ledger_path: str | None = None, limit: int | None = None,
+        since_days: float | None = None) -> dict:
     """One pass over the ledger. `now_s` is captured by the caller (main) exactly once."""
     ledger_path = ledger_path or config.LEDGER_PATH
-    rows = _rows(ledger_path)
+    led = LED.load(ledger_path)
+    # WHICH LEDGER THIS IS. Every number downstream is a statement about this file at this
+    # moment, and the cloud keeper commits new events every few minutes, so name the file, its
+    # size and its high-water event_seq before spending a single call — and say so when
+    # origin/main has already moved past it (print-only; the worktree stays the source).
+    print(f"ledger {ledger_path}: {len(led)} row(s), max event_seq "
+          f"{LED.next_event_seq(led) - 1}", flush=True)
+    LED.warn_if_behind_origin(led, "backfill")
+    rows = _rows(led, now_s, since_days)
+    if since_days:
+        print(f"  --since={since_days:g}d: {len(rows)} row(s) alerted inside the window", flush=True)
     done = _done()
     todo = [r for r in rows if _key(r["token"], r["event_seq"]) not in done]
     if limit:
@@ -121,7 +143,8 @@ def run(now_s: float, ledger_path: str | None = None, limit: int | None = None) 
                 seq = None
             fh.write(json.dumps({
                 "token": r["token"], "symbol": r["symbol"], "tier": r["tier"],
-                "event_seq": seq, "alert_ts": a, "res": p["res"], "entry": p["entry"],
+                "event_seq": seq, "alert_ts": a, "res": p["res"],
+                "pages": int(p.get("pages") or 0), "entry": p["entry"],
                 "n_bars": len(p["bars"]), "bars": p["bars"]}) + "\n")
             fh.flush()
             if i % 25 == 0:
@@ -138,13 +161,16 @@ def run(now_s: float, ledger_path: str | None = None, limit: int | None = None) 
 def main(argv: list | None = None) -> int:
     lim = None
     src = None
+    since = None
     for a in (sys.argv[1:] if argv is None else argv):
         if a.startswith("--limit="):
             lim = int(a.split("=", 1)[1])
         if a.startswith("--ledger="):
             src = a.split("=", 1)[1]
+        if a.startswith("--since="):
+            since = float(a.split("=", 1)[1])
     now_s = time.time()            # the ONE clock read; everything below is a parameter
-    run(now_s, src, lim)
+    run(now_s, src, lim, since)
     return 0
 
 
