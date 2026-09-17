@@ -265,8 +265,16 @@ DISCOVERY_LOG_SOURCES = {          # address → (kind, topic0)
     PONS_FACTORY: ("pons_create", TOPIC_PONS_CREATE),
 }
 # launchpad launches are ~99 % absent from Dexscreener at the first scan and mostly stay so: ONE
-# recheck at 30 min, never the 6 h slot (which would hold ~20k dead launches in recheck.json)
-RECHECK_SCHEDULE_BY_KIND = {"pons_create": (1800,), "longlaunch_create": (1800,), "pool_v4": (1800,)}
+# recheck at 30 min, never the 6 h slot (which would hold ~20k dead launches in recheck.json).
+# The FEED kinds are the opposite case and get their own ladders: a feed row is a token minutes old
+# that some other index already sees, and the chain's three measured winners moved in 4-30 min, so
+# the first slot is 5-10 min. A GMGN New row is the earliest sighting of all (the curve has barely
+# started) and waits 10 min; Almost-bonded gets three looks across the half hour graduation usually
+# takes; Migrated and a GT new pool get two. Without these a feed sighting was a ONE-SHOT look
+# (FOMOPAD was sighted at 4.07 min through gt_new_pools alone and then dropped for 6 h).
+RECHECK_SCHEDULE_BY_KIND = {"pons_create": (1800,), "longlaunch_create": (1800,), "pool_v4": (1800,),
+                            "gt_new_pools": (300, 900), "gmgn_new_creation": (600, 1800),
+                            "gmgn_near_completion": (300, 900, 1800), "gmgn_completed": (300, 900)}
 # reference winners (what "a coin worth finding" looks like on this chain; at-launch numbers in verify.py)
 REFERENCE_TOKENS = {
     "CATGPT": "0xd6FDE6a3Fc6Ab2d83b2BE58383944CA1baDe1E18",      # launched 2026-09-11 23:40Z, $15M on 09-12
@@ -312,17 +320,29 @@ DISCOVERY_MAX_CATCHUP_BLOCKS = 300_000   # ~8.4 h: after a longer outage skip ah
 LOG_WINDOW_BLOCKS = 100_000              # Flap ≈ 4k logs / 100k blocks — under the node's 10k cap
 DISCOVERY_MAX_LOG_TOKENS_PER_RUN = 200   # log tokens are NEVER truncated: the cursor advances only
                                          # to the block of the last log actually processed
+DISCOVERY_CATCHUP_TRIGGER_BLOCKS = 30_000   # ~50 min of blocks: past this the cursor is BEHIND, and at the
+                                         # steady-state cap it advanced ~10k blocks/run — slower than the chain,
+                                         # so the 300k floor below would eventually drop ranges instead
+DISCOVERY_MAX_LOG_TOKENS_CATCHUP = 600   # the per-run cap while catching up (the enrich arithmetic that keeps
+                                         # it inside MAX_DISCOVER is pinned in verify section J)
 DISCOVERY_FEEDS = ("gt_new_pools", "gmgn_trenches")      # cheap hedge for factories not in the log set; the
                                          # scanhood.launch_feed / robinx.feed_new adapters exist but are off
-GT_NEW_POOLS_PAGES = 2
-DISCOVER_QUOTA = {"logs": 200, "watchlist": 60, "rechecks": 40, "feeds": 20}  # unused quota spills forward
-MAX_DISCOVER = 400                       # bounds only the Dexscreener enrich set (30 addrs/call); Pons + hook-less
+GT_NEW_POOLS_PAGES = 4                   # a page is ~20 pools and the feed turns over ~582/hour, so 2 pages covered
+                                         # ~2.5 min against a 240 s cadence — less than one run
+FEED_PULL_FORWARD_MAX = 40               # per run: tokens already in recheck that a feed listed again (a new pool for
+                                         # a token we are waiting on is its graduation) are looked at FIRST, without
+                                         # consuming their scheduled slot; bounded so they cannot crowd out the queue
+DISCOVER_QUOTA = {"logs": 200, "watchlist": 60, "rechecks": 150, "feeds": 40}  # unused quota spills forward
+MAX_DISCOVER = 800                       # bounds only the Dexscreener enrich set (30 addrs/call); Pons + hook-less
                                          # V4 + Bankr ≈ 100 log tokens per 5-min run, 99 % absent → cheap
 SEEN_TTL_S = 6 * 3600                    # rejects only; the ledger dedups survivors
 RECHECK_SCHEDULE_S = (1800, 21600)       # a token that failed ONLY size gates, or has no pair yet,
                                          # is re-enriched at +30m and +6h
 RECHECK_MAX = 3000                       # ≈ 2 h of launchpad launches at one 30-min recheck each
-RECHECK_PER_RUN = 40
+RECHECK_PER_RUN = 150                    # 40 drained 600/h against a Pons inflow of 750-1,250/h, so recheck.json
+                                         # simply sat at RECHECK_MAX and the oldest slots were evicted unlooked-at;
+                                         # 150 is 2,250/h, ahead of the inflow (the cost is Dexscreener batches:
+                                         # 30 addrs/call, ~0.2 s/token measured)
 GT_INFO_BUDGET_PER_RUN = 8               # full pass-2 tokens per run: Blockscout answers in ~5 s per call (measured
                                          # 2026-09-12), so a full pass 2 is ~13 s per token even after the trims
 GT_INFO_REFRESH_S = 1800                 # watched tokens refresh pass-2 facts at most this often

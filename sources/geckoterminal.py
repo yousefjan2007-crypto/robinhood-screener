@@ -39,10 +39,10 @@ from datetime import datetime, timezone                          # noqa: E402
 
 BASE = "https://api.geckoterminal.com/api/v2"
 _FOREVER = config.FOREVER_CACHE_DAYS * 86400
-# new_pools turns over ~582 pools/hour (survey §5: pages 1+2 spanned 4.1 min), so a page is
-# stale after a minute; 60 s also lets the discovery stage and a re-run within the same
-# minute share one call against the shared 30/min budget. config has no constant for it yet.
-NEW_POOLS_CACHE_S = 60
+# new_pools turns over ~582 pools/hour (survey §5: pages 1+2 spanned 4.1 min), so a page is stale
+# after a minute. The TTL is config.GT_NEW_POOLS_CACHE_S and ONLY that: a module literal here beside
+# config's own constant shadowed it silently, so the page count and the freshness were tuned in two
+# different files.
 _ID_PREFIX = f"{config.GT_NETWORK}_"     # relationship ids look like "robinhood_0xabc..."
 # GT quote legs on this chain are NOT only WETH: page 1 on 2026-09-12 showed pons-v2 pools
 # quoted in native ETH as 0xeeee…eeee (the ERC-7528 sentinel), a uniswap-v4 pool quoted as
@@ -129,7 +129,7 @@ def new_pools(page: int = 1, network: str = config.GT_NETWORK) -> list[dict]:
     Counts are int|None (None = GT did not report the window). [] on deferred."""
     cache = os.path.join(config.CACHE_DIR, f"gt_new_pools_{network}_p{int(page)}.json")
     d = get_json(f"{BASE}/networks/{network}/new_pools?page={int(page)}",
-                 cache_path=cache, max_age_sec=NEW_POOLS_CACHE_S)
+                 cache_path=cache, max_age_sec=config.GT_NEW_POOLS_CACHE_S)
     if is_deferred(d) or is_absent(d) or not isinstance(d, dict):
         return []
     out = []

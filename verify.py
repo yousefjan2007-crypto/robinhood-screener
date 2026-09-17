@@ -316,6 +316,15 @@ for p in _py_files():
 check("every .py (cache/, data/ excluded) begins with 'from __future__ import annotations' after its docstring",
       not missing_future, str(missing_future))
 
+# a budget constant lives in config.py and NOWHERE else: a module literal beside config's own
+# GT_NEW_POOLS_CACHE_S shadowed it silently (the feed paged at a TTL config did not know about)
+_gt_path = os.path.join(ROOT, "sources", "geckoterminal.py")
+_gt_ttl = sorted(t_.id for n_ in _tree(_gt_path).body if isinstance(n_, ast.Assign)
+                 for t_ in n_.targets if isinstance(t_, ast.Name) and t_.id.endswith("CACHE_S"))
+check("sources/geckoterminal.py defines no cache-TTL literal of its own — the new-pools TTL is read from "
+      "config.GT_NEW_POOLS_CACHE_S, so one edit in config changes the feed's freshness",
+      not _gt_ttl and "config.GT_NEW_POOLS_CACHE_S" in _read(_gt_path), str(_gt_ttl))
+
 leaks = []
 for base in (os.path.join(ROOT, "docs"), os.path.join(ROOT, "selfimprove", "research"), os.path.join(ROOT, ".github")):
     for dp, dns, fns in os.walk(base):
@@ -3347,6 +3356,7 @@ section("J. run.py — exact discovery (cursor never skips a log), atomic JSON, 
 # ═══════════════════════════════════════════════════════════════════════════════════
 import run as RUN                                       # noqa: E402
 from sources import geckoterminal as GT, safety as SAFE  # noqa: E402
+from sources import gmgn as GMR                          # noqa: E402
 
 
 def _pad(a):
@@ -3381,13 +3391,13 @@ _saved_get_logs = rpc.get_logs
 calls_gl: list = []
 try:
     rpc.get_logs = lambda addrs, topics, a, b: (calls_gl.append((a, b)) or ([lg for lg in fixture_logs if a <= int(lg["blockNumber"], 16) <= b], None))
-    disc, cur, gap = RUN.discover_from_logs({"last_block": 990}, 1500, RUN._Budget(60))
+    disc, cur, gap, _meta = RUN.discover_from_logs({"last_block": 990}, 1500, RUN._Budget(60))
     check("discover_from_logs decodes the three fixture logs through rpc.decode_discovery and advances the cursor to head",
           set(disc) == {TOK_P, TOK_V3, TOK_F} and cur["last_block"] == 1500 and gap == 0)
     calls_gl.clear()
     rpc.get_logs = lambda addrs, topics, a, b: (calls_gl.append((a, b)) or (None, "query returned more than 10000 results"))
     H = 2_000_000
-    disc, cur, gap = RUN.discover_from_logs({"last_block": H - 50_000}, H, RUN._Budget(60))
+    disc, cur, gap, _meta = RUN.discover_from_logs({"last_block": H - 50_000}, H, RUN._Budget(60))
     spans = [b - a + 1 for a, b in calls_gl]
     check(f"a window error halves the window down to MIN_LOG_WINDOW ({config.MIN_LOG_WINDOW}) and the cursor STAYS",
           cur["last_block"] == H - 50_000 and disc == {} and spans[-1] <= config.MIN_LOG_WINDOW
@@ -3398,7 +3408,7 @@ try:
     check(f"the first run with no cursor scans exactly DISCOVERY_BACKFILL_BLOCKS ({config.DISCOVERY_BACKFILL_BLOCKS}) back from head",
           calls_gl[0][0] == H - config.DISCOVERY_BACKFILL_BLOCKS and calls_gl[-1][1] == H)
     calls_gl.clear()
-    disc, cur, gap = RUN.discover_from_logs({"last_block": H - 400_000}, H, RUN._Budget(60))
+    disc, cur, gap, _meta = RUN.discover_from_logs({"last_block": H - 400_000}, H, RUN._Budget(60))
     check(f"a cursor older than DISCOVERY_MAX_CATCHUP_BLOCKS ({config.DISCOVERY_MAX_CATCHUP_BLOCKS}) is capped and the gap reported",
           calls_gl[0][0] == H - config.DISCOVERY_MAX_CATCHUP_BLOCKS and gap == 400_000 - config.DISCOVERY_MAX_CATCHUP_BLOCKS - 1
           and cur["last_block"] == H)
@@ -3407,13 +3417,151 @@ try:
                       "0x" + rpc.enc_uint(1) + rpc.enc_addr(CREATOR_F) + rpc.enc_uint(i) + rpc.enc_addr("0x%040x" % (i + 1)) + rpc.enc_uint(0),
                       START + i, 0) for i in range(300)]
     rpc.get_logs = lambda addrs, topics, a, b: ([lg for lg in many_logs if a <= int(lg["blockNumber"], 16) <= b], None)
-    disc, cur, gap = RUN.discover_from_logs({"last_block": START - 1}, START + 400, RUN._Budget(60))
+    disc, cur, gap, meta = RUN.discover_from_logs({"last_block": START - 1}, START + 400, RUN._Budget(60))
     cap = config.DISCOVERY_MAX_LOG_TOKENS_PER_RUN
     check(f"with 300 log tokens only DISCOVERY_MAX_LOG_TOKENS_PER_RUN ({cap}) are processed and the cursor sits one block "
           "below the cut (log tokens are never truncated silently)",
-          len(disc) == cap and cur["last_block"] == START + cap - 2 and set(disc) == {"0x%040x" % (i + 1) for i in range(cap)})
+          len(disc) == cap and cur["last_block"] == START + cap - 2 and set(disc) == {"0x%040x" % (i + 1) for i in range(cap)}
+          and meta["catchup"] is False and meta["cap"] == cap and meta["lag_blocks"] == 401)
+    # catch-up: while the cursor is more than DISCOVERY_CATCHUP_TRIGGER_BLOCKS behind, the per-run token
+    # cap rises so the cursor can actually close the gap (at the steady-state cap the cursor advanced
+    # ~10k blocks/run and the 300k floor then DROPPED ranges — discovery hole 5)
+    disc_c, cur_c, gap_c, meta_c = RUN.discover_from_logs({"last_block": START - 1}, START + 40_000, RUN._Budget(60))
+    cap_c = config.DISCOVERY_MAX_LOG_TOKENS_CATCHUP
+    check(f"a cursor more than DISCOVERY_CATCHUP_TRIGGER_BLOCKS ({config.DISCOVERY_CATCHUP_TRIGGER_BLOCKS:,}) behind raises the cap to "
+          f"DISCOVERY_MAX_LOG_TOKENS_CATCHUP ({cap_c}) and the same 300-log fixture processes min(300, {cap_c}); the cursor still "
+          "advances only to the last log actually processed",
+          meta_c["catchup"] is True and meta_c["cap"] == cap_c and len(disc_c) == min(300, cap_c)
+          and cur_c["last_block"] == START + 40_000 and meta_c["lag_blocks"] == 40_001, str((len(disc_c), meta_c)))
+    check("the arithmetic that keeps a full run inside the enrich bound: logs + rechecks + feeds <= MAX_DISCOVER in steady state AND "
+          "in catch-up (the watchlist is exempt), and a pull-forward can never crowd out half the scheduled rechecks",
+          config.DISCOVER_QUOTA["logs"] + config.RECHECK_PER_RUN + config.DISCOVER_QUOTA["feeds"] <= config.MAX_DISCOVER
+          and cap_c + config.RECHECK_PER_RUN + config.DISCOVER_QUOTA["feeds"] <= config.MAX_DISCOVER
+          and config.FEED_PULL_FORWARD_MAX <= config.RECHECK_PER_RUN // 2
+          and config.DISCOVER_QUOTA["rechecks"] == config.RECHECK_PER_RUN,
+          str((config.DISCOVER_QUOTA, config.RECHECK_PER_RUN, config.MAX_DISCOVER, config.FEED_PULL_FORWARD_MAX)))
 finally:
     rpc.get_logs = _saved_get_logs
+
+# ── the feeds are a discovery SOURCE with a ladder, not a one-shot look ────────────────
+# A feed-sighted token Dexscreener does not price yet used to be marked seen for SEEN_TTL_S with no
+# recheck at all (the else-branch), while a log-sighted one got a ladder: FOMOPAD was sighted at
+# 4.07 min through gt_new_pools alone (discovery hole 1).
+_FEED_KINDS = ("gt_new_pools", "gmgn_new_creation", "gmgn_near_completion", "gmgn_completed")
+_ladders = {k: config.RECHECK_SCHEDULE_BY_KIND.get(k) for k in _FEED_KINDS}
+check("every feed kind has its own recheck ladder: ascending slots, the FIRST slot <= 600 s (a feed token is minutes old, not "
+      "hours), and the launchpad kinds keep their single 30-min slot (pons_create alone is 750-1,250 launches/hour)",
+      all(isinstance(v, tuple) and v and all(y > x for x, y in zip(v, v[1:])) and v[0] <= 600 for v in _ladders.values())
+      and config.RECHECK_SCHEDULE_BY_KIND["pons_create"] == (1800,)
+      and all(RUN._recheck_schedule({"kind": k}) == _ladders[k] for k in _FEED_KINDS)
+      and RUN._recheck_schedule({"kind": "no_such_kind"}) == config.RECHECK_SCHEDULE_S, str(_ladders))
+
+_saved_fd = (GT.new_pools, GMR.trenches)
+_GT_TOK, _GM_TOK, _PULL_TOK = "0x" + "a1" * 20, "0x" + "b2" * 20, "0x" + "c3" * 20
+try:
+    GT.new_pools = lambda page=1, network=None: ([{"token": _GT_TOK, "symbol": "GTX", "pool": "0x" + "d4" * 20,
+                                                   "created_ts": 1.7e9, "buys_m5": 6, "buyers_m5": 3}] if page == 1 else [])
+    _tr_cols = {"new_creation": [{"address": _GM_TOK.upper(), "creator": "0x" + "ee" * 20,
+                                  "created_timestamp": 1789263019, "launchpad_platform": "bankr",
+                                  "is_wash_trading": False, "suspected_insider_hold_rate": 0.02}],
+                "near_completion": [], "completed": [{"address": _PULL_TOK, "creator": "0x" + "ef" * 20,
+                                                      "created_timestamp": 1789261939, "launchpad_platform": "pons"}]}
+    GMR.trenches = lambda **k: _tr_cols
+    _rk = {_PULL_TOK: {"n_checks": 1, "next_check": 9.9e9, "first_seen": 1.0,
+                       "disc": {"kind": "pons_create", "creator": "0x" + "11" * 20}}}
+    _ft, _frows, _fdisc, _fhits = RUN.feed_tokens({}, set(_rk), RUN._Budget(60), recheck=_rk)
+    check("feed_tokens returns (tokens, GMGN rows, disc records, pull-forward hits): a GT new-pools row becomes a disc record of kind "
+          "gt_new_pools carrying the row's own fields, a GMGN row becomes kind gmgn_<column> with created_ts + launchpad_platform and "
+          "NEVER a `creator` key (safety._apply_disc writes creator -> deployer and would override the creation-tx-sender attribution)",
+          _ft == {_GT_TOK, _GM_TOK.lower()} and set(_fdisc) == {_GT_TOK, _GM_TOK.lower(), _PULL_TOK}
+          and _fdisc[_GT_TOK]["kind"] == "gt_new_pools" and _fdisc[_GT_TOK]["buys_m5"] == 6
+          and _fdisc[_GM_TOK.lower()] == {"kind": "gmgn_new_creation", "created_ts": 1789263019, "launchpad_platform": "bankr"}
+          and _fdisc[_PULL_TOK]["kind"] == "gmgn_completed"
+          and not any("creator" in d_ or "deployer" in d_ for t_, d_ in _fdisc.items() if t_ != _GT_TOK)
+          and set(_frows) == {_GM_TOK.lower(), _PULL_TOK}, str(_fdisc))
+    _many = {"0x%040x" % (i + 1): {"n_checks": 0, "next_check": 9.9e9} for i in range(config.FEED_PULL_FORWARD_MAX + 5)}
+    GMR.trenches = lambda **k: {"completed": [{"address": t_} for t_ in _many], "near_completion": [], "new_creation": []}
+    _fh_many = RUN.feed_tokens({}, set(_many), RUN._Budget(60), recheck=_many)[3]
+    check("a feed row for a token ALREADY in recheck is a pull-forward hit (a new pool for a token we are waiting on is its "
+          f"graduation), not a re-discovery: it stays out of the new-token set, and the hits are capped at FEED_PULL_FORWARD_MAX "
+          f"({config.FEED_PULL_FORWARD_MAX}) so they can never crowd out the scheduled rechecks",
+          _fhits == [_PULL_TOK] and _PULL_TOK not in _ft
+          and len(_fh_many) == config.FEED_PULL_FORWARD_MAX and _fh_many == sorted(_many)[: config.FEED_PULL_FORWARD_MAX],
+          str(len(_fh_many)))
+    GMR.trenches = lambda **k: _tr_cols
+    _ft0, _fr0, _fd0, _fh0 = RUN.feed_tokens({_GT_TOK: 1.0}, {_GM_TOK.lower()}, RUN._Budget(60), recheck={})
+    check("seen / known tokens are still not re-discovered by a feed; with no recheck entry there are no pull-forward hits and the "
+          "same row is an ordinary discovery (what makes it a pull-forward is that we were already waiting on the token)",
+          _ft0 == {_PULL_TOK} and _fh0 == [] and set(_fd0) == {_GT_TOK, _GM_TOK.lower(), _PULL_TOK}, str((_ft0, _fh0)))
+finally:
+    GT.new_pools, GMR.trenches = _saved_fd
+
+# ── the absent-routing table, driven through a REAL committed run into a temp data dir ────────
+# "never mark a token seen without a market snapshot" — a Dexscreener `absent` IS a snapshot, so
+# routing it is a decision, not an omission: a feed-sighted token joins its kind's LADDER exactly
+# like a log-sighted one (it used to take the else-branch straight to `seen` for SEEN_TTL_S with no
+# recheck at all, and FOMOPAD was sighted at 4.07 min through gt_new_pools alone), a ladder that has
+# run out still ends at `seen`, and a token pulled forward by a feed row keeps its scheduled slot.
+_RPATHS = ("LEDGER_PATH", "STATE_PATH", "SEEN_PATH", "RECHECK_PATH", "WATCHLIST_PATH", "CURSOR_PATH",
+           "SCAN_PATH", "BAND_VERDICTS_PATH", "PAPER_LEDGER_PATH", "PAPER_POSITIONS_PATH", "RUN_LOG_PATH")
+_saved_rp = {k: getattr(config, k) for k in _RPATHS}
+_saved_pe = config.PAPER_EXEC
+_saved_rt = {"bn": rpc.block_number, "gl": rpc.get_logs, "np_": GT.new_pools, "tr": GMR.trenches,
+             "en": RUN.dex.enrich_many, "fw": RUN.dex.forward_snapshot_many, "p1": SAFE.pass1_many,
+             "p2": SAFE.pass2, "st": scanhood.stock_tokens, "sa": RUN.send_all}
+T_FEED, T_PULL, T_DONE = "0x" + "11" * 20, "0x" + "22" * 20, "0x" + "33" * 20
+try:
+    with tempfile.TemporaryDirectory() as _dd:
+        for _k in _RPATHS:
+            setattr(config, _k, os.path.join(_dd, os.path.basename(_saved_rp[_k])))
+        config.PAPER_EXEC = False
+        _pull_rec = {"n_checks": 1, "next_check": 9.9e9, "first_seen": 1.0,
+                     "disc": {"kind": "gmgn_completed", "created_ts": 1789261939}}
+        _done_rec = {"n_checks": len(config.RECHECK_SCHEDULE_BY_KIND["gt_new_pools"]), "next_check": 1.0,
+                     "first_seen": 1.0, "disc": {"kind": "gt_new_pools", "token": T_DONE}}
+        with open(config.RECHECK_PATH, "w") as _fh:
+            json.dump({T_PULL: _pull_rec, T_DONE: _done_rec}, _fh)
+        rpc.block_number = lambda: 1000
+        rpc.get_logs = lambda addrs, topics, a, b: ([], None)
+        GT.new_pools = lambda page=1, network=None: ([{"token": T_FEED, "symbol": "FEED", "pool": "0x" + "44" * 20,
+                                                       "created_ts": 1.7e9}] if page == 1 else [])
+        GMR.trenches = lambda **k: {"new_creation": [], "near_completion": [],
+                                    "completed": [{"address": T_PULL, "launchpad_platform": "pons"}]}
+        RUN.dex.enrich_many = lambda addrs, now_s, max_age_sec=None: {"ok": {}, "absent": set(addrs), "deferred": set()}
+        RUN.dex.forward_snapshot_many = lambda toks, now_s: {}
+        SAFE.pass1_many = lambda *a, **k: {}
+        SAFE.pass2 = lambda *a, **k: None
+        scanhood.stock_tokens = lambda: set()
+        RUN.send_all = lambda title, body, dry_run=True: None
+        _t_run = time.time()
+        _r_run, _out_run = _capture(RUN.run, dry_run=False, send=False)
+        _rec_after = json.load(open(config.RECHECK_PATH))
+        _seen_after = json.load(open(config.SEEN_PATH))
+        _scan_after = json.load(open(config.SCAN_PATH))
+        _sched0 = config.RECHECK_SCHEDULE_BY_KIND["gt_new_pools"][0]
+        check(f"a FEED-sighted token Dexscreener cannot price yet joins its kind's ladder — recheck at +{_sched0} s with n_checks 1 and "
+              "its feed disc record persisted — and is NOT marked seen (the feed used to be a one-shot look)",
+              T_FEED in _rec_after and int(_rec_after[T_FEED]["n_checks"]) == 1 and T_FEED not in _seen_after
+              and abs(float(_rec_after[T_FEED]["next_check"]) - (_t_run + _sched0)) < 30
+              and (_rec_after[T_FEED].get("disc") or {}).get("kind") == "gt_new_pools", str(_rec_after.get(T_FEED)))
+        check("a token whose ladder is exhausted still ends at seen and leaves recheck (the ladder terminates; recheck.json cannot leak)",
+              T_DONE not in _rec_after and T_DONE in _seen_after, str((T_DONE in _rec_after, T_DONE in _seen_after)))
+        check("a token PULLED FORWARD by a feed row is looked at WITHOUT consuming its scheduled slot: its recheck record is identical "
+              "afterwards (same next_check, same n_checks) — the pull-forward adds a look rather than spending one",
+              _rec_after.get(T_PULL) == _pull_rec, str(_rec_after.get(T_PULL)))
+        check("latest_scan.json records how discovery ran this time — catchup, cursor_lag_blocks, feed_hits — so a run that is behind, or "
+              "is being led by the feeds, says so in the point-in-time store",
+              _scan_after.get("catchup") is False and _scan_after.get("cursor_lag_blocks") == 0
+              and _scan_after.get("feed_hits") == 1, str({k: _scan_after.get(k) for k in ("catchup", "cursor_lag_blocks", "feed_hits")}))
+finally:
+    for _k in _RPATHS:
+        setattr(config, _k, _saved_rp[_k])
+    config.PAPER_EXEC = _saved_pe
+    rpc.block_number, rpc.get_logs, GT.new_pools, GMR.trenches = _saved_rt["bn"], _saved_rt["gl"], _saved_rt["np_"], _saved_rt["tr"]
+    RUN.dex.enrich_many, RUN.dex.forward_snapshot_many = _saved_rt["en"], _saved_rt["fw"]
+    SAFE.pass1_many, SAFE.pass2, scanhood.stock_tokens, RUN.send_all = _saved_rt["p1"], _saved_rt["p2"], _saved_rt["st"], _saved_rt["sa"]
+    http_client.reset_health()
+
 with tempfile.TemporaryDirectory() as d:
     pj = os.path.join(d, "x.json")
     RUN._atomic_json(pj, {"a": float("nan"), "b": [float("inf"), 1.0]}, indent=1)
@@ -3468,7 +3616,6 @@ def _snapshot_tree(base):
     return out
 
 
-from sources import gmgn as GMR                          # noqa: E402
 _saved_run = {"block_number": rpc.block_number, "get_logs": rpc.get_logs, "new_pools": GT.new_pools,
               "enrich_many": RUN.dex.enrich_many, "pass1": SAFE.pass1_many, "pass2": SAFE.pass2,
               "stock": scanhood.stock_tokens, "send_all": RUN.send_all, "save_watch": LAB.save_watchlist,
@@ -4088,14 +4235,14 @@ _saved_feed = (GM.trenches, GT.new_pools)
 try:
     GM.trenches = lambda **k: {"completed": [_row], "near_completion": [], "new_creation": [{"address": "0xDEF" + "0" * 37}]}
     GT.new_pools = lambda page=1, network=None: []
-    _ft, _frows = RUN.feed_tokens({}, set(), RUN._Budget(60))
+    _ft, _frows, _fdsc, _fhit = RUN.feed_tokens({}, set(), RUN._Budget(60))
     check("feed_tokens adds every Trenches column's addresses (lowercased, minus seen/known) under the feeds quota and "
           "returns the rows keyed by address for pass 2",
           _ft == {_row["address"].lower(), "0xdef" + "0" * 37} and set(_frows) == _ft
           and _frows[_row["address"].lower()]["launchpad_platform"] == "longxyz", str(_ft))
-    _ft2, _ = RUN.feed_tokens({_row["address"].lower(): 1}, {"0xdef" + "0" * 37}, RUN._Budget(60))
+    _ft2 = RUN.feed_tokens({_row["address"].lower(): 1}, {"0xdef" + "0" * 37}, RUN._Budget(60))[0]
     GM.trenches = lambda **k: None
-    _ft3, _frows3 = RUN.feed_tokens({}, set(), RUN._Budget(60))
+    _ft3, _frows3, _fdsc3, _fhit3 = RUN.feed_tokens({}, set(), RUN._Budget(60))
     check("seen/known tokens are not re-fed; a deferred feed (None) contributes nothing and no rows",
           _ft2 == set() and _ft3 == set() and _frows3 == {})
 finally:

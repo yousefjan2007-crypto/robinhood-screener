@@ -96,6 +96,14 @@ def _load_json(path: str, default):
         return default
 
 
+def _int_or_none(v):
+    """int, or None for anything that is not one (a feed's timestamp is a fact or it is unknown)."""
+    try:
+        return None if v is None or isinstance(v, bool) else int(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def _round(v, sig: int = 6):
     if isinstance(v, float) and v == v and not math.isinf(v) and v != 0.0:
         return float(f"{v:.{sig}g}")
@@ -123,11 +131,20 @@ class _Budget:
 
 # ── discovery ────────────────────────────────────────────────────────────────────
 def discover_from_logs(cursor: dict, head: int | None, budget: _Budget) -> tuple:
-    """Exact discovery: (disc dict token→record, new_cursor dict, gap_blocks). The cursor
+    """Exact discovery: (disc dict token→record, new_cursor dict, gap_blocks, meta). The cursor
     advances only to the block of the last log actually processed; log tokens are never
-    truncated silently — the per-run cap moves the cursor, not the token."""
+    truncated silently — the per-run cap moves the cursor, not the token.
+
+    meta = {catchup, cap, lag_blocks}. While the cursor is more than
+    DISCOVERY_CATCHUP_TRIGGER_BLOCKS behind the head the per-run cap rises to
+    DISCOVERY_MAX_LOG_TOKENS_CATCHUP: at the steady-state cap a run advanced ~10k blocks against a
+    chain that produces ~2,400 in the same 240 s only while the log density is low — under a
+    launchpad burst the cursor fell behind and the DISCOVERY_MAX_CATCHUP_BLOCKS floor then dropped
+    whole ranges (silently, as a gap). Catching up costs Dexscreener calls, not correctness."""
+    lag = max(0, int(head or 0) - int(cursor.get("last_block") or 0)) if cursor.get("last_block") else 0
+    meta = {"catchup": False, "cap": config.DISCOVERY_MAX_LOG_TOKENS_PER_RUN, "lag_blocks": lag}
     if not head:
-        return {}, cursor, 0
+        return {}, cursor, 0, meta
     last = int(cursor.get("last_block") or 0)
     if last <= 0:
         start = max(0, head - config.DISCOVERY_BACKFILL_BLOCKS)
@@ -140,7 +157,10 @@ def discover_from_logs(cursor: dict, head: int | None, budget: _Budget) -> tuple
             gap = floor - start
             start = floor
     if start > head:
-        return {}, cursor, 0
+        return {}, cursor, 0, meta
+    if head - start > config.DISCOVERY_CATCHUP_TRIGGER_BLOCKS:
+        meta.update({"catchup": True, "cap": config.DISCOVERY_MAX_LOG_TOKENS_CATCHUP})
+    cap = meta["cap"]
     addrs = list(config.DISCOVERY_LOG_SOURCES)
     topics = [[t for _k, t in config.DISCOVERY_LOG_SOURCES.values()]]
     disc: dict = {}
@@ -160,9 +180,9 @@ def discover_from_logs(cursor: dict, head: int | None, budget: _Budget) -> tuple
                 continue
             print(f"  [discover] window {s}-{e} failed ({err}); cursor stays at {processed_block}")
             new = {"last_block": processed_block, "updated_ts": cursor.get("updated_ts")}
-            return disc, new, gap
+            return disc, new, gap, meta
         for rec in rpc.decode_discovery(logs):
-            if len(disc) >= config.DISCOVERY_MAX_LOG_TOKENS_PER_RUN:
+            if len(disc) >= cap:
                 capped = True
                 break
             t = rec["token"].lower()
@@ -175,35 +195,56 @@ def discover_from_logs(cursor: dict, head: int | None, budget: _Budget) -> tuple
     if capped:
         processed_block = max(start - 1, processed_block - 1)   # re-scan the cut block next run
     new = {"last_block": processed_block, "updated_ts": cursor.get("updated_ts")}
-    return disc, new, gap
+    return disc, new, gap, meta
 
 
-def feed_tokens(seen: dict, known: set, budget: _Budget) -> tuple:
-    """(new addresses, GMGN Trenches rows keyed by address). The feeds are HEDGES under the
-    'feeds' quota beside the exact log cursor: GeckoTerminal's new pools, and GMGN's three
-    Trenches columns in ONE POST — whose rows ride along to pass 2 as features (no second call).
-    A deferred feed contributes nothing and no rows; it is never 'nothing new'."""
+def feed_tokens(seen: dict, known: set, budget: _Budget, recheck: dict | None = None) -> tuple:
+    """(new addresses, GMGN Trenches rows keyed by address, disc records keyed by address,
+    pull-forward hits). The feeds are HEDGES under the 'feeds' quota beside the exact log cursor:
+    GeckoTerminal's new pools, and GMGN's three Trenches columns in ONE POST — whose rows ride
+    along to pass 2 as features (no second call). A deferred feed contributes nothing and no rows;
+    it is never 'nothing new'.
+
+    A feed row is also a DISCOVERY RECORD, so a feed sighting can join the recheck ladder like a
+    log sighting (safety._apply_disc reads the GT row shape as it stands). A GMGN row is reduced to
+    kind / created_ts / launchpad_platform and NEVER carries `creator`: _apply_disc writes creator
+    to `deployer`, which would override the creation-tx-sender attribution with GMGN's guess.
+
+    A row for a token ALREADY in recheck is a PULL-FORWARD hit, not a re-discovery: a new pool for
+    a token we are waiting on is its graduation, so it is looked at first this run without
+    consuming its scheduled slot. Capped at FEED_PULL_FORWARD_MAX, sorted for determinism."""
     out: set = set()
     rows: dict = {}
+    disc: dict = {}
+    pending = set(recheck or ())
+    hits: set = set()
+
+    def _note(t: str, rec: dict) -> None:
+        disc.setdefault(t, rec)          # the first feed to see a token owns its record (GT's is richer)
+        if t in pending:
+            hits.add(t)
+        elif t not in seen and t not in known:
+            out.add(t)
+
     if "gt_new_pools" in config.DISCOVERY_FEEDS:
         for page in range(1, config.GT_NEW_POOLS_PAGES + 1):
             if not budget.ok("feeds"):
                 break
             for p in gt.new_pools(page):
                 t = (p.get("token") or "").lower()
-                if t and t not in seen and t not in known:
-                    out.add(t)
+                if t:
+                    _note(t, dict(p, kind="gt_new_pools"))
     if "gmgn_trenches" in config.DISCOVERY_FEEDS and budget.ok("feeds"):
         cols = gmgn.trenches()
-        for rs in (cols or {}).values():
+        for col, rs in (cols or {}).items():
             for r in rs or []:
                 t = str((r or {}).get("address") or "").lower()
                 if not (t.startswith("0x") and len(t) == 42):
                     continue
                 rows[t] = r
-                if t not in seen and t not in known:
-                    out.add(t)
-    return out, rows
+                _note(t, {"kind": f"gmgn_{col}", "created_ts": _int_or_none(r.get("created_timestamp")),
+                          "launchpad_platform": r.get("launchpad_platform") or None})
+    return out, rows, disc, sorted(hits)[: config.FEED_PULL_FORWARD_MAX]
 
 
 # ── the screen for one token ──────────────────────────────────────────────────────
@@ -261,17 +302,24 @@ def run(dry_run: bool = True, send: bool = False) -> list:
 
     # ── discovery ────────────────────────────────────────────────────────────────
     head = rpc.block_number()
-    disc, new_cursor, gap = discover_from_logs(cursor, head, budget)
+    disc, new_cursor, gap, disc_meta = discover_from_logs(cursor, head, budget)
     log_tokens = list(disc)
     watch_tokens = [t for t in LAB.watch_due(watch, ledger_index, now_s)][: config.DISCOVER_QUOTA["watchlist"] + 100]
     due_re = sorted((t for t, r in recheck.items() if float(r.get("next_check", 0)) <= now_s),
                     key=lambda t: float(recheck[t].get("next_check", 0)))[: config.RECHECK_PER_RUN]
     known = set(ledger_index) | set(watch) | set(recheck) | set(log_tokens)
-    feeds, gmgn_rows = feed_tokens(seen, known, budget)
+    feeds, gmgn_rows, feed_disc, feed_hits = feed_tokens(seen, known, budget, recheck=recheck)
+    # a feed row for a token we are already waiting on is its graduation: look at it FIRST, ahead of
+    # the scheduled queue and without spending its slot (the routing below leaves its record alone)
+    pulled = [t for t in feed_hits if t not in due_re]
+    due_re = (pulled + due_re)[: config.RECHECK_PER_RUN]
+    pulled = set(pulled) & set(due_re)
     # quotas: logs → watchlist → rechecks → feeds, unused quota spills forward; watchlist exempt
     # from MAX_DISCOVER (it is a batched re-enrich, not discovery)
     order: list = []
     q = dict(config.DISCOVER_QUOTA)
+    if disc_meta["catchup"]:
+        q["logs"] = max(q["logs"], disc_meta["cap"])   # a raised cap the quota would throw away is a dropped range
     spill = 0
     for name, toks in (("logs", log_tokens), ("watchlist", watch_tokens),
                        ("rechecks", due_re), ("feeds", sorted(feeds))):
@@ -289,8 +337,9 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     src_of = {t: s_ for s_, t in order}
     for t in disc:
         recheck.get(t, {}).setdefault("disc", disc[t])   # log record persists with a recheck
-    print(f"discover: logs {len(log_tokens)} (gap {gap} blocks) · watchlist {len(watch_tokens)} · "
-          f"rechecks {len(due_re)} · feeds {len(feeds)} → enrich {len(enrich_set)}  "
+    print(f"discover: logs {len(log_tokens)} (gap {gap} blocks, lag {disc_meta['lag_blocks']}"
+          f"{', CATCH-UP' if disc_meta['catchup'] else ''}) · watchlist {len(watch_tokens)} · "
+          f"rechecks {len(due_re)} ({len(pulled)} pulled forward) · feeds {len(feeds)} → enrich {len(enrich_set)}  "
           f"[trigger {trigger}, head {head}]")
 
     # ── enrichment ───────────────────────────────────────────────────────────────
@@ -304,13 +353,16 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     rejected: list = []           # tokens evaluated with a market snapshot and rejected → seen
     for t in absent:
         src = src_of.get(t)
+        if t in pulled:
+            continue                  # a pulled-forward look leaves the scheduled slot exactly as it was
         r = recheck.get(t) or {"n_checks": 0, "first_seen": now_s}
-        if src == "logs" or (src == "rechecks" and r.get("disc")):
+        d0 = disc.get(t) or feed_disc.get(t)
+        if src in ("logs", "feeds") or (src == "rechecks" and r.get("disc")):
             n = int(r.get("n_checks", 0))
-            sched = _recheck_schedule(r.get("disc") or disc.get(t))
+            sched = _recheck_schedule(r.get("disc") or d0)
             if n < len(sched):
                 r.update({"next_check": now_s + sched[n], "n_checks": n + 1,
-                          "disc": r.get("disc") or disc.get(t)})
+                          "disc": r.get("disc") or d0})
                 recheck[t] = r
             else:
                 recheck.pop(t, None); seen[t] = now_s
@@ -345,19 +397,21 @@ def run(dry_run: bool = True, send: bool = False) -> list:
             pass1_rejects[key] = pass1_rejects.get(key, 0) + 1
             if src_of.get(t) == "watchlist":
                 rejected.append(t)
-            else:
+            elif t not in pulled:     # a pulled-forward look never spends the scheduled slot
                 r = recheck.get(t) or {"n_checks": 0, "first_seen": now_s}
                 n = int(r.get("n_checks", 0))
-                sched = _recheck_schedule(r.get("disc") or disc.get(t))
+                d0 = disc.get(t) or feed_disc.get(t)
+                sched = _recheck_schedule(r.get("disc") or d0)
                 if n < len(sched) and (m.get("pair_age_min") or 0) < config.AGE_MAX_MINUTES:
                     r.update({"next_check": now_s + sched[n], "n_checks": n + 1,
-                              "disc": r.get("disc") or disc.get(t)})
+                              "disc": r.get("disc") or d0})
                     recheck[t] = r
                 else:
                     recheck.pop(t, None); seen[t] = now_s
             continue
         p1_tokens.append(t)
-    dmap = {t: (disc.get(t) or (recheck.get(t) or {}).get("disc") or (watch.get(t) or {}).get("disc") or {})
+    dmap = {t: (disc.get(t) or (recheck.get(t) or {}).get("disc") or (watch.get(t) or {}).get("disc")
+                or feed_disc.get(t) or {})
             for t in p1_tokens}
     s1 = SAFE.pass1_many(p1_tokens, markets, dmap, now_s, chain_cache=chain_cache) if p1_tokens else {}
     stage_s["pass1"] = round(budget.elapsed(), 1)
@@ -627,6 +681,8 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     scan = {"scan_ts": now_s, "trigger": trigger, "band": champion, "bands_hash": STORE.bands_code_hash(),
             "champion": {"exit": exit_plan["name"], "entry_band": champion},
             "champion_na_frac": _round(champion_na_frac), "head": head, "cursor": new_cursor, "gap_blocks": gap,
+            "catchup": bool(disc_meta["catchup"]), "cursor_lag_blocks": int(disc_meta["lag_blocks"]),
+            "feed_hits": len(feed_hits),
             "discovered": len(order), "by_source": by_source, "quota_cuts": quota_cuts,
             "enriched": len(markets), "absent": len(absent), "deferred": len(deferred),
             "deferred_by_stage": dict(deferred_by_stage, **{f"budget_{k}": v for k, v in budget.cuts.items()}),
