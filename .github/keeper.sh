@@ -4,28 +4,40 @@
 # every KEEPER_CADENCE_S for up to KEEPER_MAX_S, then a handoff to its successor:
 #
 #   predecessor (slot a)                                  successor (slot b)
-#   lead window: dispatches the successor  ──────────▶    starts; sees a keeper alive
+#   lead window: dispatches the successor  ──────────▶    starts; sees a keeper running
 #   keeps scanning; polls origin every 15 s     ◀──────   writes {"ready": <id>}, pushes, polls
-#   sees ready: last commit, writes {"done"}  ──────────▶  sees done: pull --rebase, enters the loop
-#   exits 0
+#   sees ready: last commit, pulls origin, ──────────▶    sees done — or no keeper running any
+#   writes {"done"} on THAT base, exits 0                 more — pull --rebase, enters the loop
 #
 # Every git write happens under flock on data/.keeper.lock (Phase 4 puts the paper book under the
 # same lock) and follows ONE routine (commit_push): add data/ docs/ → commit → up to 5× (pull
 # --rebase --autostash → push), a failed rebase aborted, never forced; three iterations without a
 # successful push ⇒ exit 3 (the workflow's always() step uploads data/ as an artifact and the
-# successor starts from a clean checkout). Every constant comes from config.py through one
-# python3 call — never a literal here.
+# successor starts from a clean checkout). The handoff marker has its own routine (push_marker):
+# origin is pulled FIRST and the marker written on that base — a marker committed on a stale
+# base conflicts on its one line against every retry and never lands, and the successor would
+# wait the whole KEEPER_HANDOFF_WAIT_S for nothing. Every constant comes from config.py through
+# one python3 call — never a literal here.
+#
+# Every `gh run list` answer is three-valued — alive | none | unknown — and a FAILED call is
+# unknown, never "none": the one-shot guard skips, nothing is dispatched, a successor keeps
+# waiting. An API blip (5xx, 429) must never put two scans side by side or queue a redundant
+# keeper; only a definite "none" acts (fail closed).
 #
 # Modes:
 #   (no args)                 the keeper loop (env: GH_TOKEN, KEEPER_SLOT, TRIGGER, the run.py secrets)
 #   --keeper-alive            exit 0 iff ANOTHER robinhood-screener run whose title starts with
-#                             "keeper" is queued/in_progress/waiting/pending/requested; the current
-#                             $GITHUB_RUN_ID is excluded (a keeper must be able to see "none alive")
-#   --ensure-keeper [trigger] dispatch a keeper into slot a when --keeper-alive fails (default
-#                             trigger "ensure"; the watchdog passes "watchdog")
+#                             "keeper" is queued/in_progress/waiting/pending/requested (the current
+#                             $GITHUB_RUN_ID excluded); 1 = definitely none; 2 = unknown (gh failed)
+#   --ensure-keeper [trigger] dispatch a keeper into slot a when --keeper-alive is DEFINITELY none
+#                             (default trigger "ensure"; the watchdog passes "watchdog"): exit 0
+#                             alive or dispatched, 1 dispatch failed, 2 unknown (nothing dispatched)
+#   --circuit-open            exit 0 iff >= KEEPER_CIRCUIT_FAILURES keeper runs concluded failure
+#                             inside KEEPER_CIRCUIT_WINDOW_S — the breaker the watchdog and the
+#                             exit-3 self-dispatch share; 1 = closed; 2 = unknown (gh failed)
 #   --commit-push             the one flock commit+push routine, for the one-shot Persist step:
 #                             exit 0 pushed, 10 nothing to commit, 1 push failed after retries
-set -u
+set -u -o pipefail
 
 HANDOFF="data/keeper_handoff.json"
 LOCK="data/.keeper.lock"
@@ -38,14 +50,15 @@ SLOT="${KEEPER_SLOT:-a}"
 # loop state (globals: the trap and the pacing read them)
 T0=0; READY_TS=0; STOP=0; REASON=""; DISPATCHED=0; SUNDAY_DONE=0
 KEEPER_CADENCE_S=0; KEEPER_MAX_S=0; KEEPER_HANDOFF_LEAD_S=0; KEEPER_HANDOFF_WAIT_S=0; PAGES_EVERY_N=0
+CIRCUIT_FAILURES=0; CIRCUIT_WINDOW_S=0
 
 log() { echo "$(date -u +%FT%TZ) keeper $*"; }
 now() { date +%s; }
 elapsed() { echo $(( $(now) - T0 )); }
 
-read_config() {  # ONE python call; the script never carries a cadence literal
-  read -r KEEPER_CADENCE_S KEEPER_MAX_S KEEPER_HANDOFF_LEAD_S PAGES_EVERY_N KEEPER_HANDOFF_WAIT_S \
-    < <(python3 -c "import config; print(config.KEEPER_CADENCE_S, config.KEEPER_MAX_S, config.KEEPER_HANDOFF_LEAD_S, config.PAGES_EVERY_N_ITERATIONS, config.KEEPER_HANDOFF_WAIT_S)") \
+read_config() {  # ONE python call; the script never carries a cadence or a breaker literal
+  read -r KEEPER_CADENCE_S KEEPER_MAX_S KEEPER_HANDOFF_LEAD_S PAGES_EVERY_N KEEPER_HANDOFF_WAIT_S CIRCUIT_FAILURES CIRCUIT_WINDOW_S \
+    < <(python3 -c "import config; print(config.KEEPER_CADENCE_S, config.KEEPER_MAX_S, config.KEEPER_HANDOFF_LEAD_S, config.PAGES_EVERY_N_ITERATIONS, config.KEEPER_HANDOFF_WAIT_S, config.KEEPER_CIRCUIT_FAILURES, config.KEEPER_CIRCUIT_WINDOW_S)") \
     || { log "config unreadable"; exit 1; }
 }
 
@@ -54,19 +67,39 @@ git_identity() {
   git config user.email "bot@users.noreply.github.com"
 }
 
-# ── GitHub: who is alive, dispatching ─────────────────────────────────────────────
-alive_keepers() {  # ids of the OTHER unfinished keeper runs. One request per status: the API
-  local s          # filters a single status, and a 5.7 h keeper falls off an unfiltered first page
-  for s in queued in_progress waiting pending requested; do
-    gh run list -w robinhood-screener --status "$s" -L 50 --json databaseId,displayTitle \
-      --jq ".[] | select(.displayTitle | startswith(\"keeper\")) | select(.databaseId != $RUN_ID) | .databaseId" 2>/dev/null
+# ── GitHub: who is alive (three-valued), the breaker, dispatching ─────────────────
+_keeper_state() {  # $@ = run statuses. Prints alive | none | unknown. One request per status: the
+  local s out found=0 failed=0   # API filters a single status, and a 5.7 h keeper falls off an
+  for s in "$@"; do              # unfiltered first page. alive = ANY other keeper run in one of
+    if out=$(gh run list -w robinhood-screener --status "$s" -L 50 --json databaseId,displayTitle \
+               --jq ".[] | select(.displayTitle | startswith(\"keeper\")) | select(.databaseId != $RUN_ID) | .databaseId" 2>/dev/null); then
+      [ -n "$out" ] && found=1   # them (a positive finding beats a failed sibling query); none
+    else                         # only when EVERY query answered; unknown when one failed —
+      failed=1                   # the callers fail closed on unknown
+    fi
   done
+  if [ "$found" = 1 ]; then echo alive; elif [ "$failed" = 1 ]; then echo unknown; else echo none; fi
 }
-keeper_alive() { [ -n "$(alive_keepers)" ]; }
-running_keepers() {  # in_progress only: a merely QUEUED keeper can never write `done`, so it is
-  gh run list -w robinhood-screener --status in_progress -L 50 --json databaseId,displayTitle \
-    --jq ".[] | select(.displayTitle | startswith(\"keeper\")) | select(.databaseId != $RUN_ID) | .databaseId" 2>/dev/null
-}                    # not a predecessor to wait on (await_predecessor), though it counts as alive
+keeper_state()  { _keeper_state queued in_progress waiting pending requested; }
+running_state() { _keeper_state in_progress; }   # a merely QUEUED keeper counts as alive (never
+                                                 # dispatch beside it) but can never write `done`,
+                                                 # so a successor waits only on a RUNNING one
+keeper_alive() {  # the CLI contract: 0 alive | 1 definitely none | 2 unknown
+  case "$(keeper_state)" in alive) return 0 ;; none) return 1 ;; *) return 2 ;; esac
+}
+
+circuit_open() {  # 0 open (>= CIRCUIT_FAILURES keeper runs concluded failure inside CIRCUIT_WINDOW_S)
+  local since n   # | 1 closed | 2 unknown. The ONE breaker: the watchdog's restart and the exit-3
+                  # self-dispatch both consult it, so a broken keeper cannot loop forever
+  since=$(python3 -c "import time; print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(time.time() - $CIRCUIT_WINDOW_S)))") \
+    || { log "circuit: since unreadable (unknown)"; return 2; }
+  n=$(gh run list -w robinhood-screener --status failure --created ">=$since" -L 50 --json displayTitle \
+        --jq '[.[] | select(.displayTitle | startswith("keeper"))] | length' 2>/dev/null) \
+    || { log "circuit: gh failed (unknown)"; return 2; }
+  case "$n" in ''|*[!0-9]*) log "circuit: unparsable count '$n' (unknown)"; return 2 ;; esac
+  log "circuit: keeper failures since $since = $n (open at $CIRCUIT_FAILURES)"
+  [ "$n" -ge "$CIRCUIT_FAILURES" ]
+}
 
 other_slot() { if [ "$SLOT" = a ]; then echo b; else echo a; fi; }
 
@@ -79,16 +112,22 @@ dispatch_keeper() {  # $1 = slot, $2 = trigger
   return 1
 }
 
-ensure_keeper() {  # a keeper in slot a when none other is alive ($1 = trigger)
-  keeper_alive && return 0
+ensure_keeper() {  # a keeper in slot a only when NONE is definitely alive ($1 = trigger):
+  case "$(keeper_state)" in   # 0 alive or dispatched | 1 dispatch failed | 2 unknown, nothing dispatched
+    alive)   return 0 ;;
+    unknown) log "keeper state unknown (gh failed); nothing dispatched"; return 2 ;;
+  esac
   dispatch_keeper a "${1:-ensure}"
 }
 
 in_lead_window() { [ "$(elapsed)" -ge $(( KEEPER_MAX_S - KEEPER_HANDOFF_LEAD_S )) ]; }
 
-maybe_dispatch_successor() {  # idempotent: every lead-window iteration retries a lost dispatch
+maybe_dispatch_successor() {  # idempotent: every lead-window iteration retries a lost dispatch;
+  local st                    # an unknown state dispatches nothing and is retried next iteration
   in_lead_window || return 0
-  keeper_alive && return 0
+  st=$(keeper_state)
+  [ "$st" = unknown ] && log "successor: keeper state unknown (gh failed); dispatch deferred"
+  [ "$st" = none ] || return 0
   dispatch_keeper "$(other_slot)" keeper && DISPATCHED=1
 }
 
@@ -172,6 +211,38 @@ predecessor_done() {  # a `done` from ANOTHER run stamped at/after our own `read
   [ "$1" != "$RUN_ID" ] && [ "$2" -ge "$READY_TS" ]
 }
 
+marker_only_local_commit() {  # exactly one commit ahead of origin/main, and it touches only the marker
+  [ "$(git rev-list --count origin/main..HEAD 2>/dev/null)" = 1 ] \
+    && [ "$(git show --format= --name-only HEAD 2>/dev/null)" = "$HANDOFF" ]
+}
+
+_push_marker() {  # under the lock. $1 = ready|done, $2 = ts. 0 = on origin | 1 = not delivered
+  local k           # (logged, never fatal: a successor also breaks its wait when no keeper runs)
+  for k in 1 2 3 4 5; do
+    # origin FIRST. The successor's `ready` was seen through FETCH_HEAD and is not in this tree:
+    # a `done` committed on the stale line conflicts against origin on every retry and never
+    # lands. Pulled first, the marker is written on the current line and replays cleanly.
+    if ! git pull --rebase --autostash -q origin main; then
+      git rebase --abort 2>/dev/null; git merge --abort 2>/dev/null
+      # a lost push race (origin moved between our pull and our push): re-sync and re-apply the
+      # marker rather than replay the same conflicting commit. Only when the marker commit is the
+      # ONLY local commit can the one conflicting line be the marker's, and ours — the newer state
+      # — wins. Scan commits stuck behind a data conflict are never resolved blindly: the marker
+      # stays undelivered and the successor's dead-predecessor break covers the handoff.
+      marker_only_local_commit || { log "marker $1: local commits conflict with origin; not delivered"; return 1; }
+      git pull --rebase --autostash -X theirs -q origin main \
+        || { git rebase --abort 2>/dev/null; git merge --abort 2>/dev/null; sleep 5; continue; }
+    fi
+    write_handoff "$1" "$2"
+    git add "$HANDOFF"
+    git commit -q -m "keeper $1 $(date -u +%FT%TZ)" >/dev/null 2>&1 || true   # unchanged ⇒ already committed on this base
+    git push -q origin HEAD:main && return 0
+    sleep 5
+  done
+  return 1
+}
+push_marker() { with_lock _push_marker "$@"; }
+
 # ── pacing and signals ────────────────────────────────────────────────────────────
 on_signal() { STOP=1; [ -n "$REASON" ] || REASON=stop; log "signal received: stopping after the current step"; }
 nap() { sleep "$1" & wait $!; }   # interruptible: a trapped signal returns from `wait` at once
@@ -194,17 +265,22 @@ keeper_start() {
   read_config
   trap on_signal TERM INT
   T0=$(now)
-  log "START run_id=$RUN_ID slot=$SLOT cadence=${KEEPER_CADENCE_S}s max=${KEEPER_MAX_S}s lead=${KEEPER_HANDOFF_LEAD_S}s wait=${KEEPER_HANDOFF_WAIT_S}s pages_every=$PAGES_EVERY_N"
+  log "START run_id=$RUN_ID slot=$SLOT cadence=${KEEPER_CADENCE_S}s max=${KEEPER_MAX_S}s lead=${KEEPER_HANDOFF_LEAD_S}s wait=${KEEPER_HANDOFF_WAIT_S}s pages_every=$PAGES_EVERY_N circuit=${CIRCUIT_FAILURES}/${CIRCUIT_WINDOW_S}s"
 }
 
-await_predecessor() {  # successor side: announce `ready`, wait for `done` (or the timeout), sync
-  if [ -z "$(running_keepers)" ]; then log "no predecessor running; entering the loop"; return 0; fi
+await_predecessor() {  # successor side: announce `ready`, wait for `done` — or for the predecessor
+  local st             # to be gone — then sync. Unknown (gh failed) is treated as running: we wait.
+  st=$(running_state)
+  if [ "$st" = none ]; then log "no predecessor running; entering the loop"; return 0; fi
+  [ "$st" = unknown ] && log "predecessor state unknown (gh failed); waiting as if one were running"
   READY_TS=$(now)
-  write_handoff ready "$READY_TS"
-  commit_push; log "ready marker push rc=$?"
+  push_marker ready "$READY_TS"; log "ready marker push rc=$?"
   local deadline=$(( $(now) + KEEPER_HANDOFF_WAIT_S ))
   while [ "$STOP" = 0 ] && [ "$(now)" -lt "$deadline" ]; do
     if predecessor_done; then log "handoff: predecessor done; syncing"; sync_main; return 0; fi
+    # a predecessor that died without `done` (cancelled, timed out, a lost runner) must not idle
+    # us for the whole wait: break only on a DEFINITE none — unknown keeps waiting (fail closed)
+    if [ "$(running_state)" = none ]; then log "handoff: predecessor gone (no keeper running); syncing"; sync_main; return 0; fi
     nap "$POLL_S"
   done
   log "handoff timeout — starting anyway"
@@ -235,6 +311,7 @@ main_loop() {  # returns 3 on persistent push failure, else 0
 }
 
 finish() {  # $1 = main_loop rc. The final commit + push, the marker, the reason, the exit code
+  local c
   if [ -z "$REASON" ]; then   # max-time: a late successor gets until KEEPER_MAX_S to announce itself
     while [ "$STOP" = 0 ] && [ "$(elapsed)" -lt "$KEEPER_MAX_S" ]; do
       if successor_ready origin; then REASON=handoff; break; fi
@@ -242,11 +319,22 @@ finish() {  # $1 = main_loop rc. The final commit + push, the marker, the reason
     done
     [ -n "$REASON" ] || REASON=max-time
   fi
-  write_handoff done "$(now)"   # true on every exit; a waiting successor is released at once
-  commit_push; log "final push rc=$?"
-  log "EXIT reason=$REASON elapsed=$(elapsed)s dispatched_successor=$DISPATCHED"
+  commit_push; log "final push rc=$?"                       # straggler state first (usually 10: none)
+  push_marker done "$(now)"; log "done marker rc=$?"        # true on every exit, written on origin's base:
+  log "EXIT reason=$REASON elapsed=$(elapsed)s dispatched_successor=$DISPATCHED"   # a waiting successor is released at once
   if [ "$1" = 3 ]; then
-    keeper_alive || dispatch_keeper "$(other_slot)" keeper   # a clean checkout is the cure
+    # the watchdog's breaker, applied here too: a persistent push failure must not loop keeper →
+    # exit 3 → dispatch → … forever. Open or unknown ⇒ the watchdog owns the restart.
+    circuit_open; c=$?
+    if [ "$c" != 1 ]; then
+      log "self-dispatch skipped: circuit $([ "$c" = 0 ] && echo open || echo unknown) — the watchdog owns restarts"
+    else
+      case "$(keeper_state)" in
+        none)  dispatch_keeper "$(other_slot)" keeper ;;   # a clean checkout is the cure
+        alive) log "self-dispatch skipped: a keeper is alive" ;;
+        *)     log "self-dispatch skipped: keeper state unknown (gh failed) — the watchdog owns restarts" ;;
+      esac
+    fi
     exit 3
   fi
   exit 0
@@ -264,7 +352,8 @@ if [ "${KEEPER_LIB_ONLY:-0}" = 1 ]; then return 0 2>/dev/null; fi   # `KEEPER_LI
 case "${1:-}" in
   --keeper-alive)  keeper_alive ;;
   --ensure-keeper) ensure_keeper "${2:-ensure}" ;;
+  --circuit-open)  read_config; circuit_open ;;
   --commit-push)   git_identity; commit_push ;;
   "")              keeper_main ;;
-  *) echo "usage: keeper.sh [--keeper-alive | --ensure-keeper [trigger] | --commit-push]" >&2; exit 2 ;;
+  *) echo "usage: keeper.sh [--keeper-alive | --ensure-keeper [trigger] | --circuit-open | --commit-push]" >&2; exit 64 ;;
 esac

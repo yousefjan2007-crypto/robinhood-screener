@@ -402,6 +402,46 @@ check("keeper.sh reads its constants from config (never a hardcoded cadence) and
       and all(f"{fn}()" in _ks for fn in ("keeper_alive", "ensure_keeper", "commit_push", "with_lock", "write_handoff")))
 _bn = subprocess.run(["bash", "-n", KEEPER_SH], capture_output=True, text=True)
 check("bash -n .github/keeper.sh parses", _bn.returncode == 0, _bn.stderr[-300:])
+# round 1 (review): the handoff marker is written on ORIGIN's base, the alive checks are three-valued and
+# fail closed, the successor breaks on a dead predecessor, the exit-3 self-dispatch sits behind the breaker
+def _bash_fn(src, name):
+    """The text of a top-level bash function `name() {` … up to the first line that is exactly `}`."""
+    m = re.search(r"^" + re.escape(name) + r"\(\) \{.*?^\}", src, re.M | re.S)
+    return m.group(0) if m else ""
+for needle in ("set -u -o pipefail", "_keeper_state()", "keeper_state()", "running_state()", "circuit_open()", "--circuit-open",
+               "_push_marker()", "push_marker()", "marker_only_local_commit()", "rev-list --count origin/main..HEAD",
+               "config.KEEPER_CIRCUIT_FAILURES, config.KEEPER_CIRCUIT_WINDOW_S)"):
+    check(f"keeper.sh contains {needle!r}", needle in _ks)
+_fn = {n: _bash_fn(_ks, n) for n in ("_keeper_state", "keeper_alive", "ensure_keeper", "maybe_dispatch_successor",
+                                     "_commit_push", "_push_marker", "await_predecessor", "finish")}
+check("keeper.sh: every function the round-1 pins read is a top-level `name() {` … `}` block",
+      all(_fn.values()), str([k for k, v in _fn.items() if not v]))
+check("keeper.sh: the alive helpers are three-valued — alive | none | unknown — a failed gh call is unknown, never none, and "
+      "--keeper-alive returns 2 for it",
+      all(w in _fn["_keeper_state"] for w in ("echo alive", "echo none", "echo unknown", "failed=1"))
+      and "return 2" in _fn["keeper_alive"])
+check("keeper.sh: ensure_keeper and the successor dispatch act only on a DEFINITE none (unknown ⇒ nothing dispatched: rc 2, or "
+      "retried next lead-window iteration)",
+      "unknown)" in _fn["ensure_keeper"] and "return 2" in _fn["ensure_keeper"]
+      and '[ "$st" = none ] || return 0' in _fn["maybe_dispatch_successor"])
+check("keeper.sh: the marker routine pulls origin BEFORE writing the marker (a `done` committed on the stale line conflicts on every "
+      "retry and never lands), finish delivers `done` through it after the straggler commit — never a bare write_handoff on the old "
+      "base — and the successor's `ready` rides the same routine",
+      _fn["_push_marker"].index("git pull --rebase --autostash -q origin main") < _fn["_push_marker"].index('write_handoff "$1"')
+      and "push_marker done" in _fn["finish"] and "write_handoff done" not in _fn["finish"]
+      and _fn["finish"].index("commit_push") < _fn["finish"].index("push_marker done")
+      and "push_marker ready" in _fn["await_predecessor"] and "commit_push" not in _fn["await_predecessor"])
+check("keeper.sh: `-X theirs` appears exactly once, inside the marker routine, behind the marker-only-single-commit gate; the scan "
+      "commit routine stays abort-only (a data conflict is never resolved blindly)",
+      _ks.count("-X theirs") == 1 and "-X theirs" in _fn["_push_marker"]
+      and _fn["_push_marker"].index("marker_only_local_commit ||") < _fn["_push_marker"].index("-X theirs")
+      and "-X " not in _fn["_commit_push"] and "rebase --abort" in _fn["_push_marker"])
+check("keeper.sh: the successor's wait breaks on a DEFINITE none from running_state inside the poll loop (never on unknown), and "
+      "finish's exit-3 self-dispatch sits behind circuit_open (open or unknown ⇒ the watchdog owns the restart)",
+      _fn["await_predecessor"].index("while [") < _fn["await_predecessor"].index('[ "$(running_state)" = none ]')
+      and "unknown" in _fn["await_predecessor"]
+      and "circuit_open; c=$?" in _fn["finish"] and _fn["finish"].index("circuit_open") < _fn["finish"].index("dispatch_keeper")
+      and 'if [ "$c" != 1 ]' in _fn["finish"] and 'none)  dispatch_keeper "$(other_slot)" keeper' in _fn["finish"])
 pub_src = _read(os.path.join(ROOT, "selfimprove", "publish.py"))
 res_src = _read(os.path.join(ROOT, "selfimprove", "research", "run_research.sh"))
 check("publish.py adds its detached worktree under tempfile.mkdtemp() (never a repo-relative path a "
@@ -448,10 +488,13 @@ check("screener.yml: input `mode` defaults to keeper (a bare `gh workflow run ro
       _inputs.index("mode:") < _inputs.index('default: "keeper"') < _inputs.index("slot:") < _inputs.index('default: "a"'))
 check("screener.yml permissions are contents: write + actions: write (pages/id-token moved to pages.yml; actions: write dispatches the successor)",
       "contents: write" in yml and "actions: write" in yml and "pages: write" not in yml and "id-token: write" not in yml)
-check("screener.yml: the Keeper step runs only in keeper mode and the one-shot Run step guards on --keeper-alive (a keeper alive ⇒ the "
-      "one-shot exits 0 without scanning: the cutover cannot double-scan)",
+check("screener.yml: the Keeper step runs only in keeper mode and the one-shot Run step guards on the three-valued --keeper-alive (alive OR "
+      "unknown ⇒ the one-shot exits 0 without scanning; only a DEFINITE none scans: neither the cutover nor an API blip can double-scan), "
+      "and the ensure step reads the rc the same way (2 = unknown ⇒ nothing dispatched)",
       re.search(r"name: Keeper.*\n\s+if: \$\{\{ inputs\.mode == 'keeper' \}\}", yml) is not None
-      and 'bash .github/keeper.sh --keeper-alive; then' in yml and "one-shot skipped" in yml)
+      and 'bash .github/keeper.sh --keeper-alive; alive=$?' in yml and '[ "$alive" != 1 ]' in yml and "one-shot skipped" in yml
+      and 'bash .github/keeper.sh --keeper-alive; then' not in yml
+      and 'bash .github/keeper.sh --ensure-keeper; rc=$?' in yml and '2) echo "keeper state unknown; nothing dispatched"' in yml)
 vyml = _read(os.path.join(ROOT, ".github", "workflows", "verify.yml"))
 check("verify.yml runs verify.py with fetch-depth 0 on human pushes only (never inside the 5-min job)",
       "fetch-depth: 0" in vyml and "python verify.py" in vyml and "screener state" in vyml
@@ -2996,10 +3039,17 @@ check(".gitignore carries data/.keeper.lock (the flock file never rides `git add
 for needle in ('cron: "*/5 * * * *"', "group: screener-watchdog", "cancel-in-progress: true", "actions: write", "contents: read",
                "repository.private", "github.event_name != 'schedule'", "watchdog.py --send", "WATCHDOG_ACTION",
                "name: robinhood-keeper-watchdog", "timeout-minutes: 5", "--keeper-alive", "--ensure-keeper watchdog",
-               "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "NTFY_TOPIC", "workflow_dispatch", "circuit-open"):
+               "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "NTFY_TOPIC", "workflow_dispatch", "circuit-open",
+               "bash .github/keeper.sh --keeper-alive; alive=$?", "bash .github/keeper.sh --circuit-open; circuit=$?",
+               "action=unknown", "action=circuit-unknown"):
     check(f"keeper-watchdog.yml contains {needle!r}", needle in _wf_dog)
 check("keeper-watchdog.yml never pushes, never writes contents, never sees GMGN_API_KEY (a restart-only job)",
       "git push" not in _wf_dog and "contents: write" not in _wf_dog and "GMGN_API_KEY" not in _wf_dog)
+check("the breaker has ONE definition: config (3 keeper failures in 2 h) → keeper.sh --circuit-open, read by the watchdog and by "
+      "finish's exit-3 path; the watchdog carries no failure query or literal of its own",
+      (config.KEEPER_CIRCUIT_FAILURES, config.KEEPER_CIRCUIT_WINDOW_S) == (3, 7200)
+      and "--status failure" not in _wf_dog and "-ge 3" not in _wf_dog and "2 hours" not in _wf_dog
+      and "--status failure" in _read(KEEPER_SH))
 _wd_tree = _tree(os.path.join(ROOT, "watchdog.py"))
 check("watchdog.py captures time.time() EXACTLY once and imports no subprocess/http_client/urllib/sources/run/requests",
       _time_time_calls(ast.walk(_wd_tree)) == 1

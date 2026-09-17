@@ -36,15 +36,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          since="$(date -u -d '-2 hours' +%FT%TZ)"
-          failures="$(gh run list -w robinhood-screener --status failure --created ">=$since" -L 50 --json displayTitle \
-                      --jq '[.[] | select(.displayTitle | startswith("keeper"))] | length' 2>/dev/null || echo 0)"
-          if bash .github/keeper.sh --keeper-alive; then action=none
-          elif [ "${failures:-0}" -ge 3 ]; then action=circuit-open
-          elif bash .github/keeper.sh --ensure-keeper watchdog; then action=restarted
-          else action=dispatch-failed
+          # keeper.sh is the ONE definition of "alive" and of the breaker (KEEPER_CIRCUIT_FAILURES
+          # keeper failures inside KEEPER_CIRCUIT_WINDOW_S): each answers 0 yes | 1 no | 2 unknown
+          # (gh failed). Unknown never dispatches — an API blip must not queue a keeper beside a
+          # live one; the next cron fire retries.
+          set +e
+          bash .github/keeper.sh --keeper-alive; alive=$?
+          bash .github/keeper.sh --circuit-open; circuit=$?
+          set -e
+          if   [ "$alive" = 0 ];   then action=none
+          elif [ "$alive" = 2 ];   then action=unknown
+          elif [ "$circuit" = 0 ]; then action=circuit-open
+          elif [ "$circuit" = 2 ]; then action=circuit-unknown
+          else
+            set +e; bash .github/keeper.sh --ensure-keeper watchdog; rc=$?; set -e
+            case "$rc" in 0) action=restarted ;; 2) action=unknown ;; *) action=dispatch-failed ;; esac
           fi
-          echo "keeper alive: $([ "$action" = none ] && echo yes || echo no); keeper failures in 2 h: ${failures:-0}; action: $action"
+          echo "keeper alive: $alive (0 yes, 1 no, 2 unknown); circuit: $circuit (0 open, 1 closed, 2 unknown); action: $action"
           echo "WATCHDOG_ACTION=$action" >> "$GITHUB_ENV"
       - name: Alert when stale
         env:

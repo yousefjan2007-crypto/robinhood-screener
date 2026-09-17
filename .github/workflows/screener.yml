@@ -5,8 +5,9 @@
 # the loop. keeper-watchdog.yml carries the `*/5` cron (measured 13.7 fires/day on this account
 # against a nominal 288, 2026-09-12) and restarts a dead keeper; pages.yml deploys docs/ in its
 # own group. A one-shot `mode=run` (the retiring Mac dispatch, or a human) is HARMLESS while a
-# keeper is alive: it exits before scanning. The scan itself is written to be correct at any
-# cadence (block-cursor discovery catches up exactly).
+# keeper is alive: it exits before scanning — and also when `gh` cannot say (alive | none |
+# unknown: only a definite none scans or dispatches). The scan itself is written to be correct
+# at any cadence (block-cursor discovery catches up exactly).
 name: robinhood-screener
 run-name: ${{ inputs.mode || 'run' }} · ${{ inputs.trigger || 'manual' }} · slot=${{ inputs.slot || '-' }}
 
@@ -81,7 +82,12 @@ jobs:
           TRIGGER: ${{ inputs.trigger }}
           MODE: ${{ inputs.mode }}
         run: |
-          if [ "$MODE" = run ] && bash .github/keeper.sh --keeper-alive; then echo "keeper alive; one-shot skipped"; echo "skipped=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$MODE" = run ]; then
+            # 0 = a keeper is alive, 1 = DEFINITELY none, 2 = unknown (gh failed). Only a definite
+            # none scans: an API blip must never put a one-shot scan beside a live keeper
+            set +e; bash .github/keeper.sh --keeper-alive; alive=$?; set -e
+            if [ "$alive" != 1 ]; then echo "keeper alive or unknown (rc=$alive); one-shot skipped"; echo "skipped=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          fi
           echo "skipped=false" >> "$GITHUB_OUTPUT"
           if [ "$MODE" = dry ]; then python run.py; else python run.py --send; fi
       - name: Render dashboard
@@ -108,7 +114,11 @@ jobs:
         if: ${{ inputs.mode == 'run' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/keeper.sh --ensure-keeper
+        run: |
+          # 0 alive or dispatched | 1 dispatch failed | 2 unknown (gh failed: nothing dispatched,
+          # the watchdog retries) — a redundant keeper is never queued on a guess
+          set +e; bash .github/keeper.sh --ensure-keeper; rc=$?; set -e
+          case "$rc" in 0) ;; 2) echo "keeper state unknown; nothing dispatched" ;; *) echo "keeper dispatch failed (rc=$rc)"; exit "$rc" ;; esac
       - name: Upload data/ (keeper runs; forensics after an exit 3 — the successor starts from a clean checkout)
         if: ${{ always() && inputs.mode == 'keeper' }}
         uses: actions/upload-artifact@v4

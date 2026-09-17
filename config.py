@@ -74,6 +74,8 @@ KEEPER_HANDOFF_LEAD_S = 600        # dispatch the successor this long before KEE
 KEEPER_HANDOFF_WAIT_S = 600        # a successor waits this long for the predecessor's `done`, then starts anyway
 KEEPER_STALE_S = 1800              # the tripwire (dashboard red, watchdog SCAN STALE): a scan older than 30 min
 PAGES_EVERY_N_ITERATIONS = 2       # dispatch the Pages deploy on every 2nd successful push (its own workflow/group)
+KEEPER_CIRCUIT_FAILURES = 3        # keeper runs concluded `failure` inside KEEPER_CIRCUIT_WINDOW_S that open the breaker:
+KEEPER_CIRCUIT_WINDOW_S = 7200     # no watchdog restart and no exit-3 self-dispatch until a human looks (2 h)
 
 # ── statistical guards (selfimprove/) ────────────────────────────────────────────
 # Read by ~/entry_bot/stats.py (imported by sys.path APPEND so THIS config wins).
