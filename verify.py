@@ -4569,6 +4569,19 @@ check("DESIGN.md carries the livebook-in-the-keeper rows: feed source, state own
       and "RH_HTTP_RATE_SCALE=0.5" not in _design,
       str([w for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "HTTP_RATE_SCALE", "LIVEBOOK_BAND_UNDER_TEST", "whichever process sets it",
                        "lengthens its ticks", "_state_lock", "sidecar_pending") if w not in _design]))
+# the constants line is documentation of a FILE, so it is generated from that file, not remembered:
+# it carried DISCOVERY_MAX_LOG_TOKENS_PER_RUN=80 / MAX_DISCOVER=200 / RUN_TIME_BUDGET_S=200 for days
+# after config said 200 / 400 / 240
+_pins = ("DISCOVERY_MAX_LOG_TOKENS_PER_RUN", "DISCOVERY_MAX_LOG_TOKENS_CATCHUP", "DISCOVERY_CATCHUP_TRIGGER_BLOCKS",
+         "MAX_DISCOVER", "RECHECK_PER_RUN", "RECHECK_MAX", "GT_NEW_POOLS_PAGES", "GT_NEW_POOLS_CACHE_S",
+         "FEED_PULL_FORWARD_MAX", "RUN_TIME_BUDGET_S", "WATCH_REFRESH_PER_RUN", "GT_INFO_BUDGET_PER_RUN")
+_stale_pins = [n for n in _pins
+               if not any(f"{n}={v}" in _design for v in (f"{getattr(config, n)}", f"{getattr(config, n):_}"))]
+check("DESIGN.md's discovery/budget constants are REGENERATED from config.py, not remembered (every pinned name appears as "
+      "NAME=<its current value>), and the per-kind recheck ladders are written out there too",
+      not _stale_pins and all(k in _design for k in ("gt_new_pools:(300, 900)", "gmgn_new_creation:(600, 1800)",
+                                                     "gmgn_near_completion:(300, 900, 1800)", "gmgn_completed:(300, 900)")),
+      str(_stale_pins))
 check("CLAUDE.md's live-book paragraph is the keeper's (KEEPER_BOOK, LIVEBOOK_FEED_SOURCE, the four committed files, the ticks log as "
       "artifact, the band under test) and the gotchas say never to tick on the Mac after the cutover",
       all(w in _claude_md for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "livebook_ticks.jsonl", "LIVEBOOK_BAND_UNDER_TEST"))

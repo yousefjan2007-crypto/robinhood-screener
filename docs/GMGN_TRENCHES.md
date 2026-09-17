@@ -63,6 +63,39 @@ Base rates to keep in view: curve launches that ever graduate 0.2–2 % dependin
 (arXiv 2607.02823; Solana Compass), 68.7 % never trade after creation day (CoinGecko, 2026-06-23);
 on this chain ~3,250 LongLaunch launches/day, 71 % never get a pair.
 
+## The fields the screener reads (and where each one can come from)
+
+Mapped **only** from keys seen in the cached payloads (`cache/gmgn_trenches_*.json`,
+`cache/gmgn_info_*.json`); nothing is assumed from the docs. Rates arrive 0–1 (sometimes as strings)
+and are stored ×100; `is_honeypot` arrives as a **string**, not a bool.
+
+| feature | Trenches row key | `/v1/token/info` key | shape |
+|---|---|---|---|
+| `gmgn_visiting_count` | `visiting_count` | `data.visiting_count` | int — viewers on the board right now (0–5 observed on Almost bonded, up to 51 on Migrated) |
+| `gmgn_top10_holder_pct` | `top_10_holder_rate` | `stat.top_10_holder_rate` | 0–1 rate → % (< 0.20 on 59 of 60 Almost-bonded rows: the column barely discriminates) |
+| `gmgn_market_cap` | `market_cap` | — | USD |
+| `gmgn_volume_24h` | `volume_24h` | — | USD, 24 h (GMGN publishes no hour-1 volume) |
+| `gmgn_buys_24h` / `gmgn_sells_24h` | `buys_24h` / `sells_24h` | — | int counts, 24 h |
+| `gmgn_is_honeypot` | `is_honeypot` | — | **string** 'yes' / 'no' / 'unknown' → True / False / **None** |
+| `gmgn_created_ts` | `created_timestamp` | `data.creation_timestamp` | unix seconds |
+| `gmgn_progress` | `progress` | `data.launchpad_progress` | 0–1 (the info payload's key is NOT `progress`) |
+| `gmgn_launchpad_platform` | `launchpad_platform` | `data.launchpad_platform` | str |
+| `gmgn_holders` | `holder_count` | `stat.holder_count` | int |
+| `gmgn_sniper_hold_pct` | `top70_sniper_hold_rate` | `stat.top70_sniper_hold_rate` | rate → % |
+| `gmgn_fresh_wallet_pct` | `fresh_wallet_rate` | `stat.fresh_wallet_rate` | rate → % |
+| `gmgn_rat_vol_pct` | `rat_trader_amount_rate` | `stat.top_rat_trader_percentage` | rate → % |
+| `gmgn_smart_degen_count` | `smart_degen_count` | `wallet_tags_stat.smart_wallets` | int |
+| `gmgn_bundler_ratio` | — | `wallet_tags_stat.bundler_wallets ÷ stat.holder_count` | ratio (organic 0.00–0.01; the $Cubrate wallet farm 1.42) |
+| `gmgn_is_wash_trading` | `is_wash_trading` | — | bool |
+| `gmgn_insider_hold_pct` | `suspected_insider_hold_rate` | — | rate → % |
+
+The last two rows are the reason the **row** is attached at pass 1: `/v1/token/info` carries neither
+key in any of 16 cached payloads, and neither do the market-cap, volume, flow or honeypot fields, so
+a token that only ever gets a `/v1/token/info` call can never have them. The row is free once the
+feed has been pulled, and `latest_scan.json.gmgn_coverage` (the share of survivors with a known
+`gmgn_visiting_count`) says how far it actually reaches — read that number before trusting any band
+that depends on a GMGN field.
+
 ## How the scanner uses GMGN
 
 - `sources/gmgn.py` — one `POST /v1/trenches?chain=robinhood` per run (all three columns, GMGN's

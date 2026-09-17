@@ -72,10 +72,14 @@ disjoint from the runner's, so `git pull --rebase` on both sides is conflict-fre
 
 **Discovery.** `data/discovery_cursor.json` is a block cursor over `DISCOVERY_LOG_SOURCES`; log
 tokens are never truncated (`DISCOVERY_MAX_LOG_TOKENS_PER_RUN` caps the window; the cursor advances
-only to the last processed log; catch-up ≤ 300k blocks in 100k windows). Per-source quotas
-`DISCOVER_QUOTA` (logs, watchlist, rechecks, feeds) spill forward; `MAX_DISCOVER` bounds only the
-Dexscreener enrich set. A log token with no Dexscreener pair goes to recheck with its `disc` record
-and is never marked seen until it has a market snapshot. The watchlist keeps every survivor 24 h:
+only to the last processed log; catch-up ≤ 300k blocks in 100k windows, and a cursor more than
+`DISCOVERY_CATCHUP_TRIGGER_BLOCKS` behind raises the cap to `DISCOVERY_MAX_LOG_TOKENS_CATCHUP` with
+the logs quota — `latest_scan.json` carries `catchup` / `cursor_lag_blocks` / `feed_hits`). Per-source
+quotas `DISCOVER_QUOTA` (logs, watchlist, rechecks, feeds) spill forward; `MAX_DISCOVER` bounds only
+the Dexscreener enrich set. A log token with no Dexscreener pair goes to recheck with its `disc`
+record and is never marked seen until it has a market snapshot — and so does a FEED token, on its own
+`RECHECK_SCHEDULE_BY_KIND` ladder; a feed row for a token already in recheck is a pull-forward hit
+(capped at `FEED_PULL_FORWARD_MAX`) that is looked at first and does not spend the scheduled slot. The watchlist keeps every survivor 24 h:
 Dexscreener re-enrich every run, chain facts via one Multicall3 at most every `SAFETY_REFRESH_S`,
 pass-2 refresh at most every `GT_INFO_REFRESH_S` for `WATCH_REFRESH_PER_RUN` tokens ordered by
 fewest `hc_checks` misses. `RUN_TIME_BUDGET_S` is global; cuts land in `deferred_by_stage`.
@@ -87,7 +91,10 @@ keyed) is the Trenches feed (`DISCOVERY_FEEDS`, one POST per run for New / Almos
 plus `/v1/token/info` wallet tags for the first `GMGN_INFO_BUDGET_PER_RUN` pass-2 tokens; its `gmgn_*`
 fields are **features only** (three pre-declared candidate bands read them: `band_gmgn_clean`,
 `band_new_creation`, `band_almost_bonded`), never a hard gate, and a dark GMGN is named in
-`sources_dark`. `docs/GMGN_TRENCHES.md` is the operator's Trenches guide. `screen.hc_checks(feat)` is
+`sources_dark`. The Trenches ROW is free once the feed has been pulled, so it is attached at **pass 1**
+(`safety.apply_gmgn_row`) to every enriched token, not inside pass 2: applied in pass 2 only, the
+row-only fields reached 11 of 157 survivors (pass 2 covers ≤ `GT_INFO_BUDGET_PER_RUN` +
+`WATCH_REFRESH_PER_RUN` tokens a run while the watchlist is ~98 % of the survivors). `docs/GMGN_TRENCHES.md` is the operator's Trenches guide. `screen.hc_checks(feat)` is
 the **single** implementation of the A-tier checks (`None` for unknown / degraded inputs);
 `high_conviction` and `band_a_strict` both derive from it. `entry_lab/runtime.build_feat` is the
 single normalizer to `config.FEATURE_FIELDS` (NaN/inf/NA → `None`, every key present).
@@ -253,6 +260,19 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   inferred from the list, never from an HTTP status; a non-list body is deferred, not absent.
 - **`http_client` treats only 400/404 as absent**; ScanHood's explicit no-route is a 422 and
   surfaces as deferred after retries. `quotes.py` handles it; do not read it as death elsewhere.
+- **GMGN payload shapes are read only from the cached payloads** (`cache/gmgn_trenches_*.json`,
+  `cache/gmgn_info_*.json`) — never assumed. A Trenches ROW carries `visiting_count`,
+  `top_10_holder_rate` (a 0–1 rate, ×100 into `gmgn_top10_holder_pct`), `market_cap`, `volume_24h`,
+  `buys_24h`, `sells_24h`, `is_honeypot` (a **string** 'yes'/'no'/'unknown', three-valued),
+  `created_timestamp`, `is_wash_trading` and `suspected_insider_hold_rate`. `/v1/token/info` carries
+  `data.visiting_count`, `stat.top_10_holder_rate` and `data.creation_timestamp` (16/16 payloads) and
+  carries **none** of market cap / volume / buy-sell counts / honeypot / wash flag / insider rate — the
+  row is their only source. Every one of these is a FEATURE; no hard gate and no hc check reads a
+  `gmgn_*` field.
+- **Clone swarms clear the hard gates.** The same name carries 6–13 distinct tokens at ~$30k liquidity
+  and $25–38k LIFETIME volume with buys/sells 1.4–1.5×, above `LIQ_FLOOR_USD` and `MIN_VOL_H24_USD`.
+  What separates them from a runner at age ≤ 15 min is the hour-1 volume floor ($50k) — the runners did
+  $0.97M–$5.13M in hour one. Do not relax that floor to "improve recall".
 - **GMGN's `/v1/trenches` answers code 0 with EMPTY columns to a body without `version: v2` and
   `quote_address_type`** — a trap that reads like "nothing new", not an outage; `gmgn.build_trenches_body`
   is the one place the shape lives (GMGN's own client's). A 429 there is a **ban** whose cooldown

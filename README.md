@@ -60,8 +60,9 @@ files from that era are held offline and are not in this repository's history.
 ## How it works
 
 Every run advances a block cursor over the UniswapV2 `PairCreated`, Flap `TokenCreated` and V3
-`PoolCreated` logs (exact at any cadence — a gap is caught up block by block, never skipped), adds
-due rechecks, the 24 h watchlist and a GeckoTerminal new-pools hedge, batch-enriches everything via
+`PoolCreated` logs (exact at any cadence — a gap is caught up block by block, never skipped, and a
+cursor more than 30,000 blocks behind raises the per-run token cap from 200 to 600 until it is
+caught up), adds due rechecks, the 24 h watchlist and a GeckoTerminal new-pools hedge, batch-enriches everything via
 Dexscreener, and runs the hard gates twice: pass 1 on market data + one Multicall3 batch of chain
 facts (owner renounced, LP burned %, honeypot round trip) + ScanHood; pass 2, under a per-run budget,
 on GeckoTerminal info + Blockscout holders/template/scam flag + RobinX deployer record. Survivors are
@@ -138,6 +139,19 @@ count, so agent-launched tokens sit in **B** under it; the built-in candidate
 `band_launchpad_lenient` drops exactly those checks on the launchpad and the entry lab decides
 whether the leniency pays.
 
+**Discovery latency (2026-09-17).** The three tokens that ran on 2026-09-16 peaked 8, 17 and 29
+minutes after their first candle; one of them (FOMOPAD) was sighted at `pair_age_min` 4.07 through
+the GeckoTerminal new-pools feed and the other two were never discovered at all. A token sighted
+through a feed but not yet priced by Dexscreener now joins a recheck ladder of its own kind
+(5–10 minutes to the first look) instead of being dropped for six hours; a feed row for a token
+already waiting in the recheck queue is treated as that token's graduation and looked at first,
+without consuming its scheduled slot (at most 40 per run); the new-pools feed reads 4 pages instead
+of 2, because 2 pages spanned about 2.5 minutes of pool creation against a 240-second scan cadence;
+and the recheck queue drains 150 tokens a run instead of 40, which at a Pons inflow of 750–1,250
+launches an hour is the difference between draining the queue and evicting it. None of this reaches
+the 8-minute class: an architecture with a 240-second cadence and a 3–8 minute entry lag cannot
+enter a token that peaks eight minutes in, and no tuning of it will.
+
 **Pons and hook-less V4.** Pons (`pons-v2-dex`) is the chain's largest launchpad by count —
 750 to 1,250 launches an hour, each with a singleton-AMM pool at creation; only 1–4 % ever get a
 Dexscreener market and under 1 % clear the market gates. Its `Create` log is a discovery source
@@ -178,7 +192,7 @@ be B, and only rarely A. That bias is stated on the dashboard and in the weekly 
 | ScanHood | free, keyless | chain-specific verdict + sell simulation, a read-only swap quote, the launch feed |
 | RobinX | free tier | deployer track record (launched / real / dead / score), insider flags |
 | KyberSwap | free, keyless | aggregator route with USD legs and gas — paper fills for tokens with no V2 pair |
-| GMGN (`openapi.gmgn.ai`) | keyed, free tier | the Trenches feed (New / Almost bonded / Migrated) as a discovery hedge, and the behavioural wallet tags — bundler wallets ÷ holders, sniper / insider / fresh-wallet hold rates, smart-money count, wash-trading flag — as pass-2 **features, never a gate**. Its Trenches allow-list omits `pons_v2` and bare V2/V3/V4 pools (72 of the top-100 rank rows, 2026-09-12), so it complements the log cursor; a 429 is a ban and is terminal for the run. See [`docs/GMGN_TRENCHES.md`](docs/GMGN_TRENCHES.md). |
+| GMGN (`openapi.gmgn.ai`) | keyed, free tier | the Trenches feed (New / Almost bonded / Migrated) as a discovery hedge, and the behavioural wallet tags — bundler wallets ÷ holders, sniper / insider / fresh-wallet hold rates, smart-money count, wash-trading flag — plus the board's own signals (viewers, top-10 share, market cap, 24 h volume and flow, its honeypot verdict, the creation timestamp) as pass-2 **features, never a gate**. The Trenches row costs nothing once the feed has been pulled, so it is attached to every enriched token at pass 1; the dashboard prints the share of survivors GMGN saw at all. Its Trenches allow-list omits `pons_v2` and bare V2/V3/V4 pools (72 of the top-100 rank rows, 2026-09-12), so it complements the log cursor; a 429 is a ban and is terminal for the run. See [`docs/GMGN_TRENCHES.md`](docs/GMGN_TRENCHES.md). |
 
 ## The two death tests (they differ on purpose)
 
