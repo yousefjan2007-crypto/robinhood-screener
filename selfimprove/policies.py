@@ -190,6 +190,30 @@ POLICIES: dict[str, dict] = {
 }
 
 
+# ── per-tick flow features (the keeper's paper book; consumed by a `flow` policy schema) ────
+# The book reads Dexscreener's 5-minute window ONLY for positions holding an open state under a
+# policy whose dict carries a `flow` schema — none does today, so the read is inert and
+# flow_policy_names() is []. A future schema (an adaptive take-profit) is a counted trial like
+# any other policy; these two helpers are the plumbing, not the rule.
+FLOW_FEATURES = ("vol_m5", "buys_m5", "sells_m5", "vol_h1", "buys_h1", "sells_h1", "liq_usd")
+
+
+def flow_policy_names() -> list:
+    """Names of the policies carrying a `flow` schema (a dict). [] until one exists."""
+    return [n for n, p in POLICIES.items() if isinstance(p.get("flow"), dict)]
+
+
+def flow_from_market(m) -> dict | None:
+    """The FLOW_FEATURES subset of one Dexscreener market dict, or None unless `m` is a dict
+    whose m5 window is answered (vol_m5 / buys_m5 / sells_m5 all non-None): an unanswered
+    window is unknown flow, never zero flow, and a deferred read must never look like an exit."""
+    if not isinstance(m, dict):
+        return None
+    if any(m.get(k) is None for k in ("vol_m5", "buys_m5", "sells_m5")):
+        return None
+    return {k: m.get(k) for k in FLOW_FEATURES}
+
+
 # ── the candidate pool (selfimprove/candidates/registry.json, kind == "policy") ─────────────
 _POLICY_KEYS = {"ladder", "stop", "trail", "max_hold_s"}
 
@@ -305,4 +329,8 @@ if __name__ == "__main__":
     assert validate_policy("hold_to_end", {"max_hold_s": 1}) is not None
     assert validate_policy("bad", {"ladder": [(0.5, 0.5)]}) is not None
     assert validate_policy("ctl_x", {"random_exit": True}) is not None
-    print("candidate validation ok; policies loaded:", len(POLICIES), "controls:", len(CONTROLS))
+    # the flow plumbing is inert until a policy carries a `flow` schema
+    assert flow_policy_names() == [] and flow_from_market({"vol_m5": None, "buys_m5": 1, "sells_m5": 1}) is None
+    assert set(flow_from_market({k: 1 for k in FLOW_FEATURES})) == set(FLOW_FEATURES)
+    print("candidate validation ok; policies loaded:", len(POLICIES), "controls:", len(CONTROLS),
+          "flow policies:", flow_policy_names())

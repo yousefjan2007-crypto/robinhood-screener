@@ -316,8 +316,10 @@ def random_exit_hold_s(pos: dict) -> float:
 
 
 def _step_policy(pos: dict, name: str, st: dict, px: float, now_s: float,
-                 usd_full: float, gap_s: float) -> list:
-    """Advance ONE policy by one observed price. Returns the fills it produced.
+                 usd_full: float, gap_s: float, flow=None) -> list:
+    """Advance ONE policy by one observed price. Returns the fills it produced. `flow` is the
+    tick's POL.flow_from_market() dict (or None when dark / not read) — carried, not yet read:
+    no policy in the family has a flow schema, so nothing here consumes it.
 
     A tick is a single price, so unlike the bar simulator there is no ordering to assume. The
     one genuine ambiguity left is that both a rung and a protective exit can be satisfied by the
@@ -587,10 +589,12 @@ def _quote_rounds(due: list) -> list:
 
 
 def tick(now_s: float, *, quote_many_fn=quotes.quote_sell_many, weth_px_fn=quotes.weth_price_usd,
-         dex_fn=None, weth_px=None, verbose: bool = True) -> dict:
+         dex_fn=None, flow_fn=None, weth_px=None, verbose: bool = True) -> dict:
     """One cycle: ONE WETH/USD read, ONE batched sell quote for every due position, the
-    quote-integrity gate, then every policy advances; the book is saved atomically FIRST and
-    the fill / tick logs are flushed after it (the 2026-08-15 199-fills incident).
+    quote-integrity gate, at most ONE batched flow read (the Dexscreener m5 window, only for
+    honest due positions holding an open state under a flow policy — none today, so never),
+    then every policy advances; the book is saved atomically FIRST and the fill / tick logs are
+    flushed after it (the 2026-08-15 199-fills incident).
 
     Cadence: a position is due when its gap since the last tick is >= 0.9 x the wanted interval
     (0.9 so launchd jitter never skips a whole cycle): TICK_INTERVAL_S while the PREVIOUS tick
@@ -717,6 +721,36 @@ def tick(now_s: float, *, quote_many_fn=quotes.quote_sell_many, weth_px_fn=quote
         else:
             item["verdict"], item["reason"] = "suspect", "jump contradicted by dexscreener"
 
+    # (3b) ONE batched flow read — a SEPARATE call from the R2 corroboration (its call counts
+    # are pinned) — over the honest due tokens whose position holds an OPEN state under a flow
+    # policy (POL.flow_policy_names(): [] today ⇒ this never runs). A suspect / deferred /
+    # absent tick steps nothing, so it reads nothing. `flow_status`: ok | dark (asked, not
+    # answered — deferred, absent or an unanswered m5 window) | n/a (not asked).
+    flow_names = POL.flow_policy_names()
+    need_flow: set = set()
+    for item in plan:
+        item["flow"], item["flow_status"], item["need_flow"] = None, "n/a", False
+        if not flow_names or item["verdict"] not in ("ok", "corroborate"):
+            continue
+        pols = item["pos"].get("policies") or {}
+        if any(isinstance(pols.get(n), dict) and not pols[n].get("closed") for n in flow_names):
+            item["need_flow"] = True
+            need_flow.add(item["pos"]["token"])
+    flow = {"ok": {}, "absent": set(), "deferred": set()}
+    if need_flow:
+        try:
+            got = (flow_fn or _default_dex)(sorted(need_flow), now_s)
+            if isinstance(got, dict):
+                flow = got
+        except Exception as exc:
+            print("  [livebook] flow read raised: %s" % str(exc)[:120])
+    flow_ok = {str(k).lower(): v for k, v in (flow.get("ok") or {}).items()}
+    for item in plan:
+        if not item["need_flow"]:
+            continue
+        item["flow"] = POL.flow_from_market(flow_ok.get(item["pos"]["token"]))
+        item["flow_status"] = "ok" if item["flow"] is not None else "dark"
+
     # (4) apply
     pending_fills: list = []
     pending_ticks: list = []
@@ -728,7 +762,8 @@ def tick(now_s: float, *, quote_many_fn=quotes.quote_sell_many, weth_px_fn=quote
                 "usd_full": usd_full,
                 "mult": (px / pos["entry_px"]) if pos["entry_px"] > 0 else 0.0,
                 "gap_s": round(gap_s, 1), "weth_px": px_weth,
-                "source": q.get("source") if isinstance(q, dict) else None, "status": "ok"}
+                "source": q.get("source") if isinstance(q, dict) else None, "status": "ok",
+                "flow": item["flow"], "flow_status": item["flow_status"]}
         if item["reason"]:
             line["reason"] = item["reason"]
         if item["dex_px"] is not None:
@@ -803,7 +838,8 @@ def tick(now_s: float, *, quote_many_fn=quotes.quote_sell_many, weth_px_fn=quote
                 st_new["peak_px"] = pos["entry_px"]
                 pos["policies"][name] = st_new
         for name in names:
-            for f in _step_policy(pos, name, pos["policies"][name], px, now_s, usd_full, gap_s):
+            for f in _step_policy(pos, name, pos["policies"][name], px, now_s, usd_full, gap_s,
+                                  flow=item["flow"]):
                 pending_fills.append(f)
                 stats["fills"] += 1
         pos["last_tick_ts"] = now_s
@@ -1066,9 +1102,12 @@ def _smoke() -> None:
     def opn(r, now_s=t0, buy=buy_ok):
         return open_alert(r, now_s, quote_buy_fn=buy, weth_px=WETH, decimals_fn=lambda t: 18)
 
+    def flow_fn(tokens, now_s):                 # the flow read, deferred: never called today
+        return {"ok": {}, "absent": set(), "deferred": set(tokens)}
+
     def tk(now_s, **kw):
-        return tick(now_s, quote_many_fn=sell_many, dex_fn=dex_fn, weth_px=WETH, verbose=False,
-                    **kw)
+        return tick(now_s, quote_many_fn=sell_many, dex_fn=dex_fn, flow_fn=flow_fn, weth_px=WETH,
+                    verbose=False, **kw)
 
     def book():
         return _load(BOOK_PATH, {})

@@ -1483,6 +1483,19 @@ def dex_fn(tokens, now_s):
     return {"ok": ok, "absent": set(), "deferred": set(tokens) - set(ok)}
 
 
+flow_market: dict = {}                  # token -> the m5 window the flow stub answers with
+flow_calls = {"n": 0, "tokens": []}
+
+
+def flow_fn(tokens, now_s):
+    """The per-tick flow read (Phase 4), stubbed: deferred by default — nothing in verify reaches
+    the network — and a SEPARATE call from dex_fn so the R2 corroboration counts stay untouched."""
+    flow_calls["n"] += 1
+    flow_calls["tokens"].append(sorted(tokens))
+    ok = {t: dict(flow_market[t]) for t in tokens if t in flow_market}
+    return {"ok": ok, "absent": set(), "deferred": set(tokens) - set(ok)}
+
+
 def lrow(token, seq, tier="A", kind="promotion", ats=None, prior=None):
     return {"token": token, "event_seq": seq, "symbol": "T%d" % seq, "tier": tier, "event_kind": kind,
             "prior_event_seq": prior, "plan_name": "cfg_ladder_stop", "alert_ts": LT0 - 30 if ats is None else ats}
@@ -1493,7 +1506,7 @@ def opn(r, now_s=LT0, buy=buy_ok):
 
 
 def tk(now_s):
-    return LB.tick(now_s, quote_many_fn=sell_many, dex_fn=dex_fn, weth_px=WPX, verbose=False)
+    return LB.tick(now_s, quote_many_fn=sell_many, dex_fn=dex_fn, flow_fn=flow_fn, weth_px=WPX, verbose=False)
 
 
 def book():
@@ -1520,7 +1533,11 @@ def _reset(d):
         _g[name] = os.path.join(d, base)
         if os.path.exists(_g[name]):
             os.remove(_g[name])
-    script.clear(); dex_mult.clear()
+    script.clear(); dex_mult.clear(); flow_market.clear()
+
+
+def _no_nan(c):
+    raise ValueError("non-finite JSON constant %s" % c)
 
 
 try:
@@ -1721,6 +1738,67 @@ try:
               s13["close_reason"] == "stop" and s13["close_gap_s"] == 3600.0 and s13["gapped"] is True
               and p13["done"] and p13["policies"]["hold_to_end"]["gapped"] is False
               and LB.live_stats_dict(LT0)["per_policy"]["stop_50"]["n_gapped"] >= 1)
+
+        # ── the per-tick flow features (Phase 4): the m5 window in the market dict, inert in the book
+        #    until a policy carries a `flow` schema (Phase 5) ──
+        _m5 = dexscreener._normalize({"baseToken": {"address": T4}, "volume": {"m5": "12.5", "h1": "300"},
+                                      "txns": {"m5": {"buys": 7, "sells": "2"}, "h1": {"buys": 40, "sells": 10}}}, T4, LT0)
+        _nom5 = dexscreener._normalize({"baseToken": {"address": T4}, "volume": {"h1": "300"}, "txns": {"h1": {"buys": 40}}}, T4, LT0)
+        check("dexscreener._normalize carries vol_m5 / buys_m5 / sells_m5 (float / int / int) and MARKET_KEYS lists the three "
+              "right after sells_h24, in the dict's own order",
+              (_m5["vol_m5"], _m5["buys_m5"], _m5["sells_m5"]) == (12.5, 7, 2) and tuple(_m5.keys()) == dexscreener.MARKET_KEYS
+              and dexscreener.MARKET_KEYS[dexscreener.MARKET_KEYS.index("sells_h24") + 1:][:3] == ("vol_m5", "buys_m5", "sells_m5"))
+        check("an absent m5 window is None on all three — NEVER 0.0 (unknown flow is not zero flow); the h1 window keeps its "
+              "0.0 absence value", _nom5["vol_m5"] is None and _nom5["buys_m5"] is None and _nom5["sells_m5"] is None
+              and _nom5["sells_h1"] == 0 and _nom5["vol_h6"] == 0.0)
+        check("with no flow policy registered, flow_fn was never called across the whole G harness (call counter 0) and "
+              "POL.flow_policy_names() is []",
+              flow_calls["n"] == 0 and POL.flow_policy_names() == []
+              and not any(isinstance(p_.get("flow"), dict) for p_ in POL.POLICIES.values()))
+        check("POL.flow_from_market: None for a non-dict or any None m5 field; else exactly FLOW_FEATURES copied",
+              POL.FLOW_FEATURES == ("vol_m5", "buys_m5", "sells_m5", "vol_h1", "buys_h1", "sells_h1", "liq_usd")
+              and POL.flow_from_market(None) is None and POL.flow_from_market(NOT_FOUND) is None
+              and POL.flow_from_market({"vol_m5": 1.0, "buys_m5": 2, "sells_m5": None, "vol_h1": 1.0}) is None
+              and POL.flow_from_market(dict(_m5, liq_usd=5e4)) == {"vol_m5": 12.5, "buys_m5": 7, "sells_m5": 2, "vol_h1": 300.0,
+                                                                  "buys_h1": 40, "sells_h1": 10, "liq_usd": 5e4})
+        _reset(d)
+        POL.POLICIES["fx_flow_probe"] = {"trail": 0.30, "flow": {"fixture": True}}   # test-only; popped in the finally below
+        try:
+            TF1, TF2 = "0x" + "0" * 36 + "f1a1", "0x" + "0" * 36 + "f1a2"
+            nd_flow0 = dex_calls["n"]
+            opn(lrow(TF1, 31)); opn(lrow(TF2, 32))
+            script[TF1] = {"status": "ok", "mult": 1.0}; script[TF2] = {"status": "ok", "mult": 1.0}
+            flow_market[TF1] = {"vol_m5": 100.0, "buys_m5": 7, "sells_m5": 2, "vol_h1": 900.0, "buys_h1": 40, "sells_h1": 10,
+                                "liq_usd": 5e4, "price_usd": 1.0}
+            n0 = flow_calls["n"]
+            tk(LT0 + 60)
+            t1 = {t["token"]: t for t in ticks() if t["ts"] == LT0 + 60}
+            check("a fixture flow policy with an open state ⇒ exactly ONE batched flow_fn call per tick over the due honest "
+                  "tokens; flow ok for the answered token, dark for the unanswered one; the tick line carries flow + flow_status",
+                  flow_calls["n"] == n0 + 1 and flow_calls["tokens"][-1] == sorted([TF1, TF2])
+                  and t1[TF1]["flow_status"] == "ok"
+                  and t1[TF1]["flow"] == {"vol_m5": 100.0, "buys_m5": 7, "sells_m5": 2, "vol_h1": 900.0, "buys_h1": 40,
+                                          "sells_h1": 10, "liq_usd": 5e4}
+                  and t1[TF2]["flow_status"] == "dark" and t1[TF2]["flow"] is None)
+            script[TF2] = {"status": "deferred"}
+            n0 = flow_calls["n"]
+            tk(LT0 + 120)
+            check("a deferred-quote position is not in the flow set (deferred is never scored) — its line says n/a; the honest one "
+                  "still is, in ONE call", flow_calls["n"] == n0 + 1 and flow_calls["tokens"][-1] == [TF1]
+                  and [t for t in ticks() if t["token"] == TF2][-1]["flow_status"] == "n/a")
+            script[TF1] = {"status": "ok", "mult": 0.5}; script[TF2] = {"status": "ok", "mult": 0.5}
+            tk(LT0 + 180)                        # the fixture's trail closes on both at 0.5x
+            n0 = flow_calls["n"]
+            tk(LT0 + 240)
+            check("once every flow-policy state is closed the read stops (no call); every tick line since carries flow/flow_status "
+                  "and the ticks jsonl parses with NaN/Infinity refused (allow_nan=False clean)",
+                  flow_calls["n"] == n0 and all(("flow_status" in t and "flow" in t) for t in ticks() if t["ts"] >= LT0 + 60)
+                  and all(json.loads(ln, parse_constant=_no_nan) is not None for ln in open(LB.TICKS_PATH) if ln.strip())
+                  and book()[LB._pos_key(TF1, 31)]["policies"]["fx_flow_probe"]["closed"])
+            check("the flow read is a SEPARATE call from the R2 corroboration: four flow ticks moved dex_calls not at all",
+                  dex_calls["n"] == nd_flow0)
+        finally:
+            POL.POLICIES.pop("fx_flow_probe", None)
 finally:
     for k, v in _saved_lb.items():
         _g[k] = v

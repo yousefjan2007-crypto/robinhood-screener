@@ -36,11 +36,13 @@ from http_client import NOT_FOUND, get_json, is_absent, is_deferred  # noqa: E40
 BASE = "https://api.dexscreener.com"
 CHUNK = 30                       # tokens/v1 accepts up to 30 comma-separated addresses
 
-# Keys every market dict carries — FEATURE_FIELDS' market block is a subset of these.
+# Keys every market dict carries — FEATURE_FIELDS' market block is a subset of these. The three
+# m5 keys are the per-tick FLOW features the keeper's paper book reads (policies.FLOW_FEATURES);
+# they are not in FEATURE_FIELDS and no band or gate reads them.
 MARKET_KEYS = ("symbol", "name", "price_usd", "liq_usd", "mcap", "fdv", "vol_h1", "vol_h6",
-               "vol_h24", "buys_h1", "sells_h1", "buys_h24", "sells_h24", "price_chg_h1",
-               "pair", "pair_created_ms", "pair_age_min", "dex", "pair_labels", "url",
-               "socials")
+               "vol_h24", "buys_h1", "sells_h1", "buys_h24", "sells_h24", "vol_m5", "buys_m5",
+               "sells_m5", "price_chg_h1", "pair", "pair_created_ms", "pair_age_min", "dex",
+               "pair_labels", "url", "socials")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────────
@@ -102,11 +104,15 @@ def _normalize(p: dict, addr: str, now_s: float) -> dict:
     survey (explore_agent6.md §2): priceUsd, liquidity.usd, marketCap, fdv,
     volume.{h1,h6,h24}, txns.{h1,h24}.{buys,sells}, priceChange.h1 (often ABSENT — the
     live MIZUKARA pair carried only priceChange.h24), pairCreatedAt (ms), labels, dexId.
-    pair_age_min is None when pairCreatedAt is missing, else derived from now_s only."""
+    pair_age_min is None when pairCreatedAt is missing, else derived from now_s only.
+    The m5 window (volume.m5, txns.m5 — present on 45/45 cached pairs, 2026-09-17) is the
+    flow feature set: absent is None on all three, NEVER 0.0, because a flow rule that read
+    "unknown" as "no flow" would exit on every dark tick."""
     liq = p.get("liquidity") or {}
     vol = p.get("volume") or {}
     txns = p.get("txns") or {}
     h1, h24 = txns.get("h1") or {}, txns.get("h24") or {}
+    m5 = txns.get("m5")
     chg = p.get("priceChange") or {}
     base = p.get("baseToken") or {}
     created_ms = p.get("pairCreatedAt")
@@ -127,6 +133,9 @@ def _normalize(p: dict, addr: str, now_s: float) -> dict:
         "sells_h1": _i(h1.get("sells")),
         "buys_h24": _i(h24.get("buys")),
         "sells_h24": _i(h24.get("sells")),
+        "vol_m5": _f(vol.get("m5")),
+        "buys_m5": _i(m5.get("buys")) if isinstance(m5, dict) else None,
+        "sells_m5": _i(m5.get("sells")) if isinstance(m5, dict) else None,
         "price_chg_h1": _f(chg.get("h1")),
         "pair": p.get("pairAddress"),
         "pair_created_ms": created_ms,
@@ -337,6 +346,9 @@ if __name__ == "__main__":
     empty = _normalize({"baseToken": {"address": miz}}, miz, now_s)
     assert empty["price_usd"] is None and empty["liq_usd"] is None and empty["mcap"] is None
     assert empty["vol_h24"] == 0.0 and empty["buys_h1"] == 0 and empty["pair_age_min"] is None
+    # the m5 flow window is None when absent — never 0.0 (unknown flow is not zero flow)
+    assert empty["vol_m5"] is None and empty["buys_m5"] is None and empty["sells_m5"] is None
+    assert m["vol_m5"] is None or m["vol_m5"] >= 0.0
     px = weth_price_usd(now_s)
     print(f"WETH/USD: {px}")
     assert px is not None and 500 <= px <= 20000, px
