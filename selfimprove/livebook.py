@@ -1141,7 +1141,8 @@ def live_stats_dict(now_s=None) -> dict:
     def _table(names):
         out = {}
         for name in names:
-            rets, n_g, n_bf, n_fx, n_fd = [], 0, 0, 0, 0
+            rets, n_g, n_bf, n_fx, n_armed, n_fd = [], 0, 0, 0, 0, 0
+            dark_ticks, armed_ticks = 0, 0
             for p in scorable:
                 st = (p.get("policies") or {}).get(name)
                 if not isinstance(st, dict) or not st.get("closed"):
@@ -1151,8 +1152,21 @@ def live_stats_dict(now_s=None) -> dict:
                 # not about the returns, and the candidate's kill condition reads it.
                 if st.get("close_reason") == "flow_exit":
                     n_fx += 1
-                if int(st.get("flow_dark_ticks") or 0) > 0:
-                    n_fd += 1
+                # A close is "armed" iff flow_step ever ran past the arm gate for it — i.e. it
+                # recorded at least one tick, lit or dark (flow_ticks + flow_dark_ticks > 0). A
+                # position that never reached 1.5x has BOTH counters at 0 and must NOT sit in the
+                # darkness denominator: that is the bug this replaces (n_flow_dark used to fire on
+                # any dark tick while unarmed closes, which never ran the rule, diluted the share
+                # to near zero). Darkness is measured at TICK level, summed over armed closes only.
+                flow_ticks = int(st.get("flow_ticks") or 0)
+                flow_dark_ticks = int(st.get("flow_dark_ticks") or 0)
+                position_ticks = flow_ticks + flow_dark_ticks
+                if position_ticks > 0:
+                    n_armed += 1
+                    armed_ticks += position_ticks
+                    dark_ticks += flow_dark_ticks
+                    if flow_dark_ticks / position_ticks > 0.5:
+                        n_fd += 1               # backward-compatible COUNT, not the reported share
                 if st.get("backfilled_ts") is not None:
                     n_bf += 1
                     continue
@@ -1164,6 +1178,8 @@ def live_stats_dict(now_s=None) -> dict:
             row["n_gapped"] = n_g
             row["n_backfilled"] = n_bf
             row["n_flow_exit"] = n_fx
+            row["n_armed"] = n_armed
+            row["flow_dark_share"] = (dark_ticks / armed_ticks) if armed_ticks > 0 else None
             row["n_flow_dark"] = n_fd
             out[name] = row
         return out

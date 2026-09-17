@@ -2611,18 +2611,59 @@ try:
               and _s10["close_reason"] == "flow_exit" and [f["side"] for f in _f10] == ["flow_exit"]
               and _f10[0]["note"] == "vol_dry" and _s10["weak_ticks"] == 0)
         _pol_state = dict(LB._new_policy_state(), closed=True, closed_ts=LT0 + 600, remaining=0.0)
-        _bk = {"0xflow:1": {"token": "0xflow", "event_seq": 1, "symbol": "FLW", "tier": "A", "cost_usd": 10.0,
-                            "entry_lag_s": 5.0, "opened_ts": LT0, "last_tick_ts": LT0 + 600, "done": True,
-                            "policies": {CAND_FLOW: dict(_pol_state, close_reason="flow_exit", realized_usd=12.0,
-                                                         flow_dark_ticks=3),
-                                         CAND_BENCH: dict(_pol_state, close_reason="trail", realized_usd=11.0)}}}
-        LB._save_atomic(_bk, LB.BOOK_PATH)
-        _ls = LB.live_stats_dict(LT0 + 600)
-        check("live_stats_dict reports the flow leg per policy — n_flow_exit (closed on the flow rule) and "
-              "n_flow_dark (closed after at least one tick whose features were dark) — and stays NaN-free JSON",
-              _ls["per_policy"][CAND_FLOW]["n_flow_exit"] == 1 and _ls["per_policy"][CAND_FLOW]["n_flow_dark"] == 1
-              and _ls["per_policy"][CAND_BENCH]["n_flow_exit"] == 0 and _ls["per_policy"][CAND_BENCH]["n_flow_dark"] == 0
-              and json.dumps(_ls, allow_nan=False))
+
+        def _flow_pos(token, close_reason, flow_ticks, flow_dark_ticks):
+            """One scorable closed position on CAND_FLOW with a hand-set (flow_ticks, flow_dark_ticks)
+            pair — bypasses flow_step entirely so the fix-round-1 semantics of live_stats_dict can be
+            probed directly, independent of how a position actually arms."""
+            return {token + ":1": {"token": token, "event_seq": 1, "symbol": "FLW", "tier": "A",
+                                   "cost_usd": 10.0, "entry_lag_s": 5.0, "opened_ts": LT0,
+                                   "last_tick_ts": LT0 + 600, "done": True,
+                                   "policies": {CAND_FLOW: dict(_pol_state, close_reason=close_reason,
+                                                                realized_usd=11.0, flow_ticks=flow_ticks,
+                                                                flow_dark_ticks=flow_dark_ticks)}}}
+
+        # 9 of 10 closes never armed (flow_ticks == flow_dark_ticks == 0 — the position never reached
+        # 1.5x, so flow_step returned before touching either counter); the one that armed was dark on
+        # every tick it ran. Fix round 1's bug: the OLD n_flow_dark counted any close with
+        # flow_dark_ticks > 0, so this book would have reported 1 / 10 == 0.10, under the 0.50 kill
+        # line, even though the rule was dark on 100% of the ticks it ever actually ran.
+        _bk1 = {}
+        for i in range(9):
+            _bk1.update(_flow_pos("0xnv%d" % i, "trail", 0, 0))
+        _bk1.update(_flow_pos("0xarmed", "flow_exit", 0, 4))
+        LB._save_atomic(_bk1, LB.BOOK_PATH)
+        _ls1 = LB.live_stats_dict(LT0 + 600)["per_policy"][CAND_FLOW]
+        check("flow_dark_share is measured over ARMED positions, not every close: 9 never-armed closes "
+              "(0 ticks each) plus one close that armed and was 100% dark reports n_armed == 1 and "
+              "flow_dark_share == 1.0 — not 0.10, the close-level count the old n_flow_dark bug produced",
+              _ls1["n_armed"] == 1 and _ls1["flow_dark_share"] == 1.0 and _ls1["n_flow_exit"] == 1
+              and _ls1["n_flow_dark"] == 1, str(_ls1))
+
+        # the mirror case: one armed position, mostly lit, with a single dark tick in 60 — the share
+        # must be the tick-level fraction (1/60), and its own share is well under 0.5 so it must NOT
+        # be counted by the backward-compatible per-close n_flow_dark.
+        _bk2 = _flow_pos("0xmostlylit", "trail", 59, 1)
+        LB._save_atomic(_bk2, LB.BOOK_PATH)
+        _ls2 = LB.live_stats_dict(LT0 + 600)["per_policy"][CAND_FLOW]
+        check("one armed close with 1 dark tick out of 60 reports flow_dark_share == 1/60, not 1.0 and "
+              "not 0 — tick-level, not a boolean 'any dark tick' flag — and n_flow_dark stays 0 because "
+              "this close's own share (1/60) is under the 0.5 backward-compat threshold",
+              _ls2["n_armed"] == 1 and abs(_ls2["flow_dark_share"] - 1.0 / 60.0) < 1e-12
+              and _ls2["n_flow_dark"] == 0, str(_ls2))
+
+        # no close ever armed at all: the denominator is 0, and None (not 0.0, not NaN) is the only
+        # honest value — 0.0 would silently read as "the rule ran perfectly", which is false; it never
+        # ran, exactly the confusion this fix round exists to remove.
+        _bk3 = {}
+        for i in range(3):
+            _bk3.update(_flow_pos("0xnever%d" % i, "trail", 0, 0))
+        LB._save_atomic(_bk3, LB.BOOK_PATH)
+        _ls3 = LB.live_stats_dict(LT0 + 600)["per_policy"][CAND_FLOW]
+        check("no armed closes at all ⇒ flow_dark_share is None (never 0.0 or NaN) and n_armed == 0, "
+              "and the whole structure stays JSON-safe",
+              _ls3["n_armed"] == 0 and _ls3["flow_dark_share"] is None
+              and json.dumps(LB.live_stats_dict(LT0 + 600), allow_nan=False))
         check("POL.flow_policy_names() names exactly the policies carrying a flow dict (the livebook reads the "
               "5-minute features only when one is live; the list is empty until registration)",
               POL.flow_policy_names() == [CAND_FLOW]
