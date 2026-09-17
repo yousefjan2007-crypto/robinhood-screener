@@ -116,7 +116,9 @@ market-decision close follows a gap > `LIVEBOOK_MAX_SCORABLE_GAP_S`. Every state
 nomination stamping `alert_seq`, forward-only prefix, one-shot judgment, renomination cooldown, the
 one-shot demotion test, `--apply` only when every check passes and not paused. Entry
 (`improve_bands.py`): VOID iff any control has `own_lb > 0` or out-selects the champion or is
-inert; nine checks (paired lift, lift over controls, own LB net of cost, DSR at
+inert, or the gapped share of the rows carrying a lag cell exceeds `BAND_MAX_GAPPED_SHARE`
+(SAMPLING GAP — a collapsed scan grid is not a forward-return sample; `lag_unknown` rows are
+reported separately and folded into nothing); nine checks (paired lift, lift over controls, own LB net of cost, DSR at
 `len(bands_ever_scored)`, 40 days, 150 rows, forward-only prefix, BY, coverage). `ctl_random_band`
 fires at a sha256-derived delay for a sha256-selected 10 %; `ctl_inverse_band` is computed on the
 fly as `champion == 0`, never read from the sidecar. `selfimprove/PAUSE` or `champion.json.locked`

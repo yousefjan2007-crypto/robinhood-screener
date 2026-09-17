@@ -545,6 +545,14 @@ check("selfimprove/champion.py is in the cloud import chain (paper_exec/alerts r
       os.path.join(ROOT, "selfimprove", "champion.py") in _graph
       and os.path.join(ROOT, "selfimprove", "improve.py") not in _graph
       and os.path.join(ROOT, "selfimprove", "entry_lab", "scorecard.py") not in _graph)
+# scorecard.py is NOT AST-walked for wall-clock (it reads time.time() once for the markdown header),
+# so the guard that matters is a different one: every exclusion it applies must come from the ROW.
+_sc_path = os.path.join(ROOT, "selfimprove", "entry_lab", "scorecard.py")
+_sc_src = _read(_sc_path)
+check("scorecard.py reads its exclusions from the LEDGER ROW only: it imports no subprocess and mentions "
+      "neither 'publish.' nor 'origin_blob' (a scorer that shells out to git is not point-in-time)",
+      "subprocess" not in _top_imports(_tree(_sc_path)) and "publish." not in _sc_src
+      and "origin_blob" not in _sc_src)
 
 
 def _ignored(rel: str) -> bool:
@@ -2107,6 +2115,49 @@ check("DSR fails CLOSED (NaN) when entry_bot is absent", math.isnan(v_nan))
 inv = SC.sel(ser.assign(**{CHAMP: ser[CHAMP].where(ser.index != 0)}), "ctl_inverse_band", CHAMP)
 check("scorecard recomputes ctl_inverse_band on the fly from the champion column (NaN where the champion is NaN)",
       math.isnan(inv[0]) and inv[1] == 1.0 - float(ser.loc[1, CHAMP]))
+# the three symmetric exclusions, read from the ROW: implausible (EDDICE), gapped (the 2026-09-14..17
+# outage) and lag_unknown (every pre-schema row)
+_MET = config.BAND_OUTCOME_METRIC
+_LAGC = "lag_" + _MET.split("_", 1)[1]
+
+
+def _excl_fixture(tiers) -> pd.DataFrame:
+    """5 matured rows: clean, clean, gapped, implausible, lag_unknown — `tiers` assigns the arms."""
+    rows = []
+    for k, (kind, tier) in enumerate(zip(("clean", "clean", "gapped", "implausible", "lag_unknown"), tiers)):
+        rec = {c: "" for c in LED.COLUMNS}
+        rec.update({"token": f"0x{k + 1:040x}", "symbol": f"X{k}", "tier": tier, "band": CHAMP,
+                    "event_seq": k + 1, "event_kind": "first_sighting", "alert_ts": T0 + k * 600,
+                    "entry_price": 1.0, "entry_mcap": 1e6, "entry_liq": 5e4, "status": "open",
+                    _MET: 0.25, _LAGC: 60.0})
+        if kind == "gapped":
+            rec[_LAGC] = config.LEDGER_MAX_CELL_LAG_S + 1.0
+        elif kind == "implausible":
+            rec[_MET] = config.LEDGER_MAX_PLAUSIBLE_MULT + 0.5     # a multiple above the cap
+        elif kind == "lag_unknown":
+            rec[_LAGC] = ""                                        # written before the stamp existed
+        rows.append(rec)
+    return pd.DataFrame(rows, columns=LED.COLUMNS)
+
+
+ser_x, excl_x = SC.outcome_series(_excl_fixture(("A", "B", "A", "B", "A")), None)
+ser_y, excl_y = SC.outcome_series(_excl_fixture(("B", "A", "B", "A", "B")), None)   # arms swapped
+check("outcome_series excludes gapped / implausible / lag_unknown cells and counts each: 5 matured rows in, "
+      "the 2 clean ones out",
+      len(ser_x) == 2 and sorted(ser_x["event_seq"]) == [1, 2] and excl_x["gapped"] == 1
+      and excl_x["implausible"] == 1 and excl_x["lag_unknown"] == 1 and excl_x["unmatured"] == 0,
+      f"{len(ser_x)} {excl_x}")
+check("the three exclusions are SYMMETRIC across arms: swapping every row's tier changes neither the kept "
+      "rows nor any count (a one-armed exclusion would manufacture a lift)",
+      excl_x == excl_y and sorted(ser_y["event_seq"]) == sorted(ser_x["event_seq"]), f"{excl_x} {excl_y}")
+md_x = SC.markdown([{"band": CHAMP, "status": "champion", "n": 2, "days": 1, "coverage": 1.0, "mean": 0.25,
+                     "own_lb": float("nan"), "lift_lb": float("nan"), "paired_lb": float("nan"),
+                     "dsr": float("nan"), "p": float("nan"), "by_keep": None, "median_age_s": 0.0}], [],
+                    {"champion": CHAMP, "n_events": 2, "n_days": 1, "n_excluded": excl_x, "n_trials": 1})
+check("the scorecard footer prints the three exclusion counts and names the date before which "
+      "ctl_random_band carries no evidence",
+      "implausible 1" in md_x and "gapped 1" in md_x and "lag_unknown 1" in md_x
+      and f"ctl_random_band carries no evidence before {config.BAND_CTL_RANDOM_CHANGED_ON}" in md_x, md_x[-500:])
 
 # the entry gate
 _saved_dsr = SC.dsr_day_means
@@ -2195,6 +2246,19 @@ try:
     check("K1: the run is VOID when the random control alone has own_lb > 0 (the apparatus is measuring itself)",
           res["controls"]["ctl_random_band"]["own_lb"] > 0 and v["gate_broken"] and v["winner"] is None
           and "no number from this run may be quoted" in _read(IB.write_proposal(res, v, P5)))
+    d10 = os.path.join(base_dir, "x"); os.makedirs(d10)
+    P10 = IB._fixture(d10, gapped_frac=0.5)
+    res10 = IB.evaluate_all(now_i, paths=P10, shuffle_reps=SH)
+    v10 = IB.decide(res10)
+    check(f"SAMPLING GAP: half the rows sampled later than LEDGER_MAX_CELL_LAG_S VOIDs the entry gate "
+          f"(share over the rows that HAVE a lag cell, > BAND_MAX_GAPPED_SHARE={config.BAND_MAX_GAPPED_SHARE})",
+          abs(res10["gapped_share"] - 0.5) < 1e-9 and v10["gate_broken"] and v10["winner"] is None
+          and any(x.startswith("SAMPLING GAP: gapped share") for x in v10["void"]),
+          f"{res10['gapped_share']} {v10['void']}")
+    res_ok = IB.evaluate_all(now_i, paths=Pi, shuffle_reps=SH)
+    check("a fully-sampled fixture has gapped_share 0.0 and reports lag_unknown separately (0 here); the gate "
+          "decides as before", res_ok["gapped_share"] == 0.0 and res_ok["lag_unknown"] == 0
+          and not IB.decide(res_ok)["gate_broken"], f"{res_ok['gapped_share']} {res_ok['lag_unknown']}")
     d6 = os.path.join(base_dir, "vi"); os.makedirs(d6)
     P6 = IB._fixture(d6, flat_edge=True)
     res = IB.evaluate_all(now_i, paths=P6, shuffle_reps=SH)

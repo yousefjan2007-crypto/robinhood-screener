@@ -44,9 +44,15 @@ after a promotion it would be the complement of the wrong band.
 
 Exclusions (both arms, counted and printed): unmatured metric cells, status 'suspect' (quote
 integrity), entry_price < LEDGER_MIN_ENTRY_PRICE (Racoon's 5.6e-36 entry poisoned every mean),
-and — via exclude_dark — rows whose sources_dark intersects the champion's required sources (a
-row tiered on partial facts is not evidence about the band). Promoted-B rows are KEPT in the B
-arm (intention-to-treat); nothing here filters on promoted_ts.
+`implausible` (a recorded multiple above LEDGER_MAX_PLAUSIBLE_MULT — the EDDICE row the
+implied-supply gate could not see), `gapped` (the row's own lag_{h} cell says the forward cell was
+sampled more than LEDGER_MAX_CELL_LAG_S after its horizon: the scan grid IS the sampling grid, and
+during the 2026-09-14..17 outage cells were filled hours late), `lag_unknown` (a row written before
+the lag stamp existed — no claim either way), and — via exclude_dark — rows whose sources_dark
+intersects the champion's required sources (a row tiered on partial facts is not evidence about the
+band). Every one of them is applied to the ROW before any tier or band is read, so the arms lose the
+same evidence; the lag and the multiple come from the ledger row itself — no git, no subprocess, no
+run log. Promoted-B rows are KEPT in the B arm (intention-to-treat); nothing filters on promoted_ts.
 
 No wall-clock: the CLI captures time.time() once for the markdown header only. Randomness only via
 np.random.default_rng(config.SEED + offset). Never raises on bad data.
@@ -136,9 +142,17 @@ def outcome_series(led: pd.DataFrame, verdicts_wide: pd.DataFrame,
     """(series, excluded). series columns: event_seq, token, alert_ts, day, sighting_age_s,
     age_bucket, r, tier, event_kind, sources_dark (list), plus one float column per band in
     verdicts_wide (1/0/NaN, joined on event_seq; NaN where the sidecar has no line).
-    excluded: {unmatured, suspect, bad_entry, bad_row} counts. Promoted-B rows are KEPT."""
+    excluded: {unmatured, suspect, bad_entry, bad_row, implausible, gapped, lag_unknown} counts.
+    Promoted-B rows are KEPT.
+
+    Every exclusion is applied to the ROW, before any tier or band is looked at, so the two arms
+    lose the same kind of evidence by construction — a one-armed exclusion would manufacture a
+    lift. `implausible` and the lag tests read the ledger row's own cells: no git, no subprocess,
+    no run log, nothing outside the file."""
     metric = metric or config.BAND_OUTCOME_METRIC
-    excluded = {"unmatured": 0, "suspect": 0, "bad_entry": 0, "bad_row": 0}
+    lag_col = "lag_" + (metric[4:] if metric.startswith("ret_") else metric)
+    excluded = {"unmatured": 0, "suspect": 0, "bad_entry": 0, "bad_row": 0,
+                "implausible": 0, "gapped": 0, "lag_unknown": 0}
     band_cols = [c for c in (verdicts_wide.columns if verdicts_wide is not None else [])
                  if c not in ("token", "alert_ts")]
     base_cols = ["event_seq", "token", "alert_ts", "day", "sighting_age_s", "age_bucket", "r",
@@ -182,6 +196,21 @@ def outcome_series(led: pd.DataFrame, verdicts_wide: pd.DataFrame,
         r = _num(rrow.get(metric))
         if not np.isfinite(r):
             excluded["unmatured"] += 1
+            continue
+        # a mispriced quote leg the implied-supply gate could not see (EDDICE, event_seq 498:
+        # ret_6h = 11,026,957 at a constant implied supply) is not evidence about any band
+        if r > config.LEDGER_MAX_PLAUSIBLE_MULT - 1.0:
+            excluded["implausible"] += 1
+            continue
+        # the cell's own write-once sampling lag. The scan grid IS the sampling grid, so a cell
+        # filled hours after its horizon (the 2026-09-14..17 outage) is a spot sample of a
+        # different instant; a row written before the stamp existed says nothing either way.
+        lag = _num(rrow.get(lag_col))
+        if not np.isfinite(lag):
+            excluded["lag_unknown"] += 1
+            continue
+        if lag > config.LEDGER_MAX_CELL_LAG_S:
+            excluded["gapped"] += 1
             continue
         kind = str(rrow.get("event_kind"))
         if kind == "first_sighting":
@@ -617,6 +646,20 @@ def markdown(rows: list, controls: list, meta: dict | None = None) -> str:
             f"{_fmt(x['dsr'], '.3f')} | {_fmt(x['p'], '.3f')} | {by} | {age_s} | "
             f"{'YES' if x.get('inert_vs_champion') else 'no'} |")
     lines.append("")
+    ex = meta.get("n_excluded") or {}
+    if isinstance(ex, dict):
+        lines.append(
+            f"Symmetric exclusions (both arms, applied to the row before any tier or band is read): "
+            f"implausible {int(ex.get('implausible', 0) or 0)} (a recorded multiple above "
+            f"{config.LEDGER_MAX_PLAUSIBLE_MULT:.0f}x — the EDDICE quote artefact), "
+            f"gapped {int(ex.get('gapped', 0) or 0)} (the forward cell was sampled more than "
+            f"{config.LEDGER_MAX_CELL_LAG_S:.0f} s after its horizon), "
+            f"lag_unknown {int(ex.get('lag_unknown', 0) or 0)} (rows written before the lag stamp existed — "
+            f"the honest restart of the evidence, not a bug).")
+        lines.append("")
+    lines.append(f"ctl_random_band carries no evidence before {config.BAND_CTL_RANDOM_CHANGED_ON}: until then "
+                 f"its unrealisable firing delay made it return 0 on every recorded row.")
+    lines.append("")
     lines.append(f"Bounds are the {config.BOOTSTRAP_ALPHA:.1%} quantile of a DAY-clustered bootstrap "
                  f"({config.BOOTSTRAP_REPS} reps); lift is vs the same-day, same-age-bucket unselected "
                  f"pool; paired = lift(band) − lift(champion) on shared rows. A row with fewer than "
@@ -834,6 +877,7 @@ if __name__ == "__main__":
         led.loc[0, "ret_6h"] = 0.5
         led.loc[1, "ret_6h"] = 0.1
         led.loc[2, "ret_6h"] = -0.2
+        led.loc[:, "lag_6h"] = 60.0                      # sampled on the grid: none is `gapped`
         led.loc[2, "status"] = "suspect"
         LED.save(led, lp)
         store.append_verdicts([{"event_seq": 1, "token": "0xaaa", "alert_ts": t0,

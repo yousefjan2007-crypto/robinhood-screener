@@ -29,7 +29,9 @@ Guards, none optional:
     at a per-token delay spread like a maturation band's; ctl_inverse_band is the champion's
     complement, recomputed on the fly. A control clearing ANY bar voids the run: no number from a
     void run may be quoted. So does a miscalibrated resampler (the champion's within-stratum
-    shuffled false-positive rate above BAND_SHUFFLE_MAX_FP) and a champion NA on > 20% of rows.
+    shuffled false-positive rate above BAND_SHUFFLE_MAX_FP), a champion NA on > 20% of rows, and a
+    collapsed scan grid (gapped share above BAND_MAX_GAPPED_SHARE: the forward cells were sampled
+    hours after their horizon, so they are not forward returns).
   * Own-bound check #3 is NET OF COST: own_lb > BAND_OWN_LB_MIN = policies.round_trip_cost()
     (slippage both sides + the fixed L2 gas term). A band that is gross-positive and net-negative
     does not justify alerting anyone.
@@ -208,7 +210,8 @@ def evaluate_all(now_s: float, led=None, verdicts=None, reg=None, champion: str 
            "fp_champion": float("nan"), "champion_na_share": float("nan"), "max_event_seq": 0,
            "nomination": None, "forward_only": False, "trials_n": TR.family_count("bands", P["trials"]),
            "champ_state": dict(st), "demotion": None, "kill_verdict": None, "span_days": 0.0,
-           "own_lb_min": BAND_OWN_LB_MIN, "default_band": config.DEFAULT_ENTRY_BAND}
+           "own_lb_min": BAND_OWN_LB_MIN, "default_band": config.DEFAULT_ENTRY_BAND,
+           "gapped_share": float("nan"), "lag_unknown": 0}
     try:
         if led is None:
             import ledger as LED
@@ -226,6 +229,18 @@ def evaluate_all(now_s: float, led=None, verdicts=None, reg=None, champion: str 
     except Exception:
         res["max_event_seq"] = 0
     series, excl = SC.outcome_series(led, verdicts, metric=metric)
+    # Sampling health of the run grid, over the rows that CARRY a lag cell:
+    #     gapped_share = gapped / (gapped + rows kept with a lag cell).
+    # It is deliberately NOT computed per band: a gapped row is dropped by outcome_series before
+    # any verdict column is joined, so no band's selection can be attributed to it. lag_unknown
+    # (every row written before the stamp existed) is reported SEPARATELY rather than folded in —
+    # during the transition it dominates, and folding it in would read as a permanent sampling
+    # fault when it is only the absence of a claim. The gate's own floors (150 selected rows, 40
+    # retained days) keep it from deciding anything while that is true.
+    n_gapped = int(excl.get("gapped", 0) or 0)
+    res["lag_unknown"] = int(excl.get("lag_unknown", 0) or 0)
+    denom = n_gapped + int(len(series))
+    res["gapped_share"] = float(n_gapped) / denom if denom else float("nan")
     series, n_dark = SC.exclude_dark(series, SC.champion_sources(reg, champ))
     excl["dark"] = n_dark
     res["n_excluded"], res["n_excluded_dark"] = excl, n_dark
@@ -327,6 +342,12 @@ def decide(res: dict) -> dict:
     if _fin(fp) and fp > config.BAND_SHUFFLE_MAX_FP:
         void.append(f"RESAMPLER MISCALIBRATED: the champion's within-stratum shuffled false-positive rate "
                     f"{fp:.3f} > {config.BAND_SHUFFLE_MAX_FP}")
+    gs = res.get("gapped_share")
+    if _fin(gs) and gs > config.BAND_MAX_GAPPED_SHARE:
+        void.append(f"SAMPLING GAP: gapped share {gs:.3f} > BAND_MAX_GAPPED_SHARE "
+                    f"({config.BAND_MAX_GAPPED_SHARE}) — of the rows carrying a lag cell, that share had "
+                    f"their forward cell sampled more than {config.LEDGER_MAX_CELL_LAG_S:.0f} s after the "
+                    f"horizon; the scan grid collapsed and these are not forward returns")
     na = res.get("champion_na_share")
     if _fin(na) and na > 0.20:
         void.append(f"CHAMPION NA ON {na:.0%} OF ROWS (> 20%): the inverse control and the paired test "
@@ -469,6 +490,10 @@ def write_proposal(res: dict, verdict: dict, paths: dict | None = None) -> str:
         lines.append(f"- champion shuffled false-positive rate: {SC._fmt(res.get('fp_champion'), '.3f')} "
                      f"(void above {config.BAND_SHUFFLE_MAX_FP}); champion NA share "
                      f"{SC._fmt(res.get('champion_na_share'), '.3f')} (void above 0.20)")
+        lines.append(f"- sampling health: gapped share {SC._fmt(res.get('gapped_share'), '.3f')} over the rows "
+                     f"that CARRY a lag cell (void above {config.BAND_MAX_GAPPED_SHARE}); "
+                     f"{res.get('lag_unknown', 0)} row(s) written before the lag stamp existed are reported "
+                     f"separately and scored by nobody")
         lines.append("")
     nom = res.get("nomination")
     if nom:
@@ -711,7 +736,9 @@ def _print(res: dict, verdict: dict, applied: dict | None, path: str | None) -> 
                   f"{'·' if x.get('by_keep') is None else ('keep' if x['by_keep'] else 'drop'):>4s} "
                   f"{('·' if not _fin(age) else format(age / 3600, '.1f') + 'h'):>6s}")
         print(f"  champion shuffled fp {SC._fmt(res.get('fp_champion'), '.3f')}  NA share "
-              f"{SC._fmt(res.get('champion_na_share'), '.3f')}")
+              f"{SC._fmt(res.get('champion_na_share'), '.3f')}  gapped share "
+              f"{SC._fmt(res.get('gapped_share'), '.3f')} (void above {config.BAND_MAX_GAPPED_SHARE})  "
+              f"lag_unknown rows {res.get('lag_unknown', 0)}")
     if verdict.get("promote"):
         print(f"\n  PROMOTE -> {verdict['winner']}  (all checks passed, every control failed)")
     else:
@@ -755,11 +782,14 @@ def main(argv: list) -> int:
 # ── offline self-test ──────────────────────────────────────────────────────────────
 def _fixture(d: str, n_days: int = 60, planted: str = "band_score60", planted_edge=True,
              per_day: int = 12, edge_until_seq: int | None = None, start_ts: float = 1_780_012_800.0,
-             control_edge: bool = False, flat_edge: bool = False, seed: int | None = None) -> dict:
+             control_edge: bool = False, flat_edge: bool = False, seed: int | None = None,
+             gapped_frac: float = 0.0) -> dict:
     """Write a ledger + sidecar + champion + registry + trials into `d` from scorecard's
     synthetic series. Returns the paths dict. edge_until_seq: rows after it lose the planted
     edge (demotion fixture); control_edge: ctl_random_band picks only the +3 rows (void fixture);
-    flat_edge: the planted band's rows carry +0.02 (gross-positive, net-negative)."""
+    flat_edge: the planted band's rows carry +0.02 (gross-positive, net-negative);
+    gapped_frac: this share of rows (deterministic, every 1/gapped_frac-th by event_seq) carries a
+    lag cell beyond LEDGER_MAX_CELL_LAG_S — the collapsed-scan-grid fixture."""
     import ledger as LED
     ser = SC.synthetic_series(n_days=n_days, per_day=per_day, planted=planted, seed=seed,
                               champion=config.DEFAULT_ENTRY_BAND, start_ts=start_ts, planted_edge=planted_edge)
@@ -779,14 +809,18 @@ def _fixture(d: str, n_days: int = 60, planted: str = "band_score60", planted_ed
             ser.at[i, "token"] = ser.at[i0, "token"]
             ser.at[i, "alert_ts"] = float(ser.at[i0, "alert_ts"]) + float(ser.at[i, "sighting_age_s"])
     cols = {c: "" for c in LED.COLUMNS}
+    every = int(round(1.0 / gapped_frac)) if gapped_frac > 0 else 0
     rows = []
     for _, x in ser.iterrows():
         rec = dict(cols)
+        seq = int(x["event_seq"])
+        late = bool(every and seq % every == 0)
         rec.update({"token": x["token"], "symbol": "SYN", "tier": "B", "band": config.DEFAULT_ENTRY_BAND,
-                    "fired_band": "", "event_seq": int(x["event_seq"]), "event_kind": x["event_kind"],
+                    "fired_band": "", "event_seq": seq, "event_kind": x["event_kind"],
                     "alert_ts": float(x["alert_ts"]), "entry_price": 1.0, "entry_mcap": 1e6, "entry_liq": 5e4,
                     "entry_score": 50.0, "plan_name": config.IMPROVE_DEFAULT_EXIT_CHAMPION, "sources_dark": "",
-                    "ret_6h": float(x["r"]), "status": "open", "max_ret_seen": 0.0, "min_ret_seen": 0.0})
+                    "ret_6h": float(x["r"]), "status": "open", "max_ret_seen": 0.0, "min_ret_seen": 0.0,
+                    "lag_6h": (config.LEDGER_MAX_CELL_LAG_S * 10.0 if late else 60.0)})
         rows.append(rec)
     led = pd.DataFrame(rows, columns=LED.COLUMNS)
     P = {"ledger": os.path.join(d, "ledger.csv"), "verdicts": os.path.join(d, "band_verdicts.csv"),
