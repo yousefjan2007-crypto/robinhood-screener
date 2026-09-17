@@ -1799,6 +1799,173 @@ try:
                   dex_calls["n"] == nd_flow0)
         finally:
             POL.POLICIES.pop("fx_flow_probe", None)
+
+        # ── the band-under-test admission + the sidecar stamp (Phase 4): inert while the constant is None ──
+        _reset(d)
+        _saved_c2 = (config.LIVEBOOK_BAND_UNDER_TEST, config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN, config.LIVEBOOK_FEED_SOURCE,
+                     config.BAND_VERDICTS_PATH, config.LEDGER_PATH, config.LIVEBOOK_MAX_OPEN,
+                     LB.subprocess.run, LB.publish.origin_blob, _g["_sidecar_true"])
+        _sc_calls = {"n": 0}
+        _orig_sidecar = _g["_sidecar_true"]
+
+        def _counting_sidecar(seqs):
+            _sc_calls["n"] += 1
+            return _orig_sidecar(seqs)
+        _g["_sidecar_true"] = _counting_sidecar
+        try:
+            config.LIVEBOOK_FEED_SOURCE = "worktree"
+            config.BAND_VERDICTS_PATH = os.path.join(d, "band_verdicts.csv")
+            config.LIVEBOOK_BAND_UNDER_TEST = "band_x"
+            config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN = 20
+
+            def _write_sidecar(lines):
+                with open(config.BAND_VERDICTS_PATH, "w", newline="") as fh:
+                    fh.write("event_seq,token,alert_ts,band,verdict\n")
+                    for ln in lines:
+                        fh.write(",".join(str(x) for x in ln) + "\n")
+
+            def _feed(rows, now_s, buy=buy_ok):
+                return LB.feed_from_ledger(now_s, quote_buy_fn=buy, rows_fn=lambda: rows, weth_px=WPX,
+                                           decimals_fn=lambda t: 18, verbose=False)
+
+            def _missed():
+                return [json.loads(ln) for ln in open(LB.MISSED_PATH) if ln.strip()]
+            tu = LT0 + 20_000
+            _write_sidecar([])
+            _feed([], tu)                                              # the watermark
+            _feed([lrow("0x" + "7" * 40, 71, tier="A", kind="promotion", ats=tu + 10),
+                   lrow("0x" + "8" * 40, 72, tier="A", kind="promotion", ats=tu + 10)], tu + 20)
+            config.LIVEBOOK_MAX_OPEN = len([p_ for p_ in book().values() if not p_.get("done")])   # the book is now FULL
+            TB1 = "0x" + "9" * 40
+            _write_sidecar([(81, TB1, tu + 30, "band_a_strict", 0), (81, TB1, tu + 30, "band_x", 1), (81, TB1, tu + 30, "band_y", "NA")])
+            r81 = lrow(TB1, 81, tier="B", kind="band_fire", ats=tu + 30); r81["fired_band"] = "band_x"
+            n_sc = _sc_calls["n"]
+            stf = _feed([r81], tu + 40)
+            p81 = book().get(LB._pos_key(TB1, 81))
+            buy81 = [f for f in fills() if f["token"] == TB1 and f["side"] == "buy"]
+            check("a B row whose sidecar line says band_x,1 at its event_seq is admitted at LIVEBOOK_MAX_OPEN: pos.sidecar_true == "
+                  "['band_x'] (sorted, the 0 and NA bands absent), fired_band carried, the shared-buy note names both; the sidecar "
+                  "was read once for the batch",
+                  stf["opened"] == 1 and p81 is not None and p81["sidecar_true"] == ["band_x"] and p81["fired_band"] == "band_x"
+                  and len(buy81) == 1 and "sidecar_true band_x" in buy81[0]["note"] and "fired_band band_x" in buy81[0]["note"]
+                  and _sc_calls["n"] == n_sc + 1, str((stf, p81 and p81.get("sidecar_true"), buy81 and buy81[0]["note"])))
+            TB2, TB3, TB4, TB5 = ("0x" + "a" * 39 + "2", "0x" + "a" * 39 + "3", "0x" + "a" * 39 + "4", "0x" + "a" * 39 + "5")
+            _write_sidecar([(82, TB2, tu + 50, "band_x", 0)]); _feed([lrow(TB2, 82, tier="B", kind="first_sighting", ats=tu + 50)], tu + 60)
+            _write_sidecar([(83, TB3, tu + 60, "band_x", "NA")]); _feed([lrow(TB3, 83, tier="B", kind="first_sighting", ats=tu + 60)], tu + 70)
+            _write_sidecar([(99, TB4, tu + 70, "band_x", 1)]); _feed([lrow(TB4, 84, tier="B", kind="first_sighting", ats=tu + 70)], tu + 80)
+            config.BAND_VERDICTS_PATH = d                               # a directory: the sidecar is unreadable
+            _feed([lrow(TB5, 85, tier="B", kind="first_sighting", ats=tu + 80)], tu + 90)
+            config.BAND_VERDICTS_PATH = os.path.join(d, "band_verdicts.csv")
+            got = {m["event_seq"]: m["reason"] for m in _missed()}
+            check("verdict 0 / NA / a line for ANOTHER event_seq / an unreadable sidecar ⇒ the B row is 'book_full' (fail closed: "
+                  "nothing is always-admitted on a stamp the feed cannot read)",
+                  all(got.get(q) == "book_full" for q in (82, 83, 84, 85))
+                  and not any(LB._pos_key(t_, q) in book() for t_, q in ((TB2, 82), (TB3, 83), (TB4, 84), (TB5, 85))), str(got))
+            config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN = 1                # one under-test position (81) is open: the sub-cap is reached
+            TB6, TA7 = "0x" + "a" * 39 + "6", "0x" + "a" * 39 + "7"
+            _write_sidecar([(86, TB6, tu + 90, "band_x", 1), (87, TA7, tu + 90, "band_x", 1)])
+            n_sc = _sc_calls["n"]
+            stf = _feed([lrow(TB6, 86, tier="B", kind="first_sighting", ats=tu + 90),
+                         lrow(TA7, 87, tier="A", kind="promotion", ats=tu + 90)], tu + 100)
+            m_ = _missed()
+            check("at the sub-cap (LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN) the next selected B row is refused 'band_under_test_full' while "
+                  "an A row is still admitted (and stamped); one sidecar read for the batch",
+                  stf["opened"] == 1 and stf["missed"] == 1 and m_[-1]["event_seq"] == 86 and m_[-1]["reason"] == "band_under_test_full"
+                  and LB._pos_key(TA7, 87) in book() and book()[LB._pos_key(TA7, 87)]["sidecar_true"] == ["band_x"]
+                  and _sc_calls["n"] == n_sc + 1, str((stf, m_[-1])))
+            config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN = 20
+            TB8 = "0x" + "a" * 39 + "8"
+            _write_sidecar([(88, TB8, tu + 110, "band_x", 1)])
+            calls2 = {"n": 0}
+
+            def buy_defer_once(token, usd, now_s, *, weth_px=None):
+                calls2["n"] += 1
+                return _skel("buy", token, "deferred", now_s) if calls2["n"] == 1 else buy_ok(token, usd, now_s, weth_px=weth_px)
+            stf = _feed([lrow(TB8, 88, tier="B", kind="first_sighting", ats=tu + 110)], tu + 120, buy=buy_defer_once)
+            pend = LB._load(LB.FEED_STATE_PATH, {})["pending"]
+            n_sc = _sc_calls["n"]
+            os.remove(config.BAND_VERDICTS_PATH)                        # gone: a re-read would find nothing
+            stf2 = _feed([], tu + 180, buy=buy_defer_once)
+            check("a deferred buy keeps its stamp through feed.pending and opens under it on the next tick — at the cap, with the "
+                  "sidecar gone and NOT re-read (no new rows ⇒ no read)",
+                  stf["pending"] == 1 and len(pend) == 1 and pend[0]["sidecar_true"] == ["band_x"] and stf2["opened"] == 1
+                  and _sc_calls["n"] == n_sc and book()[LB._pos_key(TB8, 88)]["sidecar_true"] == ["band_x"], str((stf, pend, stf2)))
+            d2 = LB.live_stats_dict(tu + 200)
+            check("live_stats_dict: sidecar_coverage {n_stamped, n_unstamped} and band_under_test {name, n_open, n_done, n_refused_full} "
+                  "(the band_under_test_full lines in the missed log); NaN-free JSON",
+                  d2["sidecar_coverage"] == {"n_stamped": 3, "n_unstamped": 2}
+                  and d2["band_under_test"] == {"name": "band_x", "n_open": 3, "n_done": 0, "n_refused_full": 1}
+                  and json.dumps(d2, allow_nan=False), str((d2["sidecar_coverage"], d2["band_under_test"])))
+            _rc_sc, _out_sc = _capture(LB.scorecard, tu + 200)
+            check("--scorecard prints the one sidecar / band-under-test line",
+                  "sidecar: 3 stamped / 2 unstamped; band under test: band_x" in _out_sc, _out_sc[:300])
+            config.LIVEBOOK_BAND_UNDER_TEST = None
+            TB9 = "0x" + "a" * 39 + "9"
+            _write_sidecar([(89, TB9, tu + 300, "band_x", 1)])
+            _feed([lrow(TB9, 89, tier="B", kind="first_sighting", ats=tu + 300)], tu + 310)
+            m_ = _missed()
+            check("with LIVEBOOK_BAND_UNDER_TEST = None the rule is inert: the same stamped B row is 'book_full' and live_stats_dict "
+                  "reports band_under_test None (the stamp itself is still recorded)",
+                  m_[-1]["event_seq"] == 89 and m_[-1]["reason"] == "book_full" and LB.live_stats_dict(tu + 400)["band_under_test"] is None
+                  and LB._pos_key(TB9, 89) not in book())
+            # the feed's two read modes
+            _lp = os.path.join(d, "ledger_wt.csv")
+            with open(_lp, "w", newline="") as fh:
+                fh.write("token,event_seq,alert_ts,tier\n0xabc,5,1.0,B\n")
+            config.LEDGER_PATH = _lp
+            _sp = {"n": 0}
+
+            def _fake_run(args, **kw):
+                _sp["n"] += 1
+                return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+            LB.subprocess.run = _fake_run
+            LB.publish.origin_blob = lambda rel, root=None: ("token,event_seq,alert_ts,tier\n0xdef,6,2.0,A\n" if rel == LB.LEDGER_REL
+                                                             else "event_seq,token,alert_ts,band,verdict\n7,0xq,1.0,band_x,1\n7,0xq,1.0,band_z,0\n"
+                                                             if rel == LB.VERDICTS_REL else None)
+            config.LIVEBOOK_FEED_SOURCE = "worktree"
+            rows_wt = LB._cloud_ledger_rows()
+            n_wt = _sp["n"]
+            config.LIVEBOOK_FEED_SOURCE = "origin"
+            rows_or = LB._cloud_ledger_rows()
+            n_or = _sp["n"]
+            st_or = _orig_sidecar({7, 8})
+            check("LIVEBOOK_FEED_SOURCE=worktree reads config.LEDGER_PATH with csv.DictReader and NO subprocess; origin mode fetches "
+                  "ONCE and reads origin/main:data/ledger.csv through publish.origin_blob; the sidecar in origin mode rides the same "
+                  "fetch (origin_blob(VERDICTS_REL), no second fetch)",
+                  rows_wt == [{"token": "0xabc", "event_seq": "5", "alert_ts": "1.0", "tier": "B"}] and n_wt == 0
+                  and rows_or == [{"token": "0xdef", "event_seq": "6", "alert_ts": "2.0", "tier": "A"}] and n_or == 1
+                  and st_or == {7: ["band_x"]} and _sp["n"] == n_or, str((rows_wt, rows_or, st_or, _sp)))
+            config.LIVEBOOK_FEED_SOURCE = "worktree"
+            config.LEDGER_PATH = os.path.join(d, "nope.csv")
+            check("a missing worktree ledger is [] and a missing sidecar is {} (a feed outage never kills the tick loop)",
+                  LB._cloud_ledger_rows() == [] and _orig_sidecar({1}) == {} and _orig_sidecar(set()) == {})
+        finally:
+            (config.LIVEBOOK_BAND_UNDER_TEST, config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN, config.LIVEBOOK_FEED_SOURCE,
+             config.BAND_VERDICTS_PATH, config.LEDGER_PATH, config.LIVEBOOK_MAX_OPEN,
+             LB.subprocess.run, LB.publish.origin_blob, _g["_sidecar_true"]) = _saved_c2
+
+        # ── restore honesty across a keeper handoff gap (the state is committed and restored on the successor) ──
+        _reset(d)
+        TG1, TG2 = "0x" + "b" * 39 + "1", "0x" + "b" * 39 + "2"
+        opn(lrow(TG1, 91)); opn(lrow(TG2, 92))
+        script[TG1] = {"status": "ok", "mult": 1.0}; script[TG2] = {"status": "ok", "mult": 1.0}
+        tk(LT0 + 60)
+        T_ = LT0 + 60
+        saved_ts = {k_: p_["last_tick_ts"] for k_, p_ in book().items()}
+        gap_h = float(config.KEEPER_CADENCE_S + 120)
+        script[TG1] = {"status": "ok", "mult": 0.3}; script[TG2] = {"status": "ok", "mult": 2.5}
+        tk(T_ + gap_h)                                                 # the successor's first tick, 360 s after the snapshot
+        g1, g2 = book()[LB._pos_key(TG1, 91)], book()[LB._pos_key(TG2, 92)]
+        rung = [f for f in fills() if f["token"] == TG2 and f["policy"] == "cfg_ladder" and f["side"] == "tp_2x"]
+        check(f"restore honesty: a book saved with last_tick_ts = T and ticked at T + KEEPER_CADENCE_S + 120 ({gap_h:.0f} s > "
+              f"{config.LIVEBOOK_MAX_SCORABLE_GAP_S:.0f}) closes `stop` gapped; a limit rung fill on the SAME tick is a limit, not a "
+              "decision — never gapped; max_gap_s records the handoff",
+              all(v_ == T_ for v_ in saved_ts.values()) and gap_h > config.LIVEBOOK_MAX_SCORABLE_GAP_S
+              and g1["policies"]["stop_50"]["close_reason"] == "stop" and g1["policies"]["stop_50"]["gapped"] is True
+              and g1["policies"]["stop_50"]["close_gap_s"] == gap_h
+              and len(rung) == 1 and float(rung[0]["gap_s"]) == gap_h and float(rung[0]["px"]) == 2.0 * g2["entry_px"]
+              and g2["policies"]["cfg_ladder"]["gapped"] is False and not g2["policies"]["cfg_ladder"]["closed"]
+              and g2["max_gap_s"] == gap_h)
 finally:
     for k, v in _saved_lb.items():
         _g[k] = v
@@ -1974,6 +2141,12 @@ from selfimprove.entry_lab import improve_bands as IB   # noqa: E402
 
 REG = B.load_registry()
 CHAMP = config.DEFAULT_ENTRY_BAND
+_but = config.LIVEBOOK_BAND_UNDER_TEST
+check("config.LIVEBOOK_BAND_UNDER_TEST is None or a REGISTERED non-control band (the always-admission privilege can never name "
+      "a control or an unregistered name); the registry can tell a control apart",
+      (_but is None or (_but in REG.names() and not REG.is_control(_but)))
+      and REG.is_control("ctl_random_band") and not REG.is_control(CHAMP) and config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN > 0
+      and config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN <= config.LIVEBOOK_MAX_OPEN, str(_but))
 clean = B.clean_fixture()
 market = {k: clean[k] for k in ("price_usd", "liq_usd", "mcap", "fdv", "vol_h1", "vol_h6", "vol_h24", "buys_h1",
                                  "sells_h1", "buys_h24", "sells_h24", "price_chg_h1", "pair_age_min", "dex")}

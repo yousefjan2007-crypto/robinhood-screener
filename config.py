@@ -60,6 +60,12 @@ for _d in (DATA_DIR, CACHE_DIR, PROPOSALS_DIR):
     os.makedirs(_d, exist_ok=True)
 
 IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"   # the Actions runner has its own IP
+# Where the paper book (selfimprove/livebook.py) reads the ledger of record and the band-verdict
+# sidecar from: "worktree" = this checkout's data/ files, no git (the keeper's mode: the tick
+# holds the scan's lock, so it sees the old or the new file, never a partial one); "origin" =
+# `git fetch` + `git show origin/main:` (the Mac's mode, never `git pull`). The keeper exports
+# worktree; the default is origin so a Mac tick before the cutover behaves exactly as before.
+LIVEBOOK_FEED_SOURCE = os.environ.get("LIVEBOOK_FEED_SOURCE", "origin")
 SEED = 42  # any randomness → np.random.default_rng(SEED); never global np.random.*
 
 # ── the scan keeper (.github/keeper.sh on GitHub Actions; never on the Mac) ──────
@@ -483,6 +489,14 @@ SCANHOOD_QUOTE_URL = "https://scanhood.xyz/api/quote"
 # ── live multi-policy paper book (selfimprove/livebook.py; Mac, gitignored state) ──
 LIVEBOOK_FEED_TIERS = ("A", "B")   # B = passed hard gates, failed the champion band: the control
 LIVEBOOK_MAX_OPEN = 40             # A/promotion rows always admitted; B refused when full
+# The band under test: a REGISTERED non-control band name (verify checks), or None. A ledger
+# row whose sidecar verdict (data/band_verdicts.csv) for it is 1 is admitted at the cap under
+# its own sub-cap, so a candidate band's picks reach the paper book while the champion's do;
+# refusals past the sub-cap are logged `band_under_test_full`. None ⇒ the rule is inert and
+# only the `sidecar_true` stamp is recorded. Never a control (a control's picks are noise by
+# construction) and never the champion (its rows are tier A, always admitted).
+LIVEBOOK_BAND_UNDER_TEST = None
+LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN = 20
 MAX_ENTRY_LAG_S = 15 * 60          # keeper cadence 240 s + run ≤3 min + tick ≤1 min ⇒ 3-8 min expected
 LIVEBOOK_TICK_INTERVAL_S = 60.0
 LIVEBOOK_TICK_INTERVAL_LATE_S = 900.0

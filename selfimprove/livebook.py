@@ -108,7 +108,8 @@ FILLS_PATH = os.path.join(config.DATA_DIR, "livebook_fills.csv")
 TICKS_PATH = os.path.join(config.DATA_DIR, "livebook_ticks.jsonl")
 FEED_STATE_PATH = os.path.join(config.DATA_DIR, "livebook_feed.json")
 MISSED_PATH = os.path.join(config.DATA_DIR, "livebook_missed.jsonl")
-LEDGER_REL = "data/ledger.csv"                  # what the feed reads from origin/main
+LEDGER_REL = "data/ledger.csv"                  # the ledger of record (origin mode: origin/main:)
+VERDICTS_REL = "data/band_verdicts.csv"         # the sidecar the band-under-test stamp reads
 
 FILL_COLUMNS = ["ts", "token", "event_seq", "symbol", "tier", "policy", "side",
                 "frac_of_original", "px", "usd_proceeds", "gap_s", "note"]
@@ -284,6 +285,8 @@ def open_alert(row: dict, now_s: float, *, quote_buy_fn=quotes.quote_buy, weth_p
     pos = {"token": token, "event_seq": seq, "event_kind": str(row.get("event_kind") or ""),
            "prior_event_seq": prior, "symbol": symbol, "tier": tier, "ledger_tier": tier,
            "ledger_plan_name": str(row.get("plan_name") or ""),
+           "fired_band": str(row.get("fired_band") or ""),
+           "sidecar_true": sorted({str(b) for b in (row.get("sidecar_true") or [])}),
            "alert_ts": alert_ts, "entry_lag_s": round(now_s - alert_ts, 1),
            "opened_ts": now_s, "alert_seq": aseq,
            "cost_usd": cost, "tokens_raw": tokens, "entry_px": entry_px, "decimals": dec,
@@ -298,9 +301,11 @@ def open_alert(row: dict, now_s: float, *, quote_buy_fn=quotes.quote_buy, weth_p
     book[key] = pos
     _save_atomic(book, BOOK_PATH)               # durable FIRST...
     _append_fill(_fill_row(pos, "*", "buy", 1.0, entry_px, -cost, 0.0, now_s,
-                           note="shared entry via %s, impact %.4f, reserve_weth %s; %s" % (
-                               q.get("source"), pos["entry_impact_pct"],
-                               reserves[1] if reserves else "?", quotes.describe(q))))
+                           note="shared entry via %s, impact %.4f, reserve_weth %s; fired_band %s; "
+                                "sidecar_true %s; %s" % (
+                                    q.get("source"), pos["entry_impact_pct"],
+                                    reserves[1] if reserves else "?", pos["fired_band"] or "-",
+                                    ",".join(pos["sidecar_true"]) or "-", quotes.describe(q))))
     return "opened", pos
 
 
@@ -416,12 +421,23 @@ def _close_all_unfilled(pos: dict, reason: str, now_s: float, gap_s: float) -> i
     return n
 
 
-# ── the feed: origin/main:data/ledger.csv, never the working tree ────────────────
+# ── the feed: the ledger of record, by config.LIVEBOOK_FEED_SOURCE ───────────────
 def _cloud_ledger_rows() -> list:
-    """The cloud-committed ledger, read WITHOUT touching the working tree: `git fetch`
-    (incremental) then publish.origin_blob (`git show origin/main:data/ledger.csv`, exit 128 ⇒
-    None ⇒ []). Deliberately NOT `git pull`: a data-collection job must never be able to create
-    a merge conflict or move the user's HEAD. A feed outage must never kill the tick loop."""
+    """The ledger of record, in the feed's mode (config.LIVEBOOK_FEED_SOURCE):
+      worktree — the keeper's mode: data/ledger.csv in THIS checkout, csv.DictReader, no
+                 subprocess. run.py saves the ledger in one tmp + os.replace and the tick holds
+                 the keeper's lock, so a reader sees the old or the new file, never a partial one.
+      origin   — the Mac's mode: `git fetch` (incremental) then publish.origin_blob (`git show
+                 origin/main:data/ledger.csv`, exit 128 ⇒ None ⇒ []). Deliberately NOT `git
+                 pull`: a data-collection job must never be able to create a merge conflict or
+                 move the user's HEAD.
+    A feed outage must never kill the tick loop: every failure is []."""
+    if config.LIVEBOOK_FEED_SOURCE == "worktree":
+        try:
+            with open(config.LEDGER_PATH, newline="") as fh:
+                return [dict(r) for r in csv.DictReader(fh)]
+        except Exception:
+            return []
     root = config.ROOT
     try:
         subprocess.run(["git", "fetch", "-q", publish.REMOTE], cwd=root, timeout=60,
@@ -440,8 +456,42 @@ def _cloud_ledger_rows() -> list:
         return []
 
 
+def _sidecar_true(seqs: set) -> dict:
+    """{event_seq: sorted band names whose sidecar verdict is "1"} for the given event_seqs,
+    from data/band_verdicts.csv in the feed's mode: the checkout's file (worktree) or
+    publish.origin_blob(VERDICTS_REL) (origin — no second fetch: the sidecar rides the same
+    scan commit as the ledger row, so the ledger's fetch already brought it). {} on ANY
+    failure, including an unreadable or missing sidecar: fail closed — a row is never
+    always-admitted on a stamp the feed could not read. Verdicts 0 / NA are not stamps."""
+    if not seqs:
+        return {}
+    try:
+        if config.LIVEBOOK_FEED_SOURCE == "worktree":
+            with open(config.BAND_VERDICTS_PATH, newline="") as fh:
+                text = fh.read()
+        else:
+            text = publish.origin_blob(VERDICTS_REL, config.ROOT)
+        if not text:
+            return {}
+        want = {int(q) for q in seqs}
+        out: dict = {}
+        for r in csv.DictReader(io.StringIO(text)):
+            if str(r.get("verdict")).strip() != "1":
+                continue
+            try:
+                seq = int(float(r.get("event_seq")))
+            except (TypeError, ValueError):
+                continue
+            if seq in want:
+                out.setdefault(seq, set()).add(str(r.get("band")))
+        return {k: sorted(v) for k, v in out.items()}
+    except Exception:
+        return {}
+
+
 def _row_item(r: dict, now_s: float) -> dict | None:
-    """A ledger row → the feed's pending-item shape (None when unparseable)."""
+    """A ledger row → the feed's pending-item shape (None when unparseable). `sidecar_true`
+    starts empty; feed_from_ledger stamps it from the sidecar once per batch of new rows."""
     try:
         token = str(r.get("token") or "").lower()
         ats = float(r.get("alert_ts"))
@@ -458,6 +508,7 @@ def _row_item(r: dict, now_s: float) -> dict | None:
     return {"token": token, "event_seq": seq, "symbol": str(r.get("symbol") or "?"),
             "tier": str(r.get("tier") or "B"), "event_kind": str(r.get("event_kind") or ""),
             "prior_event_seq": prior, "plan_name": str(r.get("plan_name") or ""),
+            "fired_band": str(r.get("fired_band") or ""), "sidecar_true": [],
             "alert_ts": ats, "first_seen_ts": now_s}
 
 
@@ -472,6 +523,13 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
     lag over MAX_ENTRY_LAG_S ⇒ missed with the lag; a B row when LIVEBOOK_MAX_OPEN positions are
     open ⇒ missed 'book_full' (A and promotion rows are always admitted); a deferred buy quote
     ⇒ the row waits in feed.pending and is retried every tick until the lag cap.
+
+    THE BAND UNDER TEST. Every batch of new rows is stamped `sidecar_true` (the bands whose
+    sidecar verdict at that event_seq is 1 — one sidecar read per batch, none when there are
+    no new rows). When config.LIVEBOOK_BAND_UNDER_TEST names a band, a row it selected is
+    admitted at the cap too, under LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN open such positions;
+    past that sub-cap it is refused 'band_under_test_full'. A pending (deferred-buy) row keeps
+    its stamp. Unreadable sidecar ⇒ empty stamps ⇒ plain B rules (fail closed).
     """
     book = _load(BOOK_PATH, {})
     state = _load(FEED_STATE_PATH, {})
@@ -491,6 +549,9 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
                   % (now_s, len(rows)))
         return stats
     open_count = sum(1 for p in book.values() if isinstance(p, dict) and not p.get("done"))
+    but = config.LIVEBOOK_BAND_UNDER_TEST or None
+    under_test_open = sum(1 for p in book.values() if isinstance(p, dict) and not p.get("done")
+                          and but is not None and but in (p.get("sidecar_true") or []))
 
     def _miss(item, lag, reason):
         stats["missed"] += 1
@@ -501,7 +562,7 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
 
     def _try_open(item) -> bool:
         """True when the item is settled (opened / missed / already); False = still pending."""
-        nonlocal open_count
+        nonlocal open_count, under_test_open
         key = _pos_key(item["token"], item["event_seq"])
         if key in book:
             stats["already"] += 1
@@ -510,15 +571,19 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
         if lag > config.MAX_ENTRY_LAG_S:
             _miss(item, lag, "entry lag exceeds MAX_ENTRY_LAG_S")
             return True
-        always = item["tier"] == "A" or item["event_kind"] == "promotion"
+        under_test = but is not None and but in (item.get("sidecar_true") or [])
+        always = item["tier"] == "A" or item["event_kind"] == "promotion" or (
+            under_test and under_test_open < config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN)
         if not always and open_count >= config.LIVEBOOK_MAX_OPEN:
-            _miss(item, lag, "book_full")
+            _miss(item, lag, "band_under_test_full" if under_test else "book_full")
             return True
         status, pos = open_alert(item, now_s, quote_buy_fn=quote_buy_fn, weth_px=weth_px,
                                  decimals_fn=decimals_fn)
         if status == "opened":
             stats["opened"] += 1
             open_count += 1
+            if under_test:
+                under_test_open += 1
             book[key] = pos
             return True
         if status == "deferred":
@@ -547,6 +612,10 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
             continue
         parsed.append(item)
     parsed.sort(key=lambda it: (it["alert_ts"], it["event_seq"]))
+    if parsed:                                  # ONE sidecar read per batch of new rows, none otherwise
+        stamps = _sidecar_true({it["event_seq"] for it in parsed})
+        for item in parsed:
+            item["sidecar_true"] = list(stamps.get(item["event_seq"], []))
     for item in parsed:
         newest = max(newest, item["alert_ts"])
         key = _pos_key(item["token"], item["event_seq"])
@@ -919,13 +988,33 @@ def live_stats_dict(now_s=None) -> dict:
 
     lags = sorted(float(p["entry_lag_s"]) for p in positions
                   if isinstance(p.get("entry_lag_s"), (int, float)))
-    n_missed = 0
+    n_missed, n_refused_full = 0, 0
     if os.path.exists(MISSED_PATH):
         try:
             with open(MISSED_PATH) as fh:
-                n_missed = sum(1 for ln in fh if ln.strip())
+                for ln in fh:
+                    if not ln.strip():
+                        continue
+                    n_missed += 1
+                    try:
+                        if json.loads(ln).get("reason") == "band_under_test_full":
+                            n_refused_full += 1
+                    except Exception:
+                        pass
         except Exception:
-            n_missed = 0
+            n_missed, n_refused_full = 0, 0
+    # the stamp: "stamped" = the sidecar named at least one true band for the row. An empty
+    # list is either "no band true" or "sidecar unreadable" — the two are indistinguishable by
+    # design (fail closed), so a falling stamped share is the signal that the sidecar is dark.
+    n_stamped = sum(1 for p in positions if p.get("sidecar_true"))
+    but = config.LIVEBOOK_BAND_UNDER_TEST or None
+    under_test = None
+    if but is not None:
+        under_test = {"name": but,
+                      "n_open": sum(1 for p in positions if not p.get("done")
+                                    and but in (p.get("sidecar_true") or [])),
+                      "n_done": sum(1 for p in done if but in (p.get("sidecar_true") or [])),
+                      "n_refused_full": n_refused_full}
     ticks = [_num(p.get("last_tick_ts")) for p in positions]
     ticks = [t for t in ticks if t is not None]
     ts = now_s if now_s is not None else (max(ticks) if ticks else None)
@@ -940,6 +1029,8 @@ def live_stats_dict(now_s=None) -> dict:
                 for s in (p.get("policies") or {}).values())),
             "entry_lag_median_s": (lags[len(lags) // 2] if lags else None),
             "n_missed": n_missed,
+            "sidecar_coverage": {"n_stamped": n_stamped, "n_unstamped": len(positions) - n_stamped},
+            "band_under_test": under_test,
             "by_tier": {t: sum(1 for p in positions if p.get("tier") == t) for t in ("A", "B")},
             "per_policy": _table(list(POL.POLICIES)),
             "controls": _table(list(getattr(POL, "CONTROLS", {})))}
@@ -958,6 +1049,11 @@ def scorecard(now_s=None) -> None:
              d["n_gapped"], d["n_no_route"],
              ("%.0f" % d["entry_lag_median_s"]) if d["entry_lag_median_s"] is not None else "?",
              d["n_missed"]))
+    sc, bt = d["sidecar_coverage"], d.get("band_under_test")
+    print("  sidecar: %d stamped / %d unstamped; band under test: %s"
+          % (sc["n_stamped"], sc["n_unstamped"],
+             ("%s — %d open, %d done, %d refused at the sub-cap" % (
+                 bt["name"], bt["n_open"], bt["n_done"], bt["n_refused_full"])) if bt else "none"))
     rows = [(v["mean"], k, v) for k, v in d["per_policy"].items() if v["n"]]
     if not rows:
         print("  (no scorable completed positions yet — policies are still running)")
@@ -1038,6 +1134,8 @@ def _smoke() -> None:
     saved = {k: g[k] for k in ("BOOK_PATH", "FILLS_PATH", "TICKS_PATH", "FEED_STATE_PATH",
                                "MISSED_PATH")}
     saved_max_open = config.LIVEBOOK_MAX_OPEN
+    saved_cfg = (config.LIVEBOOK_BAND_UNDER_TEST, config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN,
+                 config.LIVEBOOK_FEED_SOURCE, config.BAND_VERDICTS_PATH)
     WETH = 2500.0
     TOK_RAW = 10 ** 24                          # the $10 buy fills 1e24 raw (1e6 whole tokens)
     USD = config.STACK_USD * config.POSITION_PCT
@@ -1479,11 +1577,55 @@ def _smoke() -> None:
             assert d_["per_policy"]["hold_to_end"]["n"] >= 1
             print("  L19 ok: stop after a 3600 s gap → gapped (NaN for the scorer); hold_to_end's terminal mark is not")
             json.dumps(live_stats_dict(t0), allow_nan=False)
+
+            # L20 the band under test: a B row the sidecar says band_x selected is admitted at the
+            # cap; verdict 0 is book_full; None makes the rule inert; the stamp is always recorded
+            reset(d)
+            config.LIVEBOOK_FEED_SOURCE = "worktree"
+            config.BAND_VERDICTS_PATH = os.path.join(d, "band_verdicts.csv")
+            config.LIVEBOOK_BAND_UNDER_TEST = "band_x"
+            tu = t0 + 20_000
+
+            def side(lines):
+                with open(config.BAND_VERDICTS_PATH, "w", newline="") as fh:
+                    fh.write("event_seq,token,alert_ts,band,verdict\n" + "".join("%s\n" % ln for ln in lines))
+
+            def feed(rows_, ts_):
+                return feed_from_ledger(ts_, quote_buy_fn=buy_ok, rows_fn=lambda: rows_, weth_px=WETH,
+                                        decimals_fn=lambda t: 18, verbose=False)
+            side([])
+            feed([], tu)                                                   # the watermark
+            feed([row("0x" + "7" * 40, 71, ats=tu + 10)], tu + 20)         # one A row; then the cap sits here
+            config.LIVEBOOK_MAX_OPEN = 1
+            TU = "0x" + "8" * 40
+            side(["81,%s,%r,band_x,1" % (TU, tu + 30), "81,%s,%r,band_a_strict,0" % (TU, tu + 30)])
+            st = feed([row(TU, 81, tier="B", kind="first_sighting", ats=tu + 30)], tu + 40)
+            p = book()[_pos_key(TU, 81)]
+            assert st["opened"] == 1 and p["sidecar_true"] == ["band_x"], (st, p["sidecar_true"])
+            assert [f for f in fills() if f["side"] == "buy" and f["token"] == TU][0]["note"].count("sidecar_true band_x") == 1
+            TV = "0x" + "9" * 40
+            side(["82,%s,%r,band_x,0" % (TV, tu + 50)])
+            st = feed([row(TV, 82, tier="B", kind="first_sighting", ats=tu + 50)], tu + 60)
+            missed = [json.loads(ln) for ln in open(MISSED_PATH) if ln.strip()]
+            assert st["missed"] == 1 and missed[-1]["reason"] == "book_full"
+            config.LIVEBOOK_BAND_UNDER_TEST = None
+            TW = "0x" + "0" * 39 + "a"
+            side(["83,%s,%r,band_x,1" % (TW, tu + 70)])
+            st = feed([row(TW, 83, tier="B", kind="first_sighting", ats=tu + 70)], tu + 80)
+            missed = [json.loads(ln) for ln in open(MISSED_PATH) if ln.strip()]
+            assert st["missed"] == 1 and missed[-1]["reason"] == "book_full"
+            d_ = live_stats_dict(tu + 90)
+            assert d_["sidecar_coverage"] == {"n_stamped": 1, "n_unstamped": 1} and d_["band_under_test"] is None
+            config.LIVEBOOK_MAX_OPEN = saved_max_open
+            print("  L20 ok: band_x,1 in the sidecar admitted a B row at the cap (stamped ['band_x']); verdict 0 → book_full; "
+                  "None → inert")
             scorecard(t0)
     finally:
         for k, v in saved.items():
             g[k] = v
         config.LIVEBOOK_MAX_OPEN = saved_max_open
+        (config.LIVEBOOK_BAND_UNDER_TEST, config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN,
+         config.LIVEBOOK_FEED_SOURCE, config.BAND_VERDICTS_PATH) = saved_cfg
     print("livebook smoke test OK (offline, temp dir)")
 
 
