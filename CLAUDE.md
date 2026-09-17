@@ -145,6 +145,8 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
 - **Promoted-B rows stay in B** (intention-to-treat); no code path filters on `promoted_ts`.
 - **Never mark a token seen without a market snapshot** (deferred / absent ⇒ recheck, not seen).
 - **B never emits exits; cells are write-once and time-gated; forward update is one batched call.**
+- **Forward cells carry a write-once `lag_{h}`; the scorecards exclude `gapped`, `implausible` and
+  `lag_unknown` cells symmetrically; never score a cell sampled after `LEDGER_MAX_CELL_LAG_S`.**
 - **History is never rewritten after go-live.** The one rewrite (dropping the social-attribution
   files) happened before the repo went public.
 - **`docs/` and `selfimprove/research/` carry no home paths and never name the shared secrets

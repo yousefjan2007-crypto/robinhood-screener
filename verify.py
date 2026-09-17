@@ -904,6 +904,20 @@ with tempfile.TemporaryDirectory() as d:
     LED.update_forward(T0 + 21700, _snap(price=3.0), path=LP)
     r = LED.load(LP).set_index("token")
     check("ret_6h fills at +6h with the observed 3x (+200%)", abs(float(r.at[t3, "ret_6h"]) - 2.0) < 1e-9)
+    # write-once lag stamps: how late the run grid actually sampled each horizon (the FOMOPAD
+    # outage, 2026-09-14..17: cells filled hours late were silently consumed by every scorecard)
+    check("every filled forward cell carries lag_{h} = now_s - (alert_ts + hsec): the 1h cell sampled at "
+          "+3700 s stamps 100 s, the 6h cell sampled at +21700 s stamps 100 s, an unfilled horizon has none",
+          abs(float(r.at[t3, "lag_1h"]) - 100.0) < 1e-6 and abs(float(r.at[t3, "lag_6h"]) - 100.0) < 1e-6
+          and str(r.at[t3, "lag_24h"]) in LED._EMPTY,
+          f"{r.at[t3, 'lag_1h']} {r.at[t3, 'lag_6h']} {r.at[t3, 'lag_24h']}")
+    check("the dead path stamps a lag too: t1's 1h cell was written on its 2nd absence at +3800 s (lag 200 s)",
+          abs(float(r.at[t1, "lag_1h"]) - 200.0) < 1e-6, str(r.at[t1, "lag_1h"]))
+    LED.update_forward(T0 + 30000, _snap(price=3.0), path=LP)
+    r_l = LED.load(LP).set_index("token")
+    check("lag cells are write-once with their cell: a later run does not restamp lag_1h / lag_6h",
+          float(r_l.at[t3, "lag_1h"]) == 100.0 and float(r_l.at[t3, "lag_6h"]) == 100.0,
+          f"{r_l.at[t3, 'lag_1h']} {r_l.at[t3, 'lag_6h']}")
     # rugged_after flips once and never back
     LED.update_forward(T0 + 21800, _snap(price=1.0, liq=100.0), path=LP)
     r = LED.load(LP).set_index("token")
@@ -921,6 +935,11 @@ with tempfile.TemporaryDirectory() as d:
     check("a CSV written before a schema addition loads with the missing columns present and still updates "
           "(pre-migration incident path)", list(ledo.columns) == LED.COLUMNS and fo == 1
           and abs(float(ro.at[0, "ret_1h"]) - 1.5) < 1e-9 and [e["kind"] for e in evo] == ["tp"])
+    hdr_old = _read(old).splitlines()[0].split(",")
+    check("the four lag_{h} columns are APPENDED LAST in horizon order (jarvis reads the CSV by header): "
+          "an old CSV saves with them at the end and lag_7d is the final column",
+          hdr_old[-len(LED.HORIZ):] == [f"lag_{h}" for h in LED.HORIZ] and LED.COLUMNS[-1] == "lag_7d"
+          and hdr_old == LED.COLUMNS, str(hdr_old[-6:]))
     # rotation
     rot = os.path.join(d, "rot.csv")
     LED.ensure_exists(rot)
@@ -933,6 +952,40 @@ with tempfile.TemporaryDirectory() as d:
     check(f"rotate() moves resolved rows older than LEDGER_ROTATE_AFTER_DAYS ({config.LEDGER_ROTATE_AFTER_DAYS}) "
           "to resolved_YYYY.csv (no 'ledger' in the name)", st == {"resolved"} and moved == 2 and len(outs) == 1
           and len(LED.load(rot)) == 0 and len(pd.read_csv(outs[0])) == 2, f"{st} {moved} {outs}")
+
+with tempfile.TemporaryDirectory() as d:
+    # EDDICE (event_seq 498): ret_6h = 11,026,957 with mcap_6h = 4.3e11 and a CONSTANT implied
+    # supply — the supply-drift gate cannot see a quote leg that is itself mispriced.
+    LP = os.path.join(d, "ledger.csv")
+    LED.ensure_exists(LP)
+    LED.record_rows([_ev("0ximp1"), _ev("0xok1")], alert_ts=T0, path=LP)
+    MULT = 2.0 * config.LEDGER_MAX_PLAUSIBLE_MULT
+
+    def imp_snap(toks):                              # only 0ximp1 is implausibly quoted
+        ok = {t: ({"price_usd": MULT, "mcap": MULT * 1e6, "liq_usd": 5e4} if t == "0ximp1" else
+                  {"price_usd": 1.0, "mcap": 1e6, "liq_usd": 5e4}) for t in toks}
+        return {"ok": ok, "absent": set(), "deferred": set()}
+    fi, _evi = LED.update_forward(T0 + 3700, imp_snap, path=LP)   # the 1h cell is DUE for both
+    ri = LED.load(LP).set_index("token")
+    check(f"a tick at {MULT:.0f}x entry (> LEDGER_MAX_PLAUSIBLE_MULT={config.LEDGER_MAX_PLAUSIBLE_MULT:.0f}) with a "
+          "CONSTANT implied supply fills NO horizon cell, never moves max_ret_seen, and takes the existing "
+          "suspect path (suspect_ticks += 1); an honest row beside it still fills",
+          str(ri.at["0ximp1", "ret_1h"]) in LED._EMPTY and float(ri.at["0ximp1", "max_ret_seen"]) == 0.0
+          and int(float(ri.at["0ximp1", "suspect_ticks"])) == 1 and str(ri.at["0ximp1", "status"]) == "open"
+          and float(ri.at["0xok1", "ret_1h"]) == 0.0 and fi == 1,
+          f"{ri.at['0ximp1', 'ret_1h']} {ri.at['0ximp1', 'max_ret_seen']} {ri.at['0ximp1', 'suspect_ticks']} {fi}")
+    for i in range(config.SUSPECT_TICKS_MAX - 1):
+        LED.update_forward(T0 + 3800 + i, imp_snap, path=LP)
+    ri = LED.load(LP).set_index("token")
+    check(f"{config.SUSPECT_TICKS_MAX} consecutive implausible ticks flip status to 'suspect' (the SAME counter as "
+          "the supply-drift path — no second bookkeeping)",
+          str(ri.at["0ximp1", "status"]) == "suspect" and str(ri.at["0xok1", "status"]) == "open"
+          and str(ri.at["0ximp1", "ret_6h"]) in LED._EMPTY)
+    _, out_i = _capture(LED.summary, LP)
+    check("summary() prints one 'late cells (lag > LEDGER_MAX_CELL_LAG_S)' line per horizon and the "
+          "'implausible-mult suspects' line",
+          out_i.count("late cells (lag > LEDGER_MAX_CELL_LAG_S)") == len(LED.HORIZ)
+          and "implausible-mult suspects:" in out_i, out_i[-600:])
 
 with tempfile.TemporaryDirectory() as d:
     LP = os.path.join(d, "ledger.csv")

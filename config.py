@@ -433,6 +433,12 @@ BAND_TOP10_LE15_MAX = 15.0
 BAND_HOLDERS_MAX_STALE_S = 3600    # GT holder snapshots are 8 min..23 h stale
 BAND_LP_BURNED_MIN_PCT = 95.0
 BAND_ROUND_TRIP_LOSS_MAX_PCT = 6.0
+BAND_MAX_GAPPED_SHARE = 0.25       # the entry gate VOIDs when more than this share of the rows that
+                                   # CARRY a lag cell were sampled later than LEDGER_MAX_CELL_LAG_S:
+                                   # a scan grid that collapsed is not a forward-return sample
+BAND_CTL_RANDOM_CHANGED_ON = "2026-09-17"   # the day _ctl_random_band dropped its unrealisable delay;
+                                   # before it the control returned 0 on 672/672 committed verdict rows,
+                                   # so its earlier verdicts carry no evidence
 RESEARCH_MAX_NEW_CANDIDATES_PER_WEEK = 2
 RESEARCH_MAX_REGISTERED = 40       # every registration deflates every later DSR
 RESEARCH_MAX_TURNS = 40
@@ -455,6 +461,13 @@ RUG_LIQ_USD = 500.0                # rugged_after = liquidity collapsed below th
 LEDGER_MAX_POLL_ROWS = 3000        # 100 batched Dexscreener calls ≈ 25 s
 LEDGER_MIN_ENTRY_PRICE = 1e-30     # Racoon's 5.6e-36 entry poisoned every mean; excluded
 LEDGER_ROTATE_AFTER_DAYS = 90      # resolved rows older than this move to data/resolved_YYYY.csv
+LEDGER_MAX_CELL_LAG_S = 900        # a forward cell is a SPOT sample on the scan grid; this is 3-4x the
+                                   # 240 s cadence. Measured on the committed grid: healthy days fill
+                                   # 0-3% of 6h cells later than this, the 2026-09-14..17 outage days
+                                   # 38-100%. Cells later than this are excluded from every scorecard.
+LEDGER_MAX_PLAUSIBLE_MULT = 1000.0  # = LIVEBOOK_MAX_PLAUSIBLE_MULT; the EDDICE 11e6x row (event_seq 498,
+                                   # mcap_6h 4.3e11 at a CONSTANT implied supply, so SUPPLY_DRIFT_MAX
+                                   # could not see it — the quote leg itself was mispriced)
 
 # ── paper execution + quotes (NO keys, NO funds, quotes only) ─────────────────────
 PAPER_EXEC = True

@@ -17,8 +17,14 @@ Rules that keep the numbers honest:
   • entry snapshots are immutable; horizon cells are write-once and time-gated;
   • a token absent from the index is written as -100% only on the DEAD_CONFIRM_TICKS-th
     consecutive absence (an EVM pair can drop out of the index for one poll);
-  • a quote whose implied supply drifts > SUPPLY_DRIFT_MAX vs entry writes NOTHING that run and
-    the row goes terminally 'suspect' after SUSPECT_TICKS_MAX such runs;
+  • a quote whose implied supply drifts > SUPPLY_DRIFT_MAX vs entry — or whose multiple vs entry
+    exceeds LEDGER_MAX_PLAUSIBLE_MULT, which the supply test cannot see when the quote leg itself
+    is mispriced (EDDICE, event_seq 498: ret_6h = 11,026,957 at a constant implied supply) —
+    writes NOTHING that run, and the row goes terminally 'suspect' after SUSPECT_TICKS_MAX runs;
+  • every horizon cell is stamped with lag_{h} = how late the run grid sampled it, write-once with
+    the cell and never backfilled: the scan grid IS the sampling grid, so a cell filled hours late
+    (Mac asleep, 2026-09-14..17) is a spot sample of a different instant and the scorecards exclude
+    it above LEDGER_MAX_CELL_LAG_S; rows written before the stamp existed are 'lag_unknown';
   • exit signals fire only for alerted rows (tier != B), only from the row's OWN frozen plan,
     and each kind/rung exactly once;
   • promoted B rows stay in the B arm in every statistic (intention-to-treat);
@@ -49,6 +55,9 @@ for _h in HORIZ:
 TAIL_COLS = ["max_ret_seen", "min_ret_seen", "rugged_after", "status", "tp_alerted",
              "stop_alerted", "trail_alerted", "time_exited", "suspect_ticks", "absent_ticks",
              "promoted_ts", "last_snapshot_ts"]
+# lag_{h} is APPENDED LAST (never interleaved with the ret_/price_/mcap_ block): the sibling voice
+# assistant reads this CSV by header, and load() reindexes an older file so the four read as empty.
+TAIL_COLS += [f"lag_{_h}" for _h in HORIZ]
 COLUMNS = BASE_COLS + FWD_COLS + TAIL_COLS
 _EMPTY = ("", "nan", "None", "NaN")
 _LAST_H = list(HORIZ)[-1]
@@ -272,6 +281,15 @@ def update_forward(now_s: float, snapshot_many_fn, path: str | None = None) -> t
                     if n_sus >= config.SUSPECT_TICKS_MAX:
                         led.at[i, "status"] = "suspect"
                     continue                           # nothing else is written this run
+            # Plausibility (EDDICE, event_seq 498: ret_6h = 11,026,957 at mcap 4.3e11 with a
+            # CONSTANT implied supply — the quote leg itself was mispriced, so the gate above
+            # cannot see it). Same counter, same terminal state: no second bookkeeping.
+            if cur_price > 0 and entry > 0 and cur_price / entry > config.LEDGER_MAX_PLAUSIBLE_MULT:
+                n_sus = int(_num(led.at[i, "suspect_ticks"])) + 1
+                led.at[i, "suspect_ticks"] = n_sus
+                if n_sus >= config.SUSPECT_TICKS_MAX:
+                    led.at[i, "status"] = "suspect"
+                continue                               # nothing else is written this run
             if int(_num(led.at[i, "suspect_ticks"])) != 0:
                 led.at[i, "suspect_ticks"] = 0
 
@@ -324,6 +342,10 @@ def update_forward(now_s: float, snapshot_many_fn, path: str | None = None) -> t
             led.at[i, f"price_{hname}"] = cur_price if cur_price > 0 else 0.0
             led.at[i, f"mcap_{hname}"] = cur_mcap if cur_price > 0 else 0.0
             led.at[i, col] = cur_ret
+            # how late the run grid actually sampled this horizon; write-once with the cell it
+            # describes, never backfilled (the scorecards refuse a cell later than
+            # LEDGER_MAX_CELL_LAG_S — FOMOPAD's 4.6x peak is recorded as 1.035x from a late tick)
+            led.at[i, f"lag_{hname}"] = max(0.0, now_s - (alert_ts + hsec))
             filled += 1; touched = True
 
         if cur_price > 0 and cur_liq < config.RUG_LIQ_USD and not _is_true(led.at[i, "rugged_after"]):
@@ -408,6 +430,22 @@ def summary(path: str | None = None) -> None:
         if days < config.MIN_BOOTSTRAP_CLUSTERS:
             print(f"    n_{tier} = {len(sub)} across {days} alert-days — below "
                   f"MIN_BOOTSTRAP_CLUSTERS={config.MIN_BOOTSTRAP_CLUSTERS}, this is not a bound")
+    print(f"  forward-cell sampling lag (write-once, stamped with the cell; a cell filled later than "
+          f"LEDGER_MAX_CELL_LAG_S={config.LEDGER_MAX_CELL_LAG_S:.0f}s is a spot sample of a different "
+          f"instant and every scorecard excludes it):")
+    for h in HORIZ:
+        lg = pd.to_numeric(led[f"lag_{h}"], errors="coerce").dropna()
+        n_late = int((lg > config.LEDGER_MAX_CELL_LAG_S).sum())
+        print(f"    {h:>3s}  late cells (lag > LEDGER_MAX_CELL_LAG_S): {n_late}/{len(lg)}"
+              + ("   (rows written before the stamp existed carry no lag and are excluded as lag_unknown)"
+                 if len(lg) == 0 else ""))
+    imp = pd.Series(False, index=led.index)
+    for h in HORIZ:
+        imp |= pd.to_numeric(led[f"ret_{h}"], errors="coerce").fillna(-9.0) > config.LEDGER_MAX_PLAUSIBLE_MULT - 1.0
+    imp |= pd.to_numeric(led["max_ret_seen"], errors="coerce").fillna(-9.0) > config.LEDGER_MAX_PLAUSIBLE_MULT - 1.0
+    print(f"  implausible-mult suspects: {int(imp.sum())} row(s) carrying a recorded multiple above "
+          f"LEDGER_MAX_PLAUSIBLE_MULT={config.LEDGER_MAX_PLAUSIBLE_MULT:.0f}x (the EDDICE 11e6x row) — new "
+          f"ticks above it are refused into the suspect path and the scorecards exclude these cells")
     n_sus = led["status"].astype(str).eq("suspect").sum()
     if n_sus:
         print(f"  quote-integrity: {n_sus} row(s) terminally SUSPECT (implied supply moved "
