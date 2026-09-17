@@ -512,6 +512,12 @@ IMPROVE_PUBLISH_RETRIES = 5
 PATHS_CACHE_MAX_AGE_S = 7 * 86400
 PATHS_LIMIT = 1000
 PATHS_MISPRICED_TOL = 3.0
+# One OHLCV page is PATHS_LIMIT bars, and a busy pool emits a bar a minute: the newest minute/1
+# page starts only ~16 h back, so an alert older than that read as `no_cover` however alive the
+# token was (FOMOPAD's unpaged page began three hours AFTER its alert). `before_timestamp` walks
+# backward; 4 pages reach ~2.8 days at 1m, ~42 days at 15m. The cap is a call-budget bound, not a
+# depth claim — GeckoTerminal is 30/min per IP shared with every other job on this machine.
+PATHS_MAX_PAGES = 4
 
 
 def _check_perms(path):

@@ -3273,4 +3273,163 @@ check("CLAUDE.md's Commands block carries the chain's start / see / off switch a
       and "robinhood-screener robinhood-keeper-watchdog; do gh workflow disable" in _claude_md   # one name per call
       and "gh run cancel" in _claude_md and "keeper.sh" in _claude_md)
 
+# ═══════════════════════════════════════════════════════════════════════════════════
+section("P. price paths — paging, deferred propagation, unmatched rows")
+# ═══════════════════════════════════════════════════════════════════════════════════
+# The lab that prices a ledger row on GT bars could not reach past ONE page: a busy pool emits a
+# bar a minute, so `limit=1000` at minute/1 starts ~16 h ago and an alert older than that read as
+# `no_cover` — FOMOPAD (event_seq 621, alerted 2026-09-16T14:51:50Z) was uncovered by an unpaged
+# call whose oldest bar was 18:34Z, three hours AFTER its alert. One `&before_timestamp` call
+# returned the 227 bars that contain it. Paging is therefore a coverage fix, and the rule that
+# governs it is the 472-of-1,400 rule: a page we could not fetch is DEFERRED for the whole
+# resolution, never a step toward "this token had no price".
+from sources import geckoterminal as GTM                # noqa: E402
+from selfimprove import paths as PA                     # noqa: E402
+
+check("config.PATHS_MAX_PAGES == 4 (the backward-paging cap; one page is ~16 h of 1m bars on a busy pool)",
+      int(config.PATHS_MAX_PAGES) == 4, str(getattr(config, "PATHS_MAX_PAGES", None)))
+_pa_tree = _tree(os.path.join(ROOT, "selfimprove", "paths.py"))
+check("paths.py has no time.time() in any compute path (now_s is a parameter; the smoke test reads the clock)",
+      _time_time_calls(_compute_nodes(_pa_tree)) == 0)
+
+# ── 1. pool_ohlcv: before_timestamp rides the URL; the parser is untouched ──────────
+_gt_urls: list = []
+
+
+def _gt_body(rows):
+    return {"data": {"attributes": {"ohlcv_list": rows}}}
+
+
+def _gt_fake(url, cache_path=None, max_age_sec=None, headers=None, cache_404=False):
+    _gt_urls.append(url)
+    # newest-first, one duplicate ts (GT has repeated a bar) and one bar with NO volume element
+    return _gt_body([[360, 4.0, 4.0, 4.0, 4.0],
+                     [300, 3.0, 3.5, 2.9, 3.2, 30.0],
+                     [240, 2.0, 2.5, 1.9, 2.2],
+                     [240, 2.0, 2.5, 1.9, 2.2, 5.0],
+                     [180, 1.0, 1.5, 0.9, 1.2, 10.0]])
+
+
+_gt_orig = GTM.get_json
+try:
+    GTM.get_json = _gt_fake
+    _b_none = GTM.pool_ohlcv("0xPOOL", "minute", 1, 5)
+    _b_before = GTM.pool_ohlcv("0xPOOL", "minute", 1, 5, before_timestamp=1789583640)
+finally:
+    GTM.get_json = _gt_orig
+check("pool_ohlcv omits before_timestamp when it is None and appends '&before_timestamp=<int>' when given",
+      "before_timestamp" not in _gt_urls[0] and "&before_timestamp=1789583640" in _gt_urls[1], str(_gt_urls))
+check("pool_ohlcv's parser is unchanged by paging: oldest-first, duplicate ts collapsed keeping the larger v, "
+      "v None when the element is absent (unreported is not 0.0)",
+      [b["ts"] for b in _b_none] == [180, 240, 300, 360]
+      and [b["v"] for b in _b_none] == [10.0, 5.0, 30.0, None], str(_b_none))
+check("pool_ohlcv returns the same series for a paged call (the page differs only by the URL parameter)",
+      _b_before == _b_none)
+
+# ── 2. paths._ohlcv: backward paging, per-page cache keys, cross-page merge ─────────
+_POOLP = "0x" + "ab" * 20
+_pa_calls: list = []
+
+
+def _bars(lo, hi, v=1.0):
+    """Inclusive bar indices; ts = i*60 (1-minute bars), oldest-first as pool_ohlcv returns."""
+    return [{"ts": i * 60, "o": 1.0, "h": 2.0, "l": 0.5, "c": 1.5, "v": v} for i in range(lo, hi + 1)]
+
+
+def _pages_fake(pages: dict):
+    def _f(pool, timeframe="day", aggregate=1, limit=None, network=None,
+           cache_path=None, max_age_sec=None, before_timestamp=None):
+        _pa_calls.append({"tf": timeframe, "agg": aggregate, "before": before_timestamp,
+                          "cache": os.path.basename(cache_path or "")})
+        return pages.get(before_timestamp, [])
+    return _f
+
+
+# page 0 = the newest 5; page 1 overlaps bar 10 with a LARGER volume; page 2 is short and covers
+# the alert, so paging stops on its own without touching the cap.
+_THREE = {None: _bars(10, 14, 1.0), 600: _bars(6, 10, 9.0), 360: _bars(2, 5, 1.0)}
+_pa_orig_ohlcv, _pa_orig_pool, _pa_orig_limit = GTM.pool_ohlcv, PA.top_pool, PA.LIMIT
+try:
+    PA.LIMIT, GTM.pool_ohlcv = 5, _pages_fake(_THREE)
+    _st, _merged, _npages = PA._ohlcv(_POOLP, "minute", 1, 200.0)
+finally:
+    GTM.pool_ohlcv, PA.top_pool, PA.LIMIT = _pa_orig_ohlcv, _pa_orig_pool, _pa_orig_limit
+check("_ohlcv pages backward until a page reaches the alert: 3 pages merged into one sorted, "
+      "de-duplicated series spanning every bar",
+      _st == "ok" and _npages == 3 and [b["ts"] for b in _merged] == [i * 60 for i in range(2, 15)],
+      f"{_st} {_npages} {[b['ts'] for b in _merged]}")
+check("_ohlcv merges duplicate timestamps across pages keeping the LARGER reported volume",
+      [b["v"] for b in _merged if b["ts"] == 600] == [9.0], str([b for b in _merged if b["ts"] == 600]))
+check("each page gets its OWN cache file keyed by before_timestamp (a shared key would serve page 0 forever)",
+      len({c["cache"] for c in _pa_calls}) == 3
+      and [c["before"] for c in _pa_calls] == [None, 600, 360]
+      and any("_b600" in c["cache"] for c in _pa_calls) and any("_b360" in c["cache"] for c in _pa_calls),
+      str(_pa_calls))
+
+# ── 3. a deferred page poisons the resolution, never "no price" ─────────────────────
+_pa_calls.clear()
+_DEFER = {None: _bars(10, 14, 1.0), 600: None, 360: _bars(2, 5, 1.0)}
+try:
+    PA.LIMIT, GTM.pool_ohlcv = 5, _pages_fake(_DEFER)
+    _dst, _dbars, _dpages = PA._ohlcv(_POOLP, "minute", 1, 200.0)
+    PA.top_pool = lambda token: ("ok", _POOLP)
+    _dp = PA.fetch_path("0x" + "cd" * 20, 200.0, 800.0)
+finally:
+    GTM.pool_ohlcv, PA.top_pool, PA.LIMIT = _pa_orig_ohlcv, _pa_orig_pool, _pa_orig_limit
+check("ANY deferred page makes the whole resolution DEFERRED with no bars — the page-0 bars are "
+      "discarded rather than passed off as the covering series (the 472-of-1,400 rule)",
+      (_dst, _dbars) == (PA.DEFERRED, []), f"{_dst} {len(_dbars)}")
+check("fetch_path over a deferred page is 'deferred', NEVER 'no_cover' (a rate limit is not an absent price)",
+      _dp["status"] == PA.DEFERRED and _dp["res"] is None, str(_dp))
+check("fetch_path reports `pages` on every return shape (ok and not-ok)",
+      "pages" in _dp and isinstance(_dp["pages"], int))
+
+# ── 4. the cap, and the start-resolution pick that spans it ────────────────────────
+_pa_calls.clear()
+
+
+def _endless(pool, timeframe="day", aggregate=1, limit=None, network=None,
+             cache_path=None, max_age_sec=None, before_timestamp=None):
+    _pa_calls.append(before_timestamp)
+    top = 10 ** 7 if before_timestamp is None else int(before_timestamp)
+    return [{"ts": top - (5 - i) * 60, "o": 1.0, "h": 2.0, "l": 0.5, "c": 1.5, "v": 1.0}
+            for i in range(5)]
+
+
+try:
+    PA.LIMIT, GTM.pool_ohlcv = 5, _endless
+    _cst, _cbars, _cpages = PA._ohlcv(_POOLP, "minute", 1, 0.0)
+finally:
+    GTM.pool_ohlcv, PA.LIMIT = _pa_orig_ohlcv, _pa_orig_limit
+check(f"PATHS_MAX_PAGES caps a runaway walk at {config.PATHS_MAX_PAGES} calls on a series that never reaches the alert",
+      len(_pa_calls) == int(config.PATHS_MAX_PAGES) == _cpages and _cst == "ok", f"{len(_pa_calls)} {_cpages} {_cst}")
+
+_pa_calls.clear()
+try:
+    PA.LIMIT, GTM.pool_ohlcv = 5, _pages_fake({})          # every resolution answers "no bars"
+    PA.top_pool = lambda token: ("ok", _POOLP)
+    _nc = PA.fetch_path("0x" + "ef" * 20, 0.0, 1_000_000.0)   # an 11.6-day-old alert
+finally:
+    GTM.pool_ohlcv, PA.top_pool, PA.LIMIT = _pa_orig_ohlcv, _pa_orig_pool, _pa_orig_limit
+check("every resolution answering 'no bars' is no_cover (a real answer), with pages counted",
+      _nc["status"] == "no_cover" and _nc["res"] is None and isinstance(_nc["pages"], int), str(_nc))
+_pa_calls.clear()
+_seen_tf: list = []
+
+
+def _tf_fake(pool, timeframe="day", aggregate=1, limit=None, network=None,
+             cache_path=None, max_age_sec=None, before_timestamp=None):
+    _seen_tf.append((timeframe, aggregate))
+    return []
+
+
+try:
+    GTM.pool_ohlcv = _tf_fake
+    PA.top_pool = lambda token: ("ok", _POOLP)
+    PA.fetch_path("0x" + "ef" * 20, 0.0, 1_000_000.0)
+finally:
+    GTM.pool_ohlcv, PA.top_pool = _pa_orig_ohlcv, _pa_orig_pool
+check("…and the finest resolution tried for that alert is minute/1, not minute/15",
+      _seen_tf and _seen_tf[0] == ("minute", 1), str(_seen_tf))
+
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")

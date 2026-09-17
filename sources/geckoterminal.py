@@ -274,17 +274,28 @@ def token_pools(addr: str, network: str = config.GT_NETWORK) -> list[dict]:
 
 def pool_ohlcv(pool: str, timeframe: str = "day", aggregate: int = 1,
                limit: int = config.PATHS_LIMIT, network: str = config.GT_NETWORK,
-               cache_path: str | None = None, max_age_sec: float | None = None):
+               cache_path: str | None = None, max_age_sec: float | None = None,
+               before_timestamp: int | None = None):
     """GET /pools/{pool}/ohlcv/{timeframe}?aggregate=N&limit=L&currency=usd →
     [{ts:int, o, h, l, c, v}] sorted OLDEST FIRST with duplicate timestamps collapsed (GT
     ships newest-first, omits no-trade bars, and has repeated a bar), or NOT_FOUND / None.
     `v` is None when the element is absent: a bar whose volume is UNREPORTED must never be
     conflated with a real 0.0 (the peak-mcap era treated both as zero and rejected real
     wicks). Uncached by default — the price-path lab caches under cache/paths/ with its own
-    7-day policy; pass cache_path/max_age_sec to opt in."""
+    7-day policy; pass cache_path/max_age_sec to opt in.
+
+    `before_timestamp` (epoch SECONDS) asks for the page ENDING at that instant, which is the
+    only way back past one page: a busy pool emits a bar a minute, so the newest minute/1 page
+    covers ~16 h and nothing older is reachable without it (FOMOPAD's unpaged page began at
+    18:34Z for a 14:51Z alert; one call with before_timestamp=1789583640 returned the 227 bars
+    from 14:47Z that contain it). The parser below is identical either way — a page is just a
+    window — so the CALLER must give each page its own cache_path, or page 0's file would be
+    served for every window."""
     timeframe = timeframe if timeframe in ("minute", "hour", "day") else "day"
     url = (f"{BASE}/networks/{network}/pools/{(pool or '').lower()}/ohlcv/{timeframe}"
            f"?aggregate={int(aggregate)}&limit={int(limit)}&currency=usd")
+    if before_timestamp is not None:
+        url += f"&before_timestamp={int(before_timestamp)}"
     d = get_json(url, cache_path=cache_path, max_age_sec=max_age_sec)
     if is_deferred(d):
         return None
