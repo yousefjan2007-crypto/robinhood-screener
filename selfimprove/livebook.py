@@ -155,7 +155,10 @@ TICK_INTERVAL_S = float(config.LIVEBOOK_TICK_INTERVAL_S)
 TICK_INTERVAL_LATE_S = float(config.LIVEBOOK_TICK_INTERVAL_LATE_S)
 DECISION_HORIZON_S = float(config.LIVEBOOK_DECISION_HORIZON_S)
 MAX_TRACK_S = float(config.LIVEBOOK_MAX_TRACK_S)
-MARKET_CLOSES = ("stop", "trail", "time_exit", "random_exit")   # the closes `gapped` applies to
+# the closes `gapped` applies to — every one of them is a MARKET decision taken at an observed
+# tick, so a tick gap the policy did not choose makes the fill something the policy would not
+# have done. A limit rung and a terminal mark are not decisions and are never gapped.
+MARKET_CLOSES = ("stop", "trail", "time_exit", "random_exit", "flow_exit")
 
 
 # ── atomic state, because a crash mid-write must not corrupt the book ───────────────
@@ -402,9 +405,7 @@ def random_exit_hold_s(pos: dict) -> float:
 
 def _step_policy(pos: dict, name: str, st: dict, px: float, now_s: float,
                  usd_full: float, gap_s: float, flow=None) -> list:
-    """Advance ONE policy by one observed price. Returns the fills it produced. `flow` is the
-    tick's POL.flow_from_market() dict (or None when dark / not read) — carried, not yet read:
-    no policy in the family has a flow schema, so nothing here consumes it.
+    """Advance ONE policy by one observed price. Returns the fills it produced.
 
     A tick is a single price, so unlike the bar simulator there is no ordering to assume. The
     one genuine ambiguity left is that both a rung and a protective exit can be satisfied by the
@@ -412,6 +413,14 @@ def _step_policy(pos: dict, name: str, st: dict, px: float, now_s: float,
     That means the move happened BETWEEN ticks and we never observed the intervening prices, so
     the protective exit wins and the remainder closes at the observed price. Crediting the rung
     as well would be claiming a fill at a price we never saw.
+
+    `flow` is this tick's 5-minute window (policies.flow_from_market) or None when the feature
+    read was deferred, absent or simply not taken — only a policy carrying a `flow` block reads
+    it, and None behaves exactly like the price-only policy it was built from. The order of the
+    legs below is the guarantee the operator asked for: the protective branch runs FIRST, so the
+    -50% stop (pre-arm) or the armed trail (post-arm; 1.5 x 0.7 = 1.05 x entry, well above
+    0.5 x entry) always dominates, and the ladder runs before the flow rule, so a pre-committed
+    limit fills at its level before any flow exit can act on the same tick.
     """
     # Explicit membership test, NOT `POLICIES.get(name) or CONTROLS[name]`: hold_to_end's policy
     # is the empty dict, which is falsy, so `or` fell through and raised KeyError on the one
@@ -432,14 +441,17 @@ def _step_policy(pos: dict, name: str, st: dict, px: float, now_s: float,
         st["peak_px"] = px
 
     stop_frac, trail_frac = pol.get("stop"), pol.get("trail")
+    # An ARMED trail (trail_arm) is not a level at all until the high-water mark reaches it, so
+    # it does not enter `levels` and cannot out-rank the stop before then.
+    trail_on = POL.trail_active(pol, st["peak_px"], entry_px)
     levels = []
     if stop_frac is not None:
         levels.append(entry_px * (1.0 - stop_frac))
-    if trail_frac is not None:
+    if trail_on:
         levels.append(st["peak_px"] * (1.0 - trail_frac))
     exit_level = max(levels) if levels else None
 
-    def _close(reason, fill_px):
+    def _close(reason, fill_px, note=""):
         frac = st["remaining"]
         if frac <= 1e-9:
             _finish_state(pos, st, reason, now_s, gap_s)
@@ -448,7 +460,7 @@ def _step_policy(pos: dict, name: str, st: dict, px: float, now_s: float,
         st["realized_usd"] += usd
         st["remaining"] = 0.0
         _finish_state(pos, st, reason, now_s, gap_s)
-        fills.append(_fill_row(pos, name, reason, frac, fill_px, usd, gap_s, now_s))
+        fills.append(_fill_row(pos, name, reason, frac, fill_px, usd, gap_s, now_s, note=note))
 
     # random_exit control (2026-09 solana audit: this key was read only by the bar simulator,
     # so the live control was a bit-identical alias of hold_to_end on 294/294 positions — a
@@ -459,7 +471,7 @@ def _step_policy(pos: dict, name: str, st: dict, px: float, now_s: float,
         return fills
 
     if exit_level is not None and px <= exit_level:
-        is_trail = trail_frac is not None and \
+        is_trail = trail_on and \
             st["peak_px"] * (1.0 - trail_frac) >= (levels[0] if stop_frac is not None else -1.0)
         _close("trail" if is_trail else "stop", px)
         return fills
@@ -482,6 +494,17 @@ def _step_policy(pos: dict, name: str, st: dict, px: float, now_s: float,
         st["remaining"] = 0.0
         _finish_state(pos, st, "ladder_complete", now_s, gap_s)
         return fills
+
+    # the flow rule: post-arm only, market exit at the observed tick, `gapped` like any other
+    # market close. It runs AFTER the ladder (a pre-committed limit fills at its level first) and
+    # BEFORE max_hold_s, and it returns immediately so the time leg cannot overwrite the reason.
+    if pol.get("flow"):
+        POL.flow_state_init(st)
+        why = POL.flow_step(st, pol, flow, px, entry_px, now_s, gap_s,
+                            float(config.LIVEBOOK_MAX_SCORABLE_GAP_S))
+        if why:
+            _close("flow_exit", px, note=why)
+            return fills
 
     mh = pol.get("max_hold_s")
     if mh is not None and (now_s - pos["opened_ts"]) >= mh:
@@ -1118,11 +1141,18 @@ def live_stats_dict(now_s=None) -> dict:
     def _table(names):
         out = {}
         for name in names:
-            rets, n_g, n_bf = [], 0, 0
+            rets, n_g, n_bf, n_fx, n_fd = [], 0, 0, 0, 0
             for p in scorable:
                 st = (p.get("policies") or {}).get(name)
                 if not isinstance(st, dict) or not st.get("closed"):
                     continue
+                # counted over every CLOSE, before the scoring exclusions: "how often did the flow
+                # leg decide, and how often was it flying blind" is a question about the apparatus,
+                # not about the returns, and the candidate's kill condition reads it.
+                if st.get("close_reason") == "flow_exit":
+                    n_fx += 1
+                if int(st.get("flow_dark_ticks") or 0) > 0:
+                    n_fd += 1
                 if st.get("backfilled_ts") is not None:
                     n_bf += 1
                     continue
@@ -1133,6 +1163,8 @@ def live_stats_dict(now_s=None) -> dict:
             row = _stat_row(rets)
             row["n_gapped"] = n_g
             row["n_backfilled"] = n_bf
+            row["n_flow_exit"] = n_fx
+            row["n_flow_dark"] = n_fd
             out[name] = row
         return out
 
