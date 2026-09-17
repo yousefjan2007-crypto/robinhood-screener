@@ -49,7 +49,7 @@ import config                                                    # noqa: E402
 import http_client                                               # noqa: E402
 from http_client import is_absent, is_deferred                   # noqa: E402
 from concurrent.futures import ThreadPoolExecutor
-from sources import blockscout, dexscreener, geckoterminal, kyber, robinx, rpc, scanhood   # noqa: E402
+from sources import blockscout, dexscreener, geckoterminal, gmgn, kyber, robinx, rpc, scanhood   # noqa: E402
 
 BLOCKSCOUT_HOST = "robinhoodchain.blockscout.com"
 LEGACY_INVERSE_CACHE = os.path.join(config.CACHE_DIR, "legacy_creators_inverse.json")
@@ -65,6 +65,10 @@ SAFETY_FEATURE_KEYS = (
     "gt_verified", "launchpad_graduation_pct", "launchpad_completed",
     "launchpad_completed_age_s", "holders_updated_age_s", "scanhood_verdict",
     "scanhood_sellable", "sources_dark",
+    # sources/gmgn.py — features only; no hard gate reads them (the pass-through rule, kept)
+    "gmgn_launchpad_platform", "gmgn_progress", "gmgn_bundler_ratio", "gmgn_sniper_hold_pct",
+    "gmgn_insider_hold_pct", "gmgn_fresh_wallet_pct", "gmgn_rat_vol_pct", "gmgn_smart_degen_count",
+    "gmgn_is_wash_trading", "gmgn_holders",
 )
 # … plus the solana-only keys carried as None and never gated (persisted dicts stay
 # comparable across the two screeners) …
@@ -595,8 +599,33 @@ def _apply_robinx(s: dict) -> None:
             s["creator_dead_frac"] = round(min(dead, launched) / launched, 4)
 
 
+def _apply_gmgn(s: dict, token: str, row: dict | None = None, info: bool = True) -> None:
+    """GMGN: the Trenches row already in hand (no call) and, when `info`, /v1/token/info under the
+    run's budget. FEATURES ONLY — no hard gate reads a gmgn_* field, so a dark GMGN can never
+    widen a gate (solana's two-way `{}` did exactly that on a 429); it is named in sources_dark
+    and the alert prints it. Absent (GMGN does not index the token) is a fact, not dark."""
+    got = False
+    if isinstance(row, dict) and row:
+        for k, v in gmgn.features_from_row(row).items():
+            if v is not None and k in SAFETY_FEATURE_KEYS:
+                s[k] = v
+        got = True
+    if info:
+        r = gmgn.token_info(token)
+        if r is None:
+            _mark(s, "gmgn", dark=True)
+            return
+        if not is_absent(r):
+            for k, v in r.items():
+                if v is not None and k in SAFETY_FEATURE_KEYS:
+                    s[k] = v
+        got = True
+    if got:
+        _mark(s, "gmgn", dark=False)
+
+
 def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = None,
-          fast: bool = False) -> dict:
+          fast: bool = False, gmgn_row: dict | None = None, gmgn_info: bool = True) -> dict:
     """The budgeted pass for ONE token, building on its pass-1 dict (never mutated).
     GeckoTerminal /info → Blockscout (skipped entirely while the host is marked blocked)
     → RobinX wallet of the attributed deployer → the V2 sniper count when the pair's
@@ -635,6 +664,11 @@ def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = 
         # the alert-path variant: GT + the two Blockscout flag calls only (~6–8 s instead of ~50 s);
         # RobinX, the launch history, the launcher balance and the sniper count are refined by the
         # watchlist refresh — an alert is decided on positive findings, and those are all here
+        try:
+            _apply_gmgn(s, t, row=gmgn_row, info=gmgn_info)   # the row is free; info only under budget
+        except Exception as exc:
+            print(f"  [safety] {t[:10]}… gmgn failed: {exc}")
+            _mark(s, "gmgn", dark=True)
         gt_holders = s.pop("_gt_holders", None)
         if s.get("total_holders") is None and gt_holders is not None:
             s["total_holders"], s["holders_source"] = gt_holders, "gt"
@@ -658,6 +692,12 @@ def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = 
     except Exception as exc:
         print(f"  [safety] {t[:10]}… robinx failed: {exc}")
         _mark(s, "robinx", dark=True)
+
+    try:
+        _apply_gmgn(s, t, row=gmgn_row, info=gmgn_info)
+    except Exception as exc:
+        print(f"  [safety] {t[:10]}… gmgn failed: {exc}")
+        _mark(s, "gmgn", dark=True)
 
     # Launchpad tokens: the launcher's whole-life LongLaunch history in ONE indexed log query
     # (exact), judged by the dead fraction of its PRIOR launches (Dexscreener, one batched call).
@@ -759,6 +799,7 @@ _DEGRADED_MAP = (
     ("scanhood", "scanhood_verdict", "ScanHood verdict"),
     ("robinx", "creator_score", "creator score"),
     ("robinx", "creator_dead_frac", "creator dead launches"),
+    ("gmgn", "gmgn_bundler_ratio", "GMGN wallet tags"),
 )
 
 

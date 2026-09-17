@@ -315,10 +315,18 @@ def _card(s: dict, champion: str) -> str:
             bits.append("NA " + ", ".join(_esc(b, 24) for b in na[:4]))
         if bits:
             bands_html = f'<div class="bands">bands: {" · ".join(bits)}</div>'
-    tag = "a" if url else "div"
-    href = f' href="{url}" target="_blank" rel="noopener"' if url else ""
+    tok = str(s.get("token") or "").lower()
+    links = []
+    if url:
+        links.append(f'<a href="{url}" target="_blank" rel="noopener">dexscreener</a>')
+    if tok:                                     # the terminal + explorer deep links, separate anchors
+        gm = html.escape(config.GMGN_TOKEN_URL.format(chain=config.GMGN_CHAIN, token=tok), quote=True)
+        bs = html.escape(config.BLOCKSCOUT_TOKEN_URL.format(token=tok), quote=True)
+        links.append(f'<a href="{gm}" target="_blank" rel="noopener">gmgn</a>')
+        links.append(f'<a href="{bs}" target="_blank" rel="noopener">explorer</a>')
+    links_html = f'<div class="links">{" · ".join(links)}</div>' if links else ""
     return f"""
-    <{tag} class="card {'atier' if tier == 'A' else ''}"{href}>
+    <div class="card {'atier' if tier == 'A' else ''}">
       <div class="row1"><span class="sym">{sym}</span>{badge}{kind_html}
         <span class="score">{score:.0f}<small>/100</small></span></div>
       <div class="row2">
@@ -329,8 +337,8 @@ def _card(s: dict, champion: str) -> str:
         <span>holders {holders_txt}</span><span>top10 {_fmt_pct(s.get('top10_pct'))}</span>
         <span>LP burned {lp_txt}</span><span>round-trip {_fmt_pct(rt, digits=1)}</span>
       </div>
-      {short}{dark_html}{bands_html}{plan_html}
-    </{tag}>"""
+      {short}{dark_html}{bands_html}{plan_html}{links_html}
+    </div>"""
 
 
 def _cards(survivors: list, tier: str, champion: str) -> str:
@@ -545,6 +553,8 @@ _CSS = """
   .row2 { display: flex; flex-wrap: wrap; gap: 4px 14px; color: #8b949e; font-size: 13px;
           margin-top: 6px; }
   .miss { color: #d29922; font-size: 12px; margin-top: 6px; }
+  .links { font-size: 12px; margin-top: 6px; color: #8b949e; }
+  .links a { color: #58a6ff; text-decoration: none; }
   .bands { color: #8b949e; font-size: 12px; margin-top: 4px; }
   .plan { color: #58a6ff; font-size: 12px; margin-top: 6px; }
   .empty { color: #8b949e; background: #161b22; border: 1px dashed #30363d; border-radius: 12px;

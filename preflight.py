@@ -15,7 +15,7 @@ import time
 
 import config
 import http_client
-from sources import blockscout, dexscreener, geckoterminal, kyber, rpc
+from sources import blockscout, dexscreener, geckoterminal, gmgn, kyber, rpc
 
 
 def _line(name: str, ok, detail: str = "") -> None:
@@ -58,6 +58,11 @@ def main() -> int:
           f"holders {g.get('holders_count') if isinstance(g, dict) else '-'}")
     np_ = geckoterminal.new_pools(1)
     _line("geckoterminal new_pools", bool(np_), f"{len(np_)} rows")
+    gm = gmgn.trenches(cache_s=0) if gmgn._api_key() else None
+    _line("gmgn trenches (robinhood)", gm is not None,
+          "no key configured" if not gmgn._api_key() else
+          (" ".join(f"{c}={len(gm.get(c) or [])}" for c in config.GMGN_TRENCHES_COLUMNS) if gm else
+           "banned/dark" if http_client.is_blocked("openapi.gmgn.ai") else ""))
     bi = blockscout.address_info(config.MIZUKARA)
     _line("blockscout address_info", bi is not None and not http_client.is_absent(bi),
           f"impl {bi.get('impl_name') if isinstance(bi, dict) and not http_client.is_absent(bi) else '-'}")

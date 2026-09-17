@@ -183,6 +183,24 @@ def _plan(entry_price) -> str:
         return f"PLAN [unavailable: {e}]"
 
 
+def _gmgn_line(s: dict) -> str:
+    """GMGN's wallet-tag second opinion, or its absence stated: a dark or unconsulted GMGN passes
+    through (no gate reads it) and the card says so, exactly like solana's alert did."""
+    if all(s.get(k) is None for k in ("gmgn_bundler_ratio", "gmgn_smart_degen_count", "gmgn_progress",
+                                      "gmgn_sniper_hold_pct")):
+        return "   GMGN: unavailable (passed through)"
+    prog = s.get("gmgn_progress")
+    try:
+        prog_txt = "?" if prog is None else f"{100 * float(prog):.0f}%"
+    except (TypeError, ValueError):
+        prog_txt = "?"
+    wash = s.get("gmgn_is_wash_trading")
+    return (f"   GMGN: bundler ratio {_f(s.get('gmgn_bundler_ratio'), '.2f')} · snipers hold "
+            f"{_pct(s.get('gmgn_sniper_hold_pct'), '.1f')} · insiders {_pct(s.get('gmgn_insider_hold_pct'), '.1f')} "
+            f"· smart-money {_f(s.get('gmgn_smart_degen_count'))} · wash {'?' if wash is None else wash} "
+            f"· launchpad {s.get('gmgn_launchpad_platform') or '?'} · curve {prog_txt}")
+
+
 # ── the A-tier card ───────────────────────────────────────────────────────────────
 def _token_block(s: dict) -> str:
     dark = s.get("sources_dark") or []
@@ -202,6 +220,7 @@ def _token_block(s: dict) -> str:
         f"   deployer prior launches {_f(s.get('creator_prior_tokens'))} "
         f"(dead {_frac_pct(s.get('creator_dead_frac'))}) · dev score {_f(s.get('creator_score'))} "
         f"· sniped-at-create {_f(s.get('dev_sniped'))}",
+        _gmgn_line(s),
     ]
     if dark:
         lines.append(f"   ⚠ passed through (dark): {', '.join(str(d) for d in dark)}")
@@ -210,6 +229,10 @@ def _token_block(s: dict) -> str:
                      + "; ".join(str(m) for m in misses))
     lines.append(f"   {_plan(s.get('price_usd'))}")
     lines.append(f"   {s.get('url') or ''}")
+    tok = str(s.get("token") or "").lower()
+    if tok:                                      # the terminal + explorer deep links (the human acts there)
+        lines.append(f"   gmgn {config.GMGN_TOKEN_URL.format(chain=config.GMGN_CHAIN, token=tok)}"
+                     f" · explorer {config.BLOCKSCOUT_TOKEN_URL.format(token=tok)}")
     return "\n".join(lines)
 
 

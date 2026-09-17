@@ -1761,7 +1761,8 @@ check("build_feat on the clean fixture reproduces bands.clean_fixture exactly", 
 bad_req = [n for n, sp in B.BUILTINS.items() if not set(sp.REQUIRES) <= set(config.FEATURE_FIELDS)]
 det_bad = [n for n, sp in B.BUILTINS.items() if sp.verdict(good) != sp.verdict(dict(good)) or sp.verdict(good) not in (True, False, None)]
 check("every band is deterministic, verdict in {True, False, None}, REQUIRES ⊆ FEATURE_FIELDS", not bad_req and not det_bad, f"{bad_req} {det_bad}")
-_fires = {"band_top10_le15": {"top10_pct": 15.0, "top10_pct_gt": 15.0}, "band_graduated_only": {"launchpad_completed_age_s": 3600.0}}
+_fires = {"band_top10_le15": {"top10_pct": 15.0, "top10_pct_gt": 15.0}, "band_graduated_only": {"launchpad_completed_age_s": 3600.0},
+          "band_new_creation": {"pair_age_min": 10.0}, "band_almost_bonded": {"gmgn_progress": 0.8, "launchpad_completed": False}}
 na_bad = [(n, k) for n, sp in B.BUILTINS.items() for k in sp.REQUIRES
           if sp.verdict(dict(dict(good, **_fires.get(n, {})), **{k: None})) is not None]
 check("a dark REQUIRES field yields None (NA) for every band", not na_bad, str(na_bad[:3]))
@@ -1769,7 +1770,7 @@ HC3 = [n for n, sp in B.BUILTINS.items() if sp.THREE_VALUED]
 kl = dict(good, roundtrip_loss_pct=12.0, dev_pct=None)     # a definite miss beside an unknown
 check("three-valued AND (hc family): a definite miss (round trip 12%) beside an unknown (dev_pct None) is False, not NA; "
       "the unknown alone is NA; True never fires with an unknown",
-      len(HC3) == 7 and all(B.BUILTINS[n].verdict(kl) is False for n in HC3)
+      len(HC3) == 8 and all(B.BUILTINS[n].verdict(kl) is False for n in HC3)
       and B.BUILTINS[CHAMP].verdict(dict(good, dev_pct=None)) is None
       and B.BandSpec("t", "", ("score",), (), "candidate", lambda f: True, THREE_VALUED=True).verdict(dict(good, score=None)) is None,
       str([(n, B.BUILTINS[n].verdict(kl)) for n in HC3]))
@@ -2202,15 +2203,18 @@ def _snapshot_tree(base):
     return out
 
 
+from sources import gmgn as GMR                          # noqa: E402
 _saved_run = {"block_number": rpc.block_number, "get_logs": rpc.get_logs, "new_pools": GT.new_pools,
               "enrich_many": RUN.dex.enrich_many, "pass1": SAFE.pass1_many, "pass2": SAFE.pass2,
-              "stock": scanhood.stock_tokens, "send_all": RUN.send_all, "save_watch": LAB.save_watchlist}
+              "stock": scanhood.stock_tokens, "send_all": RUN.send_all, "save_watch": LAB.save_watchlist,
+              "trenches": GMR.trenches}
 sent_run: list = []
 try:
     cur0 = RUN._load_json(config.CURSOR_PATH, {})
     rpc.block_number = lambda: int(cur0.get("last_block") or 100_000) + 10
     rpc.get_logs = lambda addrs, topics, a, b: ([], None)
     GT.new_pools = lambda page=1, network=None: []
+    GMR.trenches = lambda *a, **k: None
     RUN.dex.enrich_many = lambda addrs, now_s, max_age_sec=None: {"ok": {}, "absent": set(), "deferred": set(addrs)}
     SAFE.pass1_many = lambda *a, **k: {}
     SAFE.pass2 = lambda *a, **k: None
@@ -2227,6 +2231,7 @@ finally:
     rpc.block_number, rpc.get_logs, GT.new_pools = _saved_run["block_number"], _saved_run["get_logs"], _saved_run["new_pools"]
     RUN.dex.enrich_many, SAFE.pass1_many, SAFE.pass2 = _saved_run["enrich_many"], _saved_run["pass1"], _saved_run["pass2"]
     scanhood.stock_tokens, RUN.send_all, LAB.save_watchlist = _saved_run["stock"], _saved_run["send_all"], _saved_run["save_watch"]
+    GMR.trenches = _saved_run["trenches"]
     http_client.reset_health()
 if os.path.exists(config.SCAN_PATH):
     strict_scan = json.loads(_read(config.SCAN_PATH), parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
@@ -2341,6 +2346,9 @@ section("M. launchpad tokens — Bankr / Doppler on Uniswap V4 (the reference wi
 from sources import rpc as RPCM, safety as SAFEM   # noqa: E402
 import selfimprove.trials as TRIALS_MOD             # noqa: E402
 import run as RUNM                                   # noqa: E402
+_gm_dark = lambda token, cache_s=None: None   # noqa: E731 — GMGN dark for the whole section (offline)
+_orig_gm_ti = SAFEM.gmgn.token_info
+SAFEM.gmgn.token_info = _gm_dark
 
 CAT = config.REFERENCE_TOKENS["CATGPT"].lower()
 _SVC = "0x3a8e5ba5aa9c2464c75621c2bffb9cf912db995d"           # CATGPT's launcher (app/agent wallet)
@@ -2481,11 +2489,13 @@ try:
     SAFEM.geckoterminal.token_info = _rec("gt", {"gt_score": 50.0, "is_honeypot_gt": False})
     SAFEM.robinx.wallet = _rec("robinx", {})
     SAFEM.rpc.creator_launches = _rec("launches", [])
+    SAFEM.gmgn.token_info = _rec("gmgn", None)
     _s1 = dict(SAFEM.empty_safety(), lp_check_source="v4_launchpad:bankr", deployer="0x" + "ab" * 20)
     _sf = SAFEM.pass2("0x" + "cd" * 20, {"liq_usd": 5e4}, _s1, 1_789_300_000.0, fast=True)
-    check("fast pass 2 calls GT, token_counters and address_info ONLY (no paged holders, creator, creation logs, RobinX or "
-          "launch history), fills holders/tx-per-holder/is_scam/template and marks fast_pass2",
-          set(_bs_calls) == {"gt", "token_counters", "address_info"} and _sf["total_holders"] == 1200
+    check("fast pass 2 calls GT, token_counters, address_info and GMGN token_info ONLY (no paged holders, creator, creation "
+          "logs, RobinX or launch history), fills holders/tx-per-holder/is_scam/template, marks fast_pass2 and names a dark gmgn",
+          set(_bs_calls) == {"gt", "token_counters", "address_info", "gmgn"} and _sf["total_holders"] == 1200
+          and "gmgn" in _sf["sources_dark"]
           and _sf["holders_source"] == "blockscout" and _sf["tx_per_holder_total"] == 2.0 and _sf["is_scam"] is False
           and _sf["template_name"] == "DopplerERC20V1" and "fast_pass2" in _sf["sources_used"] and _sf["pass"] == 2,
           str((_bs_calls, {k: _sf.get(k) for k in ("total_holders", "is_scam", "template_name")})))
@@ -2493,6 +2503,7 @@ finally:
     for k, v in _orig_bs.items():
         setattr(SAFEM.blockscout, k, v)
     SAFEM.geckoterminal.token_info, SAFEM.robinx.wallet, SAFEM.rpc.creator_launches = _orig_gt, _orig_rx, _orig_cl
+    SAFEM.gmgn.token_info = _gm_dark
 # full pass 2: the creation-tx logs are read for Flap launches only (dev_sniped is a Flap concept; 6.5 s a call)
 try:
     _bs_calls = []
@@ -2579,5 +2590,288 @@ check("screener.yml: the scan job and the Pages job hold SEPARATE concurrency gr
 check("REFERENCE_TOKENS name the two winners and the registry lists the launchpad band as a candidate, never the champion",
       set(config.REFERENCE_TOKENS) == {"CATGPT", "ANTHROPIG"} and CHAMP == "band_a_strict"
       and any(e_["name"] == "band_launchpad_lenient" and e_["status"] == "candidate" for e_ in json.load(open(config.REGISTRY_PATH))["candidates"]))
+
+SAFEM.gmgn.token_info = _orig_gm_ti                    # section M is over: GMGN is real again
+# ═══════════════════════════════════════════════════════════════════════════════════
+section("N. GMGN — the Trenches feed, the wallet-tag second opinion, the terminal deep link")
+# ═══════════════════════════════════════════════════════════════════════════════════
+import importlib                                        # noqa: E402
+import dashboard as DASHM                               # noqa: E402
+try:
+    GM = importlib.import_module("sources.gmgn")
+except Exception as _e:                                 # the module must exist before anything else here can
+    GM = None
+    print(f"  (sources.gmgn import failed: {_e})")
+check("sources/gmgn.py exists and imports offline", GM is not None)
+GM_HOST = "openapi.gmgn.ai"
+check("config: GMGN chain slug 'robinhood', the token deep link + explorer link templates, a rate pin <= 1 Hz, the feed name, "
+      "GMGN's own quote_address_type set for robinhood, and openapi.gmgn.ai on the 429-is-terminal list",
+      getattr(config, "GMGN_CHAIN", None) == "robinhood"
+      and "{token}" in getattr(config, "GMGN_TOKEN_URL", "") and "{chain}" in getattr(config, "GMGN_TOKEN_URL", "")
+      and getattr(config, "BLOCKSCOUT_TOKEN_URL", "").startswith(config.BLOCKSCOUT_BASE) and "{token}" in getattr(config, "BLOCKSCOUT_TOKEN_URL", "")
+      and config.HOST_RATE_HZ.get(GM_HOST) == getattr(config, "GMGN_RATE_HZ", None) and 0 < getattr(config, "GMGN_RATE_HZ", 0) <= 1.0
+      and "gmgn_trenches" in config.DISCOVERY_FEEDS and tuple(getattr(config, "GMGN_QUOTE_ADDRESS_TYPES", ())) == (11, 20, 24, 12, 0)
+      and GM_HOST in getattr(config, "HOST_429_TERMINAL", ()))
+_env0 = os.environ.get("GMGN_API_KEY")
+try:
+    os.environ["GMGN_API_KEY"] = "verify-key"
+    _c = config.load_credentials()
+    _cfg_src = _read(os.path.join(ROOT, "config.py"))
+    check("load_credentials carries gmgn_api_key (env GMGN_API_KEY first, then config.local.json, then the solana screener's "
+          "config.local.json — never the shared vrp file) and config's smoke test prints presence only",
+          _c.get("gmgn_api_key") == "verify-key" and "SOLANA_SCREENER" in _cfg_src and "creds present" in _cfg_src
+          and '"gmgn_api_key": bool(' in _cfg_src)
+finally:
+    if _env0 is None:
+        os.environ.pop("GMGN_API_KEY", None)
+    else:
+        os.environ["GMGN_API_KEY"] = _env0
+_body = GM.build_trenches_body(("completed",), {"min_liquidity": 25000})
+check("build_trenches_body is GMGN's own client shape — version v2, one section per column with filters / launchpad_platform_v2 / "
+      "limit / quote_address_type, min_*/max_* merged in (without version + quote_address_type the server answers code 0 with EMPTY columns)",
+      _body == {"version": "v2", "completed": {"filters": ["offchain", "onchain"], "launchpad_platform_v2": True,
+                                               "limit": config.GMGN_TRENCHES_LIMIT, "quote_address_type": [11, 20, 24, 12, 0],
+                                               "min_liquidity": 25000}}
+      and set(GM.build_trenches_body()) == {"version", *config.GMGN_TRENCHES_COLUMNS}, str(_body))
+_row = {"address": "0xAbC0000000000000000000000000000000000001", "symbol": "X", "launchpad_platform": "longxyz", "progress": 0.83,
+        "holder_count": 40, "top70_sniper_hold_rate": 0.0001, "suspected_insider_hold_rate": 0.02, "fresh_wallet_rate": 0.31,
+        "rat_trader_amount_rate": 0.005, "smart_degen_count": 2, "is_wash_trading": False}
+_fr = GM.features_from_row(_row)
+check("features_from_row maps a Trenches row onto EXACTLY the gmgn_* feature keys (rates x100, counts int, '' platform -> None, "
+      "missing -> None, bundler ratio only from /v1/token/info) and every key is a FEATURE_FIELD",
+      _fr["gmgn_launchpad_platform"] == "longxyz" and _fr["gmgn_progress"] == 0.83 and _fr["gmgn_holders"] == 40
+      and abs(_fr["gmgn_sniper_hold_pct"] - 0.01) < 1e-9 and abs(_fr["gmgn_insider_hold_pct"] - 2.0) < 1e-9
+      and abs(_fr["gmgn_fresh_wallet_pct"] - 31.0) < 1e-9 and abs(_fr["gmgn_rat_vol_pct"] - 0.5) < 1e-9
+      and _fr["gmgn_smart_degen_count"] == 2 and _fr["gmgn_is_wash_trading"] is False and _fr["gmgn_bundler_ratio"] is None
+      and GM.features_from_row({"launchpad_platform": ""})["gmgn_launchpad_platform"] is None
+      and set(_fr) == set(GM.GMGN_FEATURE_KEYS) and set(GM.GMGN_FEATURE_KEYS) <= set(config.FEATURE_FIELDS), str(_fr))
+_gm_reqs: list = []
+
+
+def _gm_fake(script):
+    def f(req, timeout=None, context=None):
+        _gm_reqs.append((req.full_url, {k.lower(): v for k, v in req.headers.items()}, req.data))
+        r = script(req.full_url, req.data)
+        if isinstance(r, Exception):
+            raise r
+        return _Resp(r)
+    return f
+
+
+_saved_gm = (http_client._urlopen, config.HTTP_RETRIES, http_client._HOST_HZ.get(GM_HOST), GM._api_key)
+try:
+    http_client._HOST_HZ[GM_HOST] = 1000.0
+    http_client.reset_health()
+    GM._api_key = lambda: "verify-key"
+    _ok_body = {"code": 0, "data": {"completed": [_row], "pump": [dict(_row, address="0xDEF")], "new_creation": []}}
+    http_client._urlopen = _gm_fake(lambda u, d: json.dumps(_ok_body).encode())
+    got = GM.trenches(cache_s=0)
+    _u, _h, _d = _gm_reqs[-1]
+    _sent = json.loads(_d.decode())
+    _ts = int(dict(urllib.parse.parse_qsl(urllib.parse.urlparse(_u).query)).get("timestamp") or 0)
+    check("trenches(): POST /v1/trenches?chain=robinhood&timestamp=<FRESH unix seconds>&client_id=…, X-APIKEY header, the v2 body with "
+          "all three columns; the answer is keyed by column with GMGN's `pump` alias mapped to near_completion",
+          got == {"completed": [_row], "near_completion": [dict(_row, address="0xDEF")], "new_creation": []}
+          and "/v1/trenches?" in _u and "chain=robinhood" in _u and abs(_ts - time.time()) < 30 and "client_id=" in _u
+          and _h.get("x-apikey") == "verify-key" and _sent.get("version") == "v2"
+          and set(_sent) == {"version", *config.GMGN_TRENCHES_COLUMNS}, f"{_u} {got!r}"[:300])
+    http_client._urlopen = _gm_fake(lambda u, d: json.dumps({"code": -1, "message": "unsupported chain"}).encode())
+    check("a non-zero GMGN code is deferred (None), never an empty feed", GM.trenches(cache_s=0) is None)
+    n0 = len(_gm_reqs)
+    GM._api_key = lambda: None
+    check("no key configured -> None without a request (the source is dark, not 'nothing new')",
+          GM.trenches(cache_s=0) is None and len(_gm_reqs) == n0)
+    GM._api_key = lambda: "verify-key"
+    http_client.reset_health()
+    n0 = len(_gm_reqs)
+    config.HTTP_RETRIES = 3
+    http_client._urlopen = _gm_fake(lambda u, d: _http_error(u, 429, {"server": "cloudflare", "content-type": "application/json"}))
+    got = GM.trenches(cache_s=0)
+    check("a 429 from openapi.gmgn.ai is TERMINAL for the run: exactly one request, None (deferred), host blocked — GMGN's free-tier "
+          "ban extends 5 s per retry, so the http_client 429 wait-and-retry must not apply here",
+          got is None and len(_gm_reqs) == n0 + 1 and http_client.is_blocked(GM_HOST), str(len(_gm_reqs) - n0))
+    check("while blocked, a second call makes no request", GM.trenches(cache_s=0) is None and len(_gm_reqs) == n0 + 1)
+    http_client.reset_health()
+    _info_body = {"code": 0, "data": {"stat": {"holder_count": 1000, "top70_sniper_hold_rate": 0.01, "suspected_insider_hold_rate": 0.0,
+                                               "fresh_wallet_rate": 0.1, "top_rat_trader_percentage": 0.004},
+                                      "wallet_tags_stat": {"bundler_wallets": 10, "sniper_wallets": 3, "smart_wallets": 2}}}
+    http_client._urlopen = _gm_fake(lambda u, d: json.dumps(_info_body).encode())
+    _TI = "0x" + "c1" * 20
+    ti = GM.token_info(_TI, cache_s=0)
+    check("token_info: GET /v1/token/info?chain=robinhood&address=… -> gmgn_bundler_ratio = bundler_wallets / holder_count, the "
+          "hold rates x100, smart-money count, holders",
+          isinstance(ti, dict) and abs(ti["gmgn_bundler_ratio"] - 0.01) < 1e-9 and ti["gmgn_holders"] == 1000
+          and abs(ti["gmgn_sniper_hold_pct"] - 1.0) < 1e-9 and ti["gmgn_smart_degen_count"] == 2
+          and abs(ti["gmgn_rat_vol_pct"] - 0.4) < 1e-9 and "/v1/token/info?" in _gm_reqs[-1][0]
+          and f"address={_TI}" in _gm_reqs[-1][0] and "chain=robinhood" in _gm_reqs[-1][0], str(ti))
+    http_client._urlopen = _gm_fake(lambda u, d: _http_error(u, 404))
+    check("token_info on an unknown token is ABSENT (NOT_FOUND), a fact — not deferred",
+          http_client.is_absent(GM.token_info("0x" + "c2" * 20, cache_s=0)))
+finally:
+    http_client._urlopen, config.HTTP_RETRIES, GM._api_key = _saved_gm[0], _saved_gm[1], _saved_gm[3]
+    if _saved_gm[2] is not None:
+        http_client._HOST_HZ[GM_HOST] = _saved_gm[2]
+    http_client.reset_health()
+
+_gm_tree = _tree(os.path.join(ROOT, "sources", "gmgn.py"))
+_gm_auth = [n for n in _gm_tree.body if isinstance(n, ast.FunctionDef) and n.name == "_query"]
+check("sources/gmgn.py: the ONLY wall-clock is the auth timestamp inside _query() — GMGN answers AUTH_TIMESTAMP_EXPIRED to a stale "
+      "one (measured: run.py's start-of-run now_s reached pass 2 a minute later); nothing scored reads it",
+      len(_gm_auth) == 1 and _time_time_calls(_compute_nodes(_gm_tree)) == 1 and _time_time_calls(ast.walk(_gm_auth[0])) == 1)
+
+# the adapter: gmgn_* fields are features, never a hard gate; a dark GMGN is named, not scored
+check("SAFETY_FEATURE_KEYS is exactly the safety subset of FEATURE_FIELDS and includes every gmgn_* key",
+      set(SAFE.SAFETY_FEATURE_KEYS) == set(config.FEATURE_FIELDS) - set(RUN.dex.MARKET_KEYS) - {"token", "score", "first_sighting", "sighting_age_s"}
+      and set(GM.GMGN_FEATURE_KEYS) <= set(SAFE.SAFETY_FEATURE_KEYS))
+_s_row = SAFE.empty_safety()
+SAFE._apply_gmgn(_s_row, _row["address"], row=_row, info=False)
+_s_ok = dict(safety)
+_s_ok.update({k: _s_row[k] for k in GM.GMGN_FEATURE_KEYS})
+check("_apply_gmgn(row=…) writes the row's gmgn_* fields without a call and names gmgn in sources_used; the hard gates are "
+      "IDENTICAL with or without them (a GMGN field is never a gate)",
+      _s_row["gmgn_progress"] == 0.83 and _s_row["gmgn_launchpad_platform"] == "longxyz" and "gmgn" in _s_row["sources_used"]
+      and screen.hard_gates(market, _s_ok) == screen.hard_gates(market, safety))
+_saved_ti = GM.token_info
+try:
+    GM.token_info = lambda token, cache_s=None: None
+    _s_dark = SAFE.empty_safety()
+    SAFE._apply_gmgn(_s_dark, _row["address"], row=None, info=True)
+    check("a dark GMGN (token_info deferred) is named in sources_dark, its fields stay None, degraded_fields says 'GMGN wallet tags', "
+          "and band_a_strict is unaffected (the strict band never reads GMGN)",
+          "gmgn" in _s_dark["sources_dark"] and all(_s_dark[k] is None for k in GM.GMGN_FEATURE_KEYS)
+          and any("GMGN wallet tags" in x for x in SAFE.degraded_fields(_s_dark))
+          and B.BUILTINS["band_a_strict"].verdict(dict(good, **{k: None for k in GM.GMGN_FEATURE_KEYS})) is True)
+    GM.token_info = lambda token, cache_s=None: {"gmgn_bundler_ratio": 1.42, "gmgn_holders": 62, "gmgn_sniper_hold_pct": 0.1,
+                                                        "gmgn_insider_hold_pct": 0.0, "gmgn_fresh_wallet_pct": 40.0, "gmgn_rat_vol_pct": 0.0,
+                                                        "gmgn_smart_degen_count": 0, "gmgn_is_wash_trading": None,
+                                                        "gmgn_launchpad_platform": None, "gmgn_progress": None}
+    _s_farm = SAFE.empty_safety()
+    SAFE._apply_gmgn(_s_farm, _row["address"], row=_row, info=True)
+    check("token_info fills the bundler ratio and holders on top of the row's fields (the row's platform/progress survive)",
+          _s_farm["gmgn_bundler_ratio"] == 1.42 and _s_farm["gmgn_holders"] == 62 and _s_farm["gmgn_launchpad_platform"] == "longxyz"
+          and _s_farm["gmgn_progress"] == 0.83 and "gmgn" in _s_farm["sources_used"] and "gmgn" not in _s_farm["sources_dark"])
+finally:
+    GM.token_info = _saved_ti
+
+# discovery: the Trenches feed is a hedge under the 'feeds' quota; its rows ride along to pass 2
+_saved_feed = (GM.trenches, GT.new_pools)
+try:
+    GM.trenches = lambda **k: {"completed": [_row], "near_completion": [], "new_creation": [{"address": "0xDEF" + "0" * 37}]}
+    GT.new_pools = lambda page=1, network=None: []
+    _ft, _frows = RUN.feed_tokens({}, set(), RUN._Budget(60))
+    check("feed_tokens adds every Trenches column's addresses (lowercased, minus seen/known) under the feeds quota and "
+          "returns the rows keyed by address for pass 2",
+          _ft == {_row["address"].lower(), "0xdef" + "0" * 37} and set(_frows) == _ft
+          and _frows[_row["address"].lower()]["launchpad_platform"] == "longxyz", str(_ft))
+    _ft2, _ = RUN.feed_tokens({_row["address"].lower(): 1}, {"0xdef" + "0" * 37}, RUN._Budget(60))
+    GM.trenches = lambda **k: None
+    _ft3, _frows3 = RUN.feed_tokens({}, set(), RUN._Budget(60))
+    check("seen/known tokens are not re-fed; a deferred feed (None) contributes nothing and no rows",
+          _ft2 == set() and _ft3 == set() and _frows3 == {})
+finally:
+    GM.trenches, GT.new_pools = _saved_feed
+
+# the alert card and the dashboard card carry the GMGN + explorer deep links and a GMGN line
+_TOK = "0x" + "ab" * 20
+_gm_url = config.GMGN_TOKEN_URL.format(chain=config.GMGN_CHAIN, token=_TOK)
+_bs_url = config.BLOCKSCOUT_TOKEN_URL.format(token=_TOK)
+_card_dark = dict(surv_a, token=_TOK, sources_dark=["gmgn"], **{k: None for k in GM.GMGN_FEATURE_KEYS})
+_, _b_dark = alerts.format_alert([_card_dark], band=CHAMP)
+_card_ok = dict(surv_a, token=_TOK, gmgn_bundler_ratio=0.01, gmgn_sniper_hold_pct=0.5, gmgn_insider_hold_pct=0.0,
+                gmgn_smart_degen_count=2, gmgn_is_wash_trading=False, gmgn_launchpad_platform="longxyz", gmgn_progress=1.0)
+_, _b_ok = alerts.format_alert([_card_ok], band=CHAMP)
+check("every A card carries the GMGN token deep link and the explorer token link; the GMGN line prints the wallet-tag numbers "
+      "when present and 'unavailable (passed through)' when the source is dark",
+      _gm_url in _b_dark and _bs_url in _b_dark and "GMGN: unavailable" in _b_dark
+      and _gm_url in _b_ok and "GMGN:" in _b_ok and "bundler" in _b_ok and "0.01" in _b_ok and "longxyz" in _b_ok
+      and config.FOOTER in _b_ok, _b_ok[-600:])
+_card_html = DASHM._card(dict(_card_ok, url="https://dexscreener.com/robinhood/0xpair"), CHAMP)
+check("the dashboard card links to Dexscreener, GMGN and the explorer as SEPARATE anchors (no nested <a>)",
+      f'href="{_gm_url}"' in _card_html and 'href="https://dexscreener.com/robinhood/0xpair"' in _card_html
+      and f'href="{_bs_url}"' in _card_html and not _card_html.lstrip().startswith("<a"))
+
+# the three pre-declared bands: candidates, never the champion; NA on unknown; controls untouched
+_reg_names = {e_["name"]: e_ for e_ in json.load(open(config.REGISTRY_PATH))["candidates"]}
+for _bn in ("band_gmgn_clean", "band_new_creation", "band_almost_bonded"):
+    check(f"{_bn} is a builtin band registered as a candidate (module entry_lab.bands, registered_at_event_seq set)",
+          _bn in B.BUILTINS and _reg_names.get(_bn, {}).get("status") == "candidate"
+          and _reg_names[_bn]["module"] == "entry_lab.bands" and int(_reg_names[_bn].get("registered_at_event_seq") or 0) > 0
+          and set(B.BUILTINS[_bn].REQUIRES) <= set(config.FEATURE_FIELDS))
+_GC = B.BUILTINS["band_gmgn_clean"]
+check("band_gmgn_clean = the strict band AND organic GMGN wallet tags: True on the clean fixture, False at bundler ratio 0.2 "
+      "(A-band max 0.10) or on wash trading, NA when GMGN is dark, False on a strict-band miss whatever GMGN says",
+      _GC.verdict(good) is True and _GC.verdict(dict(good, gmgn_bundler_ratio=0.2)) is False
+      and _GC.verdict(dict(good, gmgn_is_wash_trading=True)) is False
+      and _GC.verdict(dict(good, gmgn_bundler_ratio=None, gmgn_is_wash_trading=None)) is None
+      and _GC.verdict(dict(good, pair_age_min=30.0, gmgn_bundler_ratio=None)) is False
+      and "bundler" in _GC.explain(dict(good, gmgn_bundler_ratio=0.2)))
+_NC = B.BUILTINS["band_new_creation"]
+check("band_new_creation: the New column as a band — pair age <= BAND_NC_MAX_AGE_MIN with the liquidity floor and a known sell "
+      "round trip; False once older; NA when the round trip is unknown",
+      _NC.verdict(dict(good, pair_age_min=10.0)) is True and _NC.verdict(good) is False
+      and _NC.verdict(dict(good, pair_age_min=10.0, liq_usd=config.LIQ_FLOOR_USD - 1)) is False
+      and _NC.verdict(dict(good, pair_age_min=10.0, roundtrip_loss_pct=None)) is None
+      and _NC.verdict(dict(good, pair_age_min=10.0, roundtrip_loss_pct=config.HC_MAX_ROUNDTRIP_PCT + 1)) is False)
+_AB = B.BUILTINS["band_almost_bonded"]
+check("band_almost_bonded: the Almost-bonded column as a band — GMGN progress >= BAND_AB_MIN_PROGRESS on a curve not yet completed; "
+      "False once completed or below the floor; NA without a progress reading",
+      _AB.verdict(dict(good, gmgn_progress=0.8, launchpad_completed=False)) is True
+      and _AB.verdict(dict(good, gmgn_progress=0.8, launchpad_completed=True)) is False
+      and _AB.verdict(dict(good, gmgn_progress=0.3, launchpad_completed=False)) is False
+      and _AB.verdict(dict(good, gmgn_progress=None, launchpad_completed=False)) is None
+      and _AB.verdict(dict(good, gmgn_progress=0.8, launchpad_completed=False, liq_usd=config.LIQ_FLOOR_USD - 1)) is False)
+check("the controls are untouched by the GMGN fields (ctl_random_band is sha256-of-token; ctl_inverse_band is the champion's complement)",
+      B.BUILTINS["ctl_random_band"].verdict(dict(good, gmgn_bundler_ratio=9.0)) == B.BUILTINS["ctl_random_band"].verdict(good)
+      and LAB.evaluate_bands(dict(good, gmgn_bundler_ratio=9.0), REG, CHAMP)["ctl_inverse_band"] is False)
+
+_reg_bands = [e_["name"] for e_ in json.load(open(config.REGISTRY_PATH))["candidates"]
+              if e_.get("kind") == "band" and e_.get("status") != "control"]
+_ever = set(TRIALS_MOD.load().get("bands_ever_scored") or [])
+check("every non-control band in registry.json is a counted trial in trials.json (the entry DSR deflates by len(bands_ever_scored); "
+      "a hand-registered band that skips it under-deflates every later gate)",
+      set(_reg_bands) <= _ever, str(sorted(set(_reg_bands) - _ever)))
+_saved_cd = config.CACHE_DIR
+_saved_gm2 = (http_client._urlopen, GM._api_key, http_client._HOST_HZ.get(GM_HOST))
+try:
+    http_client._HOST_HZ[GM_HOST] = 1000.0
+    http_client.reset_health()
+    GM._api_key = lambda: "verify-key"
+    with tempfile.TemporaryDirectory() as _cd:
+        config.CACHE_DIR = _cd
+        http_client._urlopen = _gm_fake(lambda u, d: json.dumps({"code": -1, "message": "boom"}).encode())
+        GM.trenches(cache_s=600)
+        GM.token_info("0x" + "c3" * 20, cache_s=600)
+        n_err = len(os.listdir(_cd))
+        http_client._urlopen = _gm_fake(lambda u, d: json.dumps(_ok_body).encode())
+        GM.trenches(cache_s=600)
+        n_ok = len(os.listdir(_cd))
+        http_client._urlopen = _gm_fake(lambda u, d: _http_error(u, 404))
+        GM.token_info("0x" + "c4" * 20, cache_s=600)
+        n_abs = len(os.listdir(_cd))
+        http_client._urlopen = _gm_fake(lambda u, d: (_ for _ in ()).throw(AssertionError("must be served from cache")))
+        again = GM.trenches(cache_s=600)
+        check("GMGN error envelopes (HTTP 200, code != 0) are NEVER cached — deferred is retried; a code-0 answer and a 404 (absent) are; "
+              "a cached Trenches answer is served without a request",
+              n_err == 0 and n_ok == 1 and n_abs == 2 and again == {"completed": [_row], "near_completion": [dict(_row, address="0xDEF")], "new_creation": []},
+              str((n_err, n_ok, n_abs)))
+finally:
+    config.CACHE_DIR = _saved_cd
+    http_client._urlopen, GM._api_key = _saved_gm2[0], _saved_gm2[1]
+    if _saved_gm2[2] is not None:
+        http_client._HOST_HZ[GM_HOST] = _saved_gm2[2]
+    http_client.reset_health()
+_wf_txt = _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
+check("screener.yml passes GMGN_API_KEY to BOTH the preflight step and the scan step (preflight exists to probe from the runner's IP)",
+      _wf_txt.count("GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}") == 2)
+
+# plumbing: the cloud secret, the workflow env, the preflight probe, the docs page
+check("GMGN_API_KEY is piped by cloud_secrets.py, passed by screener.yml, and preflight probes openapi.gmgn.ai",
+      "GMGN_API_KEY" in _read(os.path.join(ROOT, "cloud_secrets.py"))
+      and "GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}" in _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
+      and "gmgn" in _read(os.path.join(ROOT, "preflight.py")))
+_gdoc = os.path.join(ROOT, "docs", "GMGN_TRENCHES.md")
+check("docs/GMGN_TRENCHES.md exists, names the three columns and the filter translation, and carries no home path",
+      os.path.exists(_gdoc) and all(w in _read(_gdoc) for w in ("Migrated", "Almost bonded", "min_liquidity", "robinhood"))
+      and "/Users/" not in _read(_gdoc))
 
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")

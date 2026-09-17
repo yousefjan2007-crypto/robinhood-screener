@@ -2,8 +2,8 @@
 Set the GitHub Actions secrets for the cloud scan WITHOUT a value ever touching argv, a log, or
 shell history. THE HUMAN RUNS THIS (an assistant may not enter credentials).
 
-    python3 cloud_secrets.py           # pipe TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID / NTFY_TOPIC
-                                       # from config.load_credentials() into `gh secret set`
+    python3 cloud_secrets.py           # pipe TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID / NTFY_TOPIC /
+                                       # GMGN_API_KEY from config.load_credentials() into `gh secret set`
     python3 cloud_secrets.py --check   # list the secret NAMES the repo has
 
 Values go to `gh` over stdin — never as a command-line argument (argv is visible to every process
@@ -38,7 +38,8 @@ def main(argv: list) -> int:
     tg = creds.get("telegram") or {}
     results = [_set("TELEGRAM_BOT_TOKEN", tg.get("bot_token") or ""),
                _set("TELEGRAM_CHAT_ID", str(tg.get("chat_id") or "")),
-               _set("NTFY_TOPIC", creds.get("ntfy_topic") or "")]
+               _set("NTFY_TOPIC", creds.get("ntfy_topic") or ""),
+               _set("GMGN_API_KEY", creds.get("gmgn_api_key") or "")]
     print("done" if all(results) else "some secrets were NOT set — fix and rerun")
     return 0 if all(results) else 1
 

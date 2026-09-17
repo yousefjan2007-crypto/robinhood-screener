@@ -25,6 +25,7 @@ python3 run.py                                      # dry: writes nothing, sends
 python3 run.py --commit                             # write ledger/state/scan/verdicts, send nothing
 python3 run.py --send                               # write AND alert — only the workflow runs this
 python3 preflight.py                                # source probes from wherever it runs; commits nothing
+python3 sources/gmgn.py                             # one live Trenches pull + one token_info (needs the GMGN key)
 python3 ledger.py                                   # A-vs-B scorecard, promoted-B n, suspect line
 python3 paper_exec.py                               # paper A book (--live marks the open book: one Multicall3)
 python3 dashboard.py --write                        # render docs/index.html (no flag = smoke test only)
@@ -71,8 +72,13 @@ pass-2 refresh at most every `GT_INFO_REFRESH_S` for `WATCH_REFRESH_PER_RUN` tok
 fewest `hc_checks` misses. `RUN_TIME_BUDGET_S` is global; cuts land in `deferred_by_stage`.
 
 **Two passes, one adapter.** `sources/safety.py` is the boundary: `pass1_many` (Multicall3 chain
-facts + ScanHood + legacy creator index) and `pass2` (GT info → Blockscout → RobinX, threaded, budgeted)
-produce the one flat safety dict; `screen.hard_gates` runs after each. `screen.hc_checks(feat)` is
+facts + ScanHood + legacy creator index) and `pass2` (GT info → Blockscout → RobinX → GMGN, threaded,
+budgeted) produce the one flat safety dict; `screen.hard_gates` runs after each. GMGN (`sources/gmgn.py`,
+keyed) is the Trenches feed (`DISCOVERY_FEEDS`, one POST per run for New / Almost bonded / Migrated)
+plus `/v1/token/info` wallet tags for the first `GMGN_INFO_BUDGET_PER_RUN` pass-2 tokens; its `gmgn_*`
+fields are **features only** (three pre-declared candidate bands read them: `band_gmgn_clean`,
+`band_new_creation`, `band_almost_bonded`), never a hard gate, and a dark GMGN is named in
+`sources_dark`. `docs/GMGN_TRENCHES.md` is the operator's Trenches guide. `screen.hc_checks(feat)` is
 the **single** implementation of the A-tier checks (`None` for unknown / degraded inputs);
 `high_conviction` and `band_a_strict` both derive from it. `entry_lab/runtime.build_feat` is the
 single normalizer to `config.FEATURE_FIELDS` (NaN/inf/NA → `None`, every key present).
@@ -213,6 +219,13 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   inferred from the list, never from an HTTP status; a non-list body is deferred, not absent.
 - **`http_client` treats only 400/404 as absent**; ScanHood's explicit no-route is a 422 and
   surfaces as deferred after retries. `quotes.py` handles it; do not read it as death elsewhere.
+- **GMGN's `/v1/trenches` answers code 0 with EMPTY columns to a body without `version: v2` and
+  `quote_address_type`** — a trap that reads like "nothing new", not an outage; `gmgn.build_trenches_body`
+  is the one place the shape lives (GMGN's own client's). A 429 there is a **ban** whose cooldown
+  extends 5 s per retry, so `HOST_429_TERMINAL` makes it one request, deferred, dark for the run. The
+  auth timestamp must be fresh per request (`AUTH_TIMESTAMP_EXPIRED` when run.py's start-of-run `now_s`
+  reached pass 2) — the one wall-clock in a source module, pinned by verify to `gmgn._query`. Its
+  Trenches allow-list omits `pons_v2` and bare V2/V3/V4 pools, so the feed is a hedge, never the cursor.
 - **The workflow does `git add data/ docs/`** — anything new and non-ignored under `data/` is
   committed automatically; the livebook files, `cache/` and `data/backups/` are gitignored.
 - **Alerts go out EARLY in a run**: tokens the champion band selects on pass-1 facts get pass 2

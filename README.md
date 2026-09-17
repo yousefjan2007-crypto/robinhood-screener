@@ -87,7 +87,7 @@ Claude session proposes new candidates that merge only if `verify.py` is green.
 | `preflight.py` | Probes every source from wherever it runs (the Actions runner or the Mac); commits nothing. |
 | `cloud_secrets.py` | Pipes the alert secrets into `gh secret set` over stdin. The human runs it. |
 | `verify.py` | The invariant suite — the only tests. Offline, fail-fast. |
-| `sources/` | One module per vendor (`rpc`, `blockscout`, `geckoterminal`, `dexscreener`, `scanhood`, `robinx`, `kyber`) plus `safety.py`, the adapter that fuses them into the one flat safety dict with the pass-through rule. |
+| `sources/` | One module per vendor (`rpc`, `blockscout`, `geckoterminal`, `dexscreener`, `scanhood`, `robinx`, `kyber`, `gmgn`) plus `safety.py`, the adapter that fuses them into the one flat safety dict with the pass-through rule. |
 | `selfimprove/` | The exit loop: `policies.py` (16 policies + 2 controls), `livebook.py` (the Mac's live multi-policy book), `paths.py`/`backfill.py`/`evaluate.py` (bar backtest), `improve.py` (the 7-check exit gate), `champion.py` (the sole writer of `champion.json`), `publish.py`, `weekly_summary.py`, `run_improve.sh`, `trials.json`. |
 | `selfimprove/entry_lab/` | The entry loop: `bands.py` (bands as pure functions + controls + the registry loader), `runtime.py` (feature normalizer, band evaluation, event decisions, watchlist), `store.py` (the verdict sidecar), `scorecard.py`, `improve_bands.py` (the 9-check entry gate). |
 | `selfimprove/candidates/` | The research pool: `registry.json`, `register.py --scan`, `_template.py`, and every candidate module the weekly session has proposed. |
@@ -177,6 +177,7 @@ be B, and only rarely A. That bias is stated on the dashboard and in the weekly 
 | ScanHood | free, keyless | chain-specific verdict + sell simulation, a read-only swap quote, the launch feed |
 | RobinX | free tier | deployer track record (launched / real / dead / score), insider flags |
 | KyberSwap | free, keyless | aggregator route with USD legs and gas — paper fills for tokens with no V2 pair |
+| GMGN (`openapi.gmgn.ai`) | keyed, free tier | the Trenches feed (New / Almost bonded / Migrated) as a discovery hedge, and the behavioural wallet tags — bundler wallets ÷ holders, sniper / insider / fresh-wallet hold rates, smart-money count, wash-trading flag — as pass-2 **features, never a gate**. Its Trenches allow-list omits `pons_v2` and bare V2/V3/V4 pools (72 of the top-100 rank rows, 2026-09-12), so it complements the log cursor; a 429 is a ban and is terminal for the run. See [`docs/GMGN_TRENCHES.md`](docs/GMGN_TRENCHES.md). |
 
 ## The two death tests (they differ on purpose)
 

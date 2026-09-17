@@ -416,6 +416,109 @@ band_volume_early = _register(BandSpec(
     ("latest_scan.json history 2026-09-12 (40 survivors, first sighting vs mcap 2.5 h later)",),
     "candidate", _band_volume_early, _explain_volume_early))
 
+# ── the GMGN bands (pre-declared 2026-09-13) ──────────────────────────────────────
+_GMGN_REQUIRES = ("gmgn_bundler_ratio", "gmgn_is_wash_trading")
+
+
+def _band_gmgn_clean(f):
+    """The strict band AND organic GMGN wallet tags: bundler wallets / holders at or below the
+    A-band max (organic 0.00-0.01; the $Cubrate wallet farm 1.42) and no wash-trading flag."""
+    c = screen.hc_checks(f)
+    br, wash = f.get("gmgn_bundler_ratio"), f.get("gmgn_is_wash_trading")
+    c["gmgn_bundler"] = None if br is None else br <= config.HC_GMGN_BUNDLER_RATIO_MAX
+    c["gmgn_wash"] = None if wash is None else (wash is False)
+    return _all_or_none(c)
+
+
+def _explain_gmgn_clean(f):
+    parts = []
+    br, wash = f.get("gmgn_bundler_ratio"), f.get("gmgn_is_wash_trading")
+    if br is None:
+        parts.append("unknown: GMGN bundler ratio")
+    elif br > config.HC_GMGN_BUNDLER_RATIO_MAX:
+        parts.append(f"GMGN bundler ratio {br:.2f} above {config.HC_GMGN_BUNDLER_RATIO_MAX:.2f} (organic ~0.01)")
+    if wash is None:
+        parts.append("unknown: GMGN wash-trading flag")
+    elif wash:
+        parts.append("GMGN flags wash trading")
+    rest = _hc_explain(f)
+    if rest:
+        parts.append(rest)
+    return "; ".join(parts)
+
+
+band_gmgn_clean = _register(BandSpec(
+    "band_gmgn_clean",
+    "Pre-declared 2026-09-13: band_a_strict plus GMGN's behavioural wallet tags — bundler wallets "
+    "/ holders <= HC_GMGN_BUNDLER_RATIO_MAX and no wash-trading flag. On solana the bundler RATIO "
+    "was the one signal that separated the $Cubrate wallet farm (1.42, RugCheck insider "
+    "networks 0 before and after the rug) from organic coins (WIF 0.002, trumplet 0.01). Tests "
+    "whether that second opinion buys survival here; NA when GMGN is dark, never a silent False.",
+    _HC_REQUIRES + _GMGN_REQUIRES,
+    ("solana $Cubrate post-mortem (2026-07-05)", "GMGN /v1/token/info wallet_tags_stat"),
+    "candidate", _band_gmgn_clean, _explain_gmgn_clean, THREE_VALUED=True))
+
+
+def _band_new_creation(f):
+    return (f["pair_age_min"] <= config.BAND_NC_MAX_AGE_MIN
+            and f["liq_usd"] >= config.LIQ_FLOOR_USD
+            and f["roundtrip_loss_pct"] <= config.HC_MAX_ROUNDTRIP_PCT)
+
+
+def _explain_new_creation(f):
+    parts = []
+    if f["pair_age_min"] > config.BAND_NC_MAX_AGE_MIN:
+        parts.append(f"age above {config.BAND_NC_MAX_AGE_MIN:.0f}m (not a new creation)")
+    if f["liq_usd"] < config.LIQ_FLOOR_USD:
+        parts.append(f"liq below ${config.LIQ_FLOOR_USD:,.0f}")
+    if f["roundtrip_loss_pct"] > config.HC_MAX_ROUNDTRIP_PCT:
+        parts.append(f"round trip above {config.HC_MAX_ROUNDTRIP_PCT:.0f}%")
+    return "; ".join(parts)
+
+
+band_new_creation = _register(BandSpec(
+    "band_new_creation",
+    "Pre-declared 2026-09-13: GMGN Trenches' NEW column as a band — a priced pair no older than "
+    "BAND_NC_MAX_AGE_MIN with the liquidity floor and a KNOWN sell round trip, and nothing else "
+    "(band_volume_early adds the volume/flow condition; this is the unconditioned early entry). "
+    "The base rate is the hypothesis under test: 0.2-2 % of curve launches ever graduate and "
+    "~69 % never trade past their creation day.",
+    ("pair_age_min", "liq_usd", "roundtrip_loss_pct"),
+    ("GMGN Trenches new_creation column (2026-09-13)", "arXiv 2607.02823 graduation rates"),
+    "candidate", _band_new_creation, _explain_new_creation))
+
+
+def _band_almost_bonded(f):
+    return (f["gmgn_progress"] >= config.BAND_AB_MIN_PROGRESS and f["gmgn_progress"] < 1.0
+            and f.get("launchpad_completed") is not True
+            and f["liq_usd"] >= config.LIQ_FLOOR_USD
+            and f["roundtrip_loss_pct"] <= config.HC_MAX_ROUNDTRIP_PCT)
+
+
+def _explain_almost_bonded(f):
+    parts = []
+    if f.get("launchpad_completed") is True or f["gmgn_progress"] >= 1.0:
+        parts.append("curve already completed (migrated)")
+    elif f["gmgn_progress"] < config.BAND_AB_MIN_PROGRESS:
+        parts.append(f"curve progress {100 * f['gmgn_progress']:.0f}% below {100 * config.BAND_AB_MIN_PROGRESS:.0f}%")
+    if f["liq_usd"] < config.LIQ_FLOOR_USD:
+        parts.append(f"liq below ${config.LIQ_FLOOR_USD:,.0f}")
+    if f["roundtrip_loss_pct"] > config.HC_MAX_ROUNDTRIP_PCT:
+        parts.append(f"round trip above {config.HC_MAX_ROUNDTRIP_PCT:.0f}%")
+    return "; ".join(parts)
+
+
+band_almost_bonded = _register(BandSpec(
+    "band_almost_bonded",
+    "Pre-declared 2026-09-13: GMGN Trenches' ALMOST-BONDED column as a band — GMGN curve progress "
+    ">= BAND_AB_MIN_PROGRESS and below 1.0 on a launch not yet completed, priced, with the "
+    "liquidity floor and a known sell round trip. Tests the 'buy the curve before migration' "
+    "entry GMGN's own guide recommends against buying above ~$45k on the curve; NA without a "
+    "GMGN progress reading.",
+    ("gmgn_progress", "liq_usd", "roundtrip_loss_pct"),
+    ("GMGN Trenches near_completion column (2026-09-13)", "GeckoTerminal launchpad_details"),
+    "candidate", _band_almost_bonded, _explain_almost_bonded))
+
 ctl_random_band = _register(BandSpec(
     "ctl_random_band",
     "NEGATIVE CONTROL. Selects a sha256-chosen BAND_CTL_RANDOM_RATE share of tokens and fires at "
@@ -629,6 +732,10 @@ def clean_fixture() -> dict:
         "gt_verified": True, "launchpad_graduation_pct": 100.0, "launchpad_completed": True,
         "launchpad_completed_age_s": 9000.0, "holders_updated_age_s": 600.0,
         "scanhood_verdict": "PASS", "scanhood_sellable": True, "sources_dark": [],
+        "gmgn_launchpad_platform": "flap", "gmgn_progress": 1.0, "gmgn_bundler_ratio": 0.01,
+        "gmgn_sniper_hold_pct": 0.5, "gmgn_insider_hold_pct": 0.0, "gmgn_fresh_wallet_pct": 5.0,
+        "gmgn_rat_vol_pct": 0.0, "gmgn_smart_degen_count": 2, "gmgn_is_wash_trading": False,
+        "gmgn_holders": 1400,
         "token": "0x" + "ab" * 20, "first_sighting": True, "sighting_age_s": 0.0,
     })
     f["score"] = screen.soft_score(f, f)[0]

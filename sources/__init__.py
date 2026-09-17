@@ -16,6 +16,9 @@ normalized flat dicts. What only each source can do:
   robinx.py        FREE tier: deployer track record (launched / real / dead / score), insider
                    flags, a 10-min-delayed launch feed.
   kyber.py         keyless aggregator route quote — paper fills for tokens with no V2 pair.
+  gmgn.py          KEYED: GMGN's Trenches feed (New / Almost bonded / Migrated, one POST) as a
+                   discovery hedge, and /v1/token/info wallet tags (bundler ratio, sniper /
+                   insider / fresh-wallet hold rates, smart money) as pass-2 features — never a gate.
   safety.py        THE ADAPTER BOUNDARY: fuses the above into the one flat dict that
                    screen.hard_gates / screen.hc_checks consume, with the pass-through rule.
 """

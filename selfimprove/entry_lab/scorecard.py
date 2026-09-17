@@ -77,6 +77,7 @@ SHUFFLE_INNER_REPS = 400                                   # cheap inner bound i
 # REQUIRES field -> the source that answers it (substring rules, first match wins). A row whose
 # sources_dark names one of the champion's sources was tiered on partial facts.
 FIELD_SOURCE_RULES = (
+    (("gmgn_",), "gmgn"),                 # first: gmgn_holders / gmgn_sniper_* must not match the rules below
     (("gt_", "launchpad_", "holders_updated", "top10_pct_gt"), "geckoterminal"),
     (("holders", "top10", "template", "is_scam", "deployer", "verified_source", "is_proxy",
       "creator_prior", "creator_dead"), "blockscout"),

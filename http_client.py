@@ -254,6 +254,14 @@ def _request(url: str, data: bytes | None, headers: dict | None):
                     h["ok"] += 1
                     h["absent"] += 1
                 return NOT_FOUND
+            if code == 429 and host in getattr(config, "HOST_429_TERMINAL", ()):
+                # a 429 from this host is a BAN whose cooldown extends with every retry (GMGN:
+                # +5 s per request, up to 5 min): one request, deferred, dark for the rest of
+                # the run — the wait-and-retry below would only lengthen the ban
+                _record(host, False, code, exc)
+                mark_blocked(host, "rate-limit banned (429): dark for this run")
+                print(f"  [http 429] {host}: rate-limit banned — dark for this run :: {_describe(exc)[:160]}")
+                return None
             if _is_bot_challenge(code, exc):
                 if not rotated and _rotate_headers(host):
                     rotated = True           # one retry with the next header set, not counted

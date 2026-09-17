@@ -43,6 +43,8 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Preflight (sources as seen from the runner IP; commits nothing)
         if: ${{ github.event.inputs.mode == 'preflight' }}
+        env:
+          GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}
         run: python preflight.py
       - name: Run screener
         if: ${{ github.event.inputs.mode != 'preflight' }}
@@ -50,6 +52,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}
           TRIGGER: ${{ github.event_name == 'schedule' && 'schedule' || github.event.inputs.trigger }}
         run: |
           if [ "${{ github.event.inputs.mode }}" = "dry" ]; then python run.py; else python run.py --send; fi

@@ -40,6 +40,7 @@ from selfimprove.entry_lab import bands as BANDS
 from selfimprove.entry_lab import runtime as LAB
 from selfimprove.entry_lab import store as STORE
 from sources import dexscreener as dex
+from sources import gmgn                                          # noqa: E402
 from sources import geckoterminal as gt
 from sources import rpc
 from sources import safety as SAFE
@@ -157,8 +158,13 @@ def discover_from_logs(cursor: dict, head: int | None, budget: _Budget) -> tuple
     return disc, new, gap
 
 
-def feed_tokens(seen: dict, known: set, budget: _Budget) -> set:
+def feed_tokens(seen: dict, known: set, budget: _Budget) -> tuple:
+    """(new addresses, GMGN Trenches rows keyed by address). The feeds are HEDGES under the
+    'feeds' quota beside the exact log cursor: GeckoTerminal's new pools, and GMGN's three
+    Trenches columns in ONE POST — whose rows ride along to pass 2 as features (no second call).
+    A deferred feed contributes nothing and no rows; it is never 'nothing new'."""
     out: set = set()
+    rows: dict = {}
     if "gt_new_pools" in config.DISCOVERY_FEEDS:
         for page in range(1, config.GT_NEW_POOLS_PAGES + 1):
             if not budget.ok("feeds"):
@@ -167,7 +173,17 @@ def feed_tokens(seen: dict, known: set, budget: _Budget) -> set:
                 t = (p.get("token") or "").lower()
                 if t and t not in seen and t not in known:
                     out.add(t)
-    return out
+    if "gmgn_trenches" in config.DISCOVERY_FEEDS and budget.ok("feeds"):
+        cols = gmgn.trenches()
+        for rs in (cols or {}).values():
+            for r in rs or []:
+                t = str((r or {}).get("address") or "").lower()
+                if not (t.startswith("0x") and len(t) == 42):
+                    continue
+                rows[t] = r
+                if t not in seen and t not in known:
+                    out.add(t)
+    return out, rows
 
 
 # ── the screen for one token ──────────────────────────────────────────────────────
@@ -231,7 +247,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     due_re = sorted((t for t, r in recheck.items() if float(r.get("next_check", 0)) <= now_s),
                     key=lambda t: float(recheck[t].get("next_check", 0)))[: config.RECHECK_PER_RUN]
     known = set(ledger_index) | set(watch) | set(recheck) | set(log_tokens)
-    feeds = feed_tokens(seen, known, budget)
+    feeds, gmgn_rows = feed_tokens(seen, known, budget)
     # quotas: logs → watchlist → rechecks → feeds, unused quota spills forward; watchlist exempt
     # from MAX_DISCOVER (it is a batched re-enrich, not discovery)
     order: list = []
@@ -396,12 +412,16 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     p2_rest = p2_rest[: p2_budget + config.WATCH_REFRESH_PER_RUN]
     deferred_by_stage["pass2_overflow"] = len([t for t in fresh if t not in p2_rest])
     safety: dict = {}
+    # GMGN /v1/token/info (weight 1 each) for the first GMGN_INFO_BUDGET_PER_RUN tokens in pass-2
+    # order — the alert candidates first; every token still gets its Trenches row for free
+    gmgn_info_set = set((prio + [t for t in p2_rest if t not in prio])[: config.GMGN_INFO_BUDGET_PER_RUN])
 
     def _p2(t, fast=False):
         if not budget.ok("pass2"):
             return t, None
         try:
-            return t, SAFE.pass2(t, markets[t], s1[t], now_s, disc=dmap.get(t), fast=fast)
+            return t, SAFE.pass2(t, markets[t], s1[t], now_s, disc=dmap.get(t), fast=fast,
+                                 gmgn_row=gmgn_rows.get(t), gmgn_info=(t in gmgn_info_set))
         except Exception as exc:          # one bad token never kills the run
             print(f"  ! pass2({t[:10]}…) failed: {exc}")
             return t, None

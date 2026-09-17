@@ -25,6 +25,7 @@ import os
 HOME = os.path.expanduser("~")
 ROOT = os.path.dirname(os.path.abspath(__file__))
 VRP_BACKTEST = os.path.join(HOME, "vrp_backtest")   # the shared Mac secrets file lives here
+SOLANA_SCREENER = os.path.join(HOME, "solana_screener")   # sibling screener: its GMGN key is borrowed (read-only)
 
 DATA_DIR = os.path.join(ROOT, "data")       # ledger + state — COMMITTED back on cloud runs
 CACHE_DIR = os.path.join(ROOT, "cache")     # ephemeral API caches — gitignored
@@ -86,6 +87,10 @@ RPC_RATE_HZ = 2.0                  # public RPC 429s under bursts of ~5+/s; 2 Hz
 SCANHOOD_RATE_HZ = 3.0             # free tier ~5 req/s per IP
 ROBINX_RATE_HZ = 0.5               # free-tier caps unpublished ("rate-capped") → conservative
 KYBER_RATE_HZ = 1.0                # undocumented; 10 rapid calls OK
+GMGN_RATE_HZ = 0.5                 # openapi.gmgn.ai: a weighted leaky bucket (rate 20 / capacity 20; trenches weight 3,
+                                   # token/info weight 1) on paper, but the FREE tier banned a probe after 13 spaced calls
+                                   # (429 RATE_LIMIT_BANNED, 2026-09-12) and a ban extends 5 s per retry — so 0.5 Hz, and
+                                   # a 429 is terminal for the run (HOST_429_TERMINAL), never waited out
 HOST_RATE_HZ = {                   # assembled from the named constants — http_client has no literals
     "api.dexscreener.com": DEXSCREENER_RATE_HZ,
     "api.geckoterminal.com": GECKOTERMINAL_RATE_HZ,
@@ -94,8 +99,10 @@ HOST_RATE_HZ = {                   # assembled from the named constants — http
     "scanhood.xyz": SCANHOOD_RATE_HZ,
     "api.robinx.io": ROBINX_RATE_HZ,
     "aggregator-api.kyberswap.com": KYBER_RATE_HZ,
+    "openapi.gmgn.ai": GMGN_RATE_HZ,
 }
 DEFAULT_RATE_HZ = 2.0
+HOST_429_TERMINAL = ("openapi.gmgn.ai",)   # a 429 here is a BAN: one request, deferred, dark for the run (no wait-and-retry)
 ENRICH_CACHE_MIN = 2         # dexscreener market snapshots
 INFO_CACHE_MIN = 10          # mutable per-token facts (holders, top-10, GT info, RobinX wallet)
 GT_NEW_POOLS_CACHE_S = 60    # the new_pools feed page
@@ -125,6 +132,24 @@ RPC_URL = "https://rpc.mainnet.chain.robinhood.com"
 BLOCKSCOUT_BASE = "https://robinhoodchain.blockscout.com"
 GT_NETWORK = "robinhood"           # GeckoTerminal network slug
 DEX_CHAIN = "robinhood"            # Dexscreener chain slug
+# ── GMGN (openapi.gmgn.ai) — the Trenches feed + the wallet-tag second opinion; keyed ──────
+# GMGN lists Robinhood Chain as a first-class chain (slug `robinhood`; verified live 2026-09-12/13:
+# POST /v1/trenches returned 60 rows per column, GET /v1/token/info and /v1/token/security answer).
+# Its Trenches feed applies a fixed launchpad allow-list that omits pons_v2 and bare V2/V3/V4 pools
+# (72 of the top-100 rank rows on 2026-09-12), so it is a discovery HEDGE beside the log cursor,
+# never a replacement. The body shape below is GMGN's own client's (OpenApiClient.ts
+# buildTrenchesBody): without `version: v2` + `quote_address_type` the server answers code 0 with
+# EMPTY columns — a trap, not an outage.
+GMGN_CHAIN = "robinhood"
+GMGN_BASE = "https://openapi.gmgn.ai"
+GMGN_TOKEN_URL = "https://gmgn.ai/{chain}/token/{token}"          # the terminal deep link in every alert
+BLOCKSCOUT_TOKEN_URL = BLOCKSCOUT_BASE + "/token/{token}"          # the explorer deep link beside it
+GMGN_TRENCHES_COLUMNS = ("new_creation", "near_completion", "completed")   # New / Almost bonded / Migrated
+GMGN_TRENCHES_LIMIT = 80           # the documented maximum per column
+GMGN_TRENCHES_FILTERS = ("offchain", "onchain")
+GMGN_QUOTE_ADDRESS_TYPES = (11, 20, 24, 12, 0)   # TRENCHES_QUOTE_ADDRESS_TYPES["robinhood"] in GMGN's client
+GMGN_TRENCHES_CACHE_S = 120        # one POST per run; the feed moves every minute
+GMGN_INFO_BUDGET_PER_RUN = 20      # /v1/token/info calls per run (weight 1 each), pass-2 order
 BLOCK_TIME_S = 0.101               # Blockscout /api/v2/stats average_block_time, 2026-09-12
 WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73"           # router.WETH()
 UNIV2_FACTORY = "0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f"  # router.factory(); owns the MIZUKARA pair
@@ -251,7 +276,7 @@ DISCOVERY_MAX_CATCHUP_BLOCKS = 300_000   # ~8.4 h: after a longer outage skip ah
 LOG_WINDOW_BLOCKS = 100_000              # Flap ≈ 4k logs / 100k blocks — under the node's 10k cap
 DISCOVERY_MAX_LOG_TOKENS_PER_RUN = 200   # log tokens are NEVER truncated: the cursor advances only
                                          # to the block of the last log actually processed
-DISCOVERY_FEEDS = ("gt_new_pools",)      # cheap hedge for factories not in the log set; the
+DISCOVERY_FEEDS = ("gt_new_pools", "gmgn_trenches")      # cheap hedge for factories not in the log set; the
                                          # scanhood.launch_feed / robinx.feed_new adapters exist but are off
 GT_NEW_POOLS_PAGES = 2
 DISCOVER_QUOTA = {"logs": 200, "watchlist": 60, "rechecks": 40, "feeds": 20}  # unused quota spills forward
@@ -328,6 +353,8 @@ HC_REQUIRE_TEMPLATE_KNOWN = True   # impl name whitelisted or source verified
 TEMPLATE_WHITELIST = {"FlapTaxTokenV3", "DopplerERC20V1"}   # Flap launchpad clone; Bankr/Doppler clone
 HC_REQUIRE_LP_KNOWN = True         # an unknown LP status can be B, never A
 HC_MAX_DEV_PCT = 2.0
+HC_GMGN_BUNDLER_RATIO_MAX = 0.10   # band_gmgn_clean: GMGN bundler wallets / holders — organic 0.00-0.01 (WIF 0.002,
+                                   # trumplet 0.01), the $Cubrate wallet farm 1.42 (solana calibration 2026-07-05)
 DEFAULT_ENTRY_BAND = "band_a_strict"     # the fallback / demotion target; the LIVE champion is selfimprove/champion.json
 # band_volume_early — the operator's thesis (2026-09-12): the money is in early entries on coins that
 # already trade heavily with buyers dominating; measured at sighting on the day's survivors,
@@ -338,6 +365,11 @@ BAND_VE_MIN_VOL_H1_USD = 50_000.0
 BAND_VE_MIN_LIQ_USD = 10_000.0
 BAND_VE_BUY_SELL_RATIO = 2.0
 BAND_VE_MAX_MCAP_USD = 2_000_000.0
+# band_new_creation / band_almost_bonded — GMGN Trenches' New and Almost-bonded columns as pre-declared
+# bands (2026-09-13): silent B arms judged by the entry gate, never a tier. New = pair age <= 15 min with
+# the liquidity floor and a known sell round trip; Almost bonded = GMGN curve progress >= 0.5, not completed.
+BAND_NC_MAX_AGE_MIN = 15.0
+BAND_AB_MIN_PROGRESS = 0.5
 
 # ── entry lab (selfimprove/entry_lab) ─────────────────────────────────────────────
 # The ONE flat dict every band reads. build_feat() produces EXACTLY these keys (None when
@@ -355,6 +387,10 @@ FEATURE_FIELDS = (
     "gt_verified", "launchpad_graduation_pct", "launchpad_completed",
     "launchpad_completed_age_s", "holders_updated_age_s", "scanhood_verdict",
     "scanhood_sellable", "sources_dark",
+    # safety (sources/gmgn.py via safety._apply_gmgn): features only, never a hard gate
+    "gmgn_launchpad_platform", "gmgn_progress", "gmgn_bundler_ratio", "gmgn_sniper_hold_pct",
+    "gmgn_insider_hold_pct", "gmgn_fresh_wallet_pct", "gmgn_rat_vol_pct", "gmgn_smart_degen_count",
+    "gmgn_is_wash_trading", "gmgn_holders",
     # runtime
     "token", "score", "first_sighting", "sighting_age_s",
 )
@@ -469,11 +505,13 @@ def _check_perms(path):
 def load_credentials() -> dict:
     """Load push secrets without hardcoding them. Priority, so the SAME code runs both on a
     GitHub Actions runner and on the Mac:
-      1. env vars (GitHub Secrets): NTFY_TOPIC, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID.
+      1. env vars (GitHub Secrets): NTFY_TOPIC, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GMGN_API_KEY.
       2. robinhood_screener/config.local.json (gitignored local override).
-      3. the shared Mac secrets file (telegram + ntfy only).
-    Returns {ntfy_topic, telegram:{bot_token,chat_id}}. Values are never printed."""
-    creds = {"ntfy_topic": os.environ.get("NTFY_TOPIC"), "telegram": {}}
+      3. the shared Mac secrets file (telegram + ntfy only), and the sibling solana_screener's
+         config.local.json for the GMGN key only (the same key serves both chains).
+    Returns {ntfy_topic, telegram:{bot_token,chat_id}, gmgn_api_key}. Values are never printed."""
+    creds = {"ntfy_topic": os.environ.get("NTFY_TOPIC"), "telegram": {},
+             "gmgn_api_key": os.environ.get("GMGN_API_KEY") or None}
     bt, cid = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if bt and cid:
         creds["telegram"] = {"bot_token": bt, "chat_id": cid}
@@ -499,6 +537,14 @@ def load_credentials() -> dict:
                 creds["ntfy_topic"] = creds["ntfy_topic"] or m.get("ntfy_topic")
             except Exception:
                 pass
+    if not creds.get("gmgn_api_key"):
+        sib = os.path.join(SOLANA_SCREENER, "config.local.json")
+        if os.path.exists(sib):
+            _check_perms(sib)
+            try:
+                creds["gmgn_api_key"] = json.load(open(sib)).get("gmgn_api_key") or None
+            except Exception:
+                pass
     return creds
 
 
@@ -516,4 +562,5 @@ if __name__ == "__main__":
     # presence only — the values themselves are never printed (this goes to a log)
     c = load_credentials()
     print("  creds present:", {"ntfy_topic": bool(c.get("ntfy_topic")),
-                               "telegram": bool(c.get("telegram"))})
+                               "telegram": bool(c.get("telegram")),
+                               "gmgn_api_key": bool(c.get("gmgn_api_key"))})
