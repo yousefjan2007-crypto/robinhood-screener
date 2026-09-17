@@ -1,5 +1,5 @@
 """
-One-shot orchestrator — the cloud scan (GitHub Actions; the Mac dispatches it every 5 min).
+One-shot orchestrator — the cloud scan (GitHub Actions; the keeper job runs it every 240 s).
 
     python3 run.py             # dry run: print, write nothing, send nothing
     python3 run.py --commit    # write ledger / state / scan, send nothing
@@ -64,6 +64,26 @@ def _atomic_json(path: str, obj, indent=None) -> None:
     tmp = f"{path}.{os.getpid()}.tmp"
     with open(tmp, "w") as f:
         json.dump(_clean(obj), f, indent=indent, allow_nan=False)
+    os.replace(tmp, path)
+
+
+def _atomic_json_lines(path: str, obj: dict) -> None:
+    """A dict as `{`, ONE `"key": <compact json>` per line in SORTED key order, `}` — still
+    json.load-able, still allow_nan=False (after _clean), still tmp + os.replace. For the big
+    state files rewritten every run (seen / recheck / watchlist): an unchanged entry is an
+    unchanged LINE, so git packs each commit as a small delta instead of a fresh blob —
+    recheck.json alone (3,000 entries) was 67 % of the measured 72 KB/commit packed growth.
+    latest_scan.json keeps _atomic_json: its one-line shape is what the dashboard and the lab read."""
+    d = _clean(obj)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
+        f.write("{\n")
+        keys = sorted(d)
+        for i, k in enumerate(keys):
+            f.write(json.dumps(str(k)) + ": "
+                    + json.dumps(d[k], allow_nan=False, sort_keys=True, separators=(",", ":"))
+                    + (",\n" if i < len(keys) - 1 else "\n"))
+        f.write("}\n")
     os.replace(tmp, path)
 
 
@@ -592,8 +612,8 @@ def run(dry_run: bool = True, send: bool = False) -> list:
             worst = sorted(recheck, key=lambda t: (-int(recheck[t].get("n_checks", 0)), float(recheck[t].get("next_check", 0))))
             for t in worst[: len(recheck) - config.RECHECK_MAX]:
                 recheck.pop(t, None)
-        _atomic_json(config.SEEN_PATH, seen)
-        _atomic_json(config.RECHECK_PATH, recheck)
+        _atomic_json_lines(config.SEEN_PATH, seen)
+        _atomic_json_lines(config.RECHECK_PATH, recheck)
         _atomic_json(config.CURSOR_PATH, dict(new_cursor, updated_ts=now_s))
         _atomic_json(config.STATE_PATH, state, indent=1)
         n_moved = ledger.rotate(now_s)

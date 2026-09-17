@@ -318,13 +318,23 @@ def _nan_to_none(obj):
 
 
 def save_watchlist(state: dict, path: str | None = None) -> None:
+    """One entry per line in sorted key order — run.py's _atomic_json_lines format, repeated
+    here because run imports this module: a survivor whose facts did not change is an unchanged
+    LINE, so the every-run rewrite packs as a delta. Still atomic, still allow_nan=False."""
     path = path or config.WATCHLIST_PATH
     d = os.path.dirname(path)
     if d:
         os.makedirs(d, exist_ok=True)
+    clean = _nan_to_none(state)
     tmp = f"{path}.{os.getpid()}.tmp"
     with open(tmp, "w") as f:
-        json.dump(_nan_to_none(state), f, indent=1, sort_keys=True, allow_nan=False)
+        f.write("{\n")
+        keys = sorted(clean)
+        for i, k in enumerate(keys):
+            f.write(json.dumps(str(k)) + ": "
+                    + json.dumps(clean[k], allow_nan=False, sort_keys=True, separators=(",", ":"))
+                    + (",\n" if i < len(keys) - 1 else "\n"))
+        f.write("}\n")
     os.replace(tmp, path)
 
 
