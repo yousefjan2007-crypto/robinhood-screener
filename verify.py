@@ -206,6 +206,7 @@ section("A. source hygiene (AST-based; identifiers in strings/comments never tri
 import screen                                           # noqa: E402
 import http_client                                      # noqa: E402
 from selfimprove.entry_lab import bands as B            # noqa: E402
+from selfimprove.candidates import register as REGC     # noqa: E402
 
 FORBIDDEN_IMPORTS = {"datetime", "time", "urllib", "http_client", "random", "subprocess",
                      "requests", "socket", "pathlib"}
@@ -241,6 +242,10 @@ CAND_DIR = os.path.join(config.SELFIMPROVE_DIR, "candidates")
 cand_paths = [os.path.join(CAND_DIR, e["module"].split(".", 1)[1] + ".py")
               for e in REG_RAW.get("candidates", []) if str(e.get("module", "")).startswith("candidates.")]
 cand_paths.append(os.path.join(CAND_DIR, "_template.py"))
+# Written but NOT registered (registration is a counted trial, and the operator's move): the two
+# adaptive-exit modules still face every check a registered candidate faces.
+UNREGISTERED_CANDS = ["tp15_half_armtrail30_stop50_6h", "tp15_half_flowtrail_stop50_6h"]
+cand_paths.extend(os.path.join(CAND_DIR, n + ".py") for n in UNREGISTERED_CANDS)
 
 for p in (os.path.join(ROOT, "screen.py"),):
     bi, ba, bc = _hygiene(p)
@@ -256,6 +261,21 @@ for p in cand_paths:
           f"{bi} {ba} {bc}")
     ok, why = B.static_ok(p)
     check(f"bands.static_ok accepts {_rel(p)}", ok, why)
+for _n in UNREGISTERED_CANDS:
+    _r = REGC._run_validator(os.path.join(CAND_DIR, _n + ".py"), _n, [], "1")
+    check(f"candidate {_n} imports cleanly under `python3 -I -S` exactly the way register.py validates one "
+          "(stdlib only, no site-packages, no env) and declares NAME == the file name, KIND 'policy', a "
+          "RATIONALE and a POLICY the CURRENT validate_policy accepts",
+          bool(_r.get("ok")) and _r.get("name") == _n and _r.get("kind") == "policy"
+          and str(_r.get("rationale") or "").strip()
+          and REGC.POL.validate_policy("zz_probe", _r.get("policy")) is None, str(_r)[:200])
+_reg_pols = [c for c in REG_RAW.get("candidates", []) if c.get("kind") == "policy" and c.get("status") != "retired"]
+check("every non-retired kind == 'policy' registry entry still validates under the CURRENT validate_policy "
+      "(shape checked under a probe name, since a registered candidate is already in POLICIES); none is "
+      "registered today, so the extended arm/flow schema cannot have orphaned one",
+      not [c.get("name") for c in _reg_pols
+           if REGC.POL.validate_policy("zz_probe", c.get("policy")) is not None],
+      str([c.get("name") for c in _reg_pols]))
 with tempfile.TemporaryDirectory() as _d:
     cases = {"t_time.py": "import time\nNAME='x'\n",
              "t_open.py": "import config\ndef verdict(f):\n    return open('/etc/passwd')\n",
@@ -275,7 +295,8 @@ with tempfile.TemporaryDirectory() as _d:
 run_tree = _tree(os.path.join(ROOT, "run.py"))
 check("run.py contains exactly ONE time.time() call (the single wall-clock capture)",
       _time_time_calls(ast.walk(run_tree)) == 1, str(_time_time_calls(ast.walk(run_tree))))
-for rel in ("ledger.py", "screen.py", os.path.join("sources", "safety.py"), "quotes.py"):
+for rel in ("ledger.py", "screen.py", os.path.join("sources", "safety.py"), "quotes.py",
+            os.path.join("selfimprove", "policies.py")):
     t = _tree(os.path.join(ROOT, rel))
     n = _time_time_calls(_compute_nodes(t))
     check(f"{rel} has no time.time() in any compute path (outside the __main__ smoke test)", n == 0, str(n))
@@ -816,9 +837,28 @@ check("gates_bitmask length == len(_GATE_ORDER), '-' for informational keys",
 section("C. ledger.py — event model, write-once forward returns, exits from the frozen plan")
 # ═══════════════════════════════════════════════════════════════════════════════════
 import ledger as LED                                    # noqa: E402
+from selfimprove import policies as POL                 # noqa: E402
 
 T0 = 1_780_000_000.0
 MK = {"price_usd": 1.0, "mcap": 1e6, "liq_usd": 5e4}
+
+
+@contextlib.contextmanager
+def _policies(pols: dict):
+    """Temporarily add exit policies to POL.POLICIES, then remove them.
+
+    The two adaptive-exit candidates are WRITTEN but deliberately NOT registered: registration is
+    a permanent counted trial that deflates every later Deflated Sharpe, so it is the operator's
+    move, not a side effect of a test. Every section that needs them injects them for the length
+    of one block — `len(POL.POLICIES)` must still be the pre-declared 16 when section H checks
+    what improve.py deflates by.
+    """
+    POL.POLICIES.update(pols)
+    try:
+        yield
+    finally:
+        for k in pols:
+            POL.POLICIES.pop(k, None)
 
 
 def _ev(token, tier="B", kind="first_sighting", price=1.0, fired=None, prior=None, mcap=None):
@@ -906,6 +946,20 @@ with tempfile.TemporaryDirectory() as d:
     check("sell_15m row: exactly one time_exit at +900 s with due_ts = alert_ts + max_hold_s, never again",
           len(te) == 1 and te[0]["kind"] == "time_exit" and te[0]["due_ts"] == T0 + 20000 + 900
           and not [e for e in e5b if e["token"] == "0xt15m"])
+    # THE ARMED TRAIL ON THE CLOUD LEG. A trail with no arm sits above the -50% stop from the first
+    # tick (a 30% trail off a 1.0x high-water mark is 0.70 x entry), which would make "the stop is
+    # always live" false by construction: the trail would always fire first.
+    with _policies({"zz_armtrail": {"trail": 0.30, "trail_arm": 1.5, "stop": 0.50}}):
+        LED.record_rows([_ev("0xarm", tier="A", kind="promotion", fired="x")], alert_ts=T0 + 30000,
+                        plan_name="zz_armtrail", path=LP)
+        arm_ev = []
+        for dt, price in ((100, 1.2), (200, 0.8), (300, 1.6), (400, 1.1), (500, 1.05), (600, 0.45)):
+            _, evx = LED.update_forward(T0 + 30000 + dt, _snap(price=price), path=LP)
+            arm_ev.append([e["kind"] for e in evx if e["token"] == "0xarm"])
+        check("trail_arm 1.5 on the cloud leg: 1.2x then 0.8x emits NOTHING (0.8 is below an unarmed 30% "
+              "trail at 0.84 — the arm suppresses it); 1.6x then 1.1x emits exactly one 'trail'; 0.45x "
+              "emits 'stop' from the -50% leg that was live the whole time",
+              arm_ev == [[], [], [], ["trail"], [], ["stop"]], str(arm_ev))
     check("forward return math: 100 -> 250 == +150%",
           abs([e for e in e1 if e["token"] == "0xtrail"] == [] and 0) == 0 and
           abs(LED.update_forward(T0 + 20950, _snap(price=2.5), path=LP)[1][0]["ret"] - 1.5) < 1e-9
@@ -1399,6 +1453,19 @@ with tempfile.TemporaryDirectory() as d:
     check("P1 a buy opens once (usd_flow = -(size+gas), gap_s = entry lag); a re-open is a no-op",
           r and r["side"] == "buy" and abs(r["usd_flow"] + (USD + GAS)) < 1e-9 and abs(r["gap_s"] - 240) < 1e-9
           and r2 is None and len(st["positions"]) == 1 and st["positions"][PX._key(PTOK, 7)]["plan"]["name"] == "cfg_ladder_stop")
+    _fp = PX._frozen_plan({"name": "x", "ladder": [[1.5, 0.5]], "stop": 0.5, "trail": 0.3, "trail_arm": 1.5,
+                           "flow": {"buy_share_max": 0.45, "weak_ticks": 2, "vol_floor_frac": 0.20, "min_txns_m5": 5}})
+    _fp_def = PX._frozen_plan(None)
+    _flow_sell = _mk_sell([("ok", 10.0)])
+    _flow_r = PX.execute_exit({"kind": "flow_exit", "token": PTOK, "symbol": "DEMO", "event_seq": 7,
+                               "price": 3e-23, "ret": 0.5, "mult": 1.5, "gap_s": 60.0},
+                              T0 + 60, quote_sell_fn=_flow_sell, **kw)
+    check("P1b the frozen plan carries trail_arm and flow for the audit trail, and the cloud book executes "
+          "NEITHER: 'flow_exit' is not an EXIT_KIND, so execute_exit returns None on an OPEN position "
+          "without taking a single sell quote (the flow leg is scored by the paper book alone)",
+          _fp["trail_arm"] == 1.5 and _fp["flow"]["weak_ticks"] == 2 and _fp_def["trail_arm"] is None
+          and _fp_def["flow"] is None and _flow_r is None and _flow_sell.calls["n"] == 0
+          and "flow_exit" not in PX.EXIT_KINDS and "flow_exit" not in PX.PROTECTIVE_KINDS)
     ev = {"kind": "tp", "token": PTOK, "symbol": "DEMO", "event_seq": 7, "price": 2e-23, "ret": 1.0, "mult": 2.0,
           "levels": [(2.0, 0.5)], "gap_s": 120.0}
     r = PX.execute_exit(ev, T0 + 3600, quote_sell_fn=_mk_sell([("ok", 10.0)]), **kw)
@@ -2320,6 +2387,266 @@ finally:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════
+section("G2. adaptive exit — trail_arm / flow (the -50% stop is always live; flow is livebook-only)")
+# ═══════════════════════════════════════════════════════════════════════════════════
+from selfimprove import evaluate as EV                  # noqa: E402
+
+CAND_BENCH = "tp15_half_armtrail30_stop50_6h"
+CAND_FLOW = "tp15_half_flowtrail_stop50_6h"
+
+
+def _cand_policy(name: str) -> dict:
+    """The candidate module's own POLICY dict, read from the file the operator will register."""
+    return B.load_candidate_module(os.path.join(CAND_DIR, name + ".py"), name).POLICY
+
+
+def _norm(pol: dict) -> dict:
+    """policies.load_candidates' own normalisation: a registry/JSON ladder is a list of lists;
+    simulate() removes rungs by tuple identity, so the loader retuples them at registration."""
+    if not pol.get("ladder"):
+        return dict(pol)
+    return dict(pol, ladder=[(float(m), float(f)) for m, f in pol["ladder"]])
+
+
+CAND_RAW = {n: _cand_policy(n) for n in (CAND_BENCH, CAND_FLOW)}
+CAND_POL = {n: _norm(p) for n, p in CAND_RAW.items()}
+FLOW_OK = dict(CAND_RAW[CAND_FLOW]["flow"])
+
+check("both candidate dicts validate: ladder 1.5x/half, stop 0.50, trail 0.30, trail_arm 1.5, 6 h — and the "
+      "adaptive one adds exactly the four flow keys",
+      all(POL.validate_policy(n, p) is None for n, p in CAND_RAW.items()),
+      str({n: POL.validate_policy(n, p) for n, p in CAND_RAW.items()}))
+_bad_shapes = {
+    "trail_arm without trail": {"stop": 0.5, "trail_arm": 1.5},
+    "trail_arm <= 1": {"trail": 0.3, "trail_arm": 1.0},
+    "flow without trail_arm": {"trail": 0.3, "flow": FLOW_OK},
+    "flow missing a key": {"trail": 0.3, "trail_arm": 1.5,
+                           "flow": {k: v for k, v in FLOW_OK.items() if k != "min_txns_m5"}},
+    "flow with an extra key": {"trail": 0.3, "trail_arm": 1.5, "flow": dict(FLOW_OK, vol_floor_pct=0.2)},
+    "flow not a dict": {"trail": 0.3, "trail_arm": 1.5, "flow": 0.45},
+    "buy_share_max out of (0,1)": {"trail": 0.3, "trail_arm": 1.5, "flow": dict(FLOW_OK, buy_share_max=1.0)},
+    "vol_floor_frac out of (0,1)": {"trail": 0.3, "trail_arm": 1.5, "flow": dict(FLOW_OK, vol_floor_frac=0.0)},
+    "weak_ticks < 1": {"trail": 0.3, "trail_arm": 1.5, "flow": dict(FLOW_OK, weak_ticks=0)},
+    "min_txns_m5 negative": {"trail": 0.3, "trail_arm": 1.5, "flow": dict(FLOW_OK, min_txns_m5=-1)},
+}
+_slipped = [k for k, p in _bad_shapes.items() if POL.validate_policy("zz_probe", p) is None]
+check("validate_policy rejects every malformed arm/flow shape — in particular a flow rule WITHOUT trail_arm, "
+      "which would be laxer than the stop-only regime the operator asked for before 1.5x", not _slipped, str(_slipped))
+check("the extended schema leaves every pre-declared policy validating unchanged",
+      not [n for n, p in POL.POLICIES.items() if p and POL.validate_policy("zz_probe", p) is not None])
+with tempfile.TemporaryDirectory() as _rd:
+    _rp = os.path.join(_rd, "registry.json")
+    with open(_rp, "w") as _fh:
+        json.dump({"candidates": [{"name": CAND_BENCH, "kind": "policy", "status": "candidate",
+                                   "policy": CAND_RAW[CAND_BENCH]}]}, _fh)
+    _loaded = POL.load_candidates(_rp)
+    check("registration day: load_candidates accepts the benchmark from a JSON registry and retuples its "
+          "ladder, so simulate() can remove the rung it fills (a list-of-lists ladder would raise)",
+          list(_loaded) == [CAND_BENCH] and _loaded[CAND_BENCH]["ladder"] == [(1.5, 0.5)]
+          and not math.isnan(POL.simulate(1.0, [{"ts": 0, "o": 1.0, "h": 2.0, "l": 1.0, "c": 2.0, "v": 1.0}],
+                                          _loaded[CAND_BENCH])))
+
+
+def _sbar(ts, o, h, l, c):
+    return {"ts": ts, "o": o, "h": h, "l": l, "c": c, "v": 1.0}
+
+
+def _sim(pol, bars, pess=True):
+    return POL.simulate(1.0, bars, dict(pol), pessimistic=pess)
+
+
+ARM_POL = {"stop": 0.50, "trail": 0.30, "trail_arm": 1.5}
+NOARM_POL = {"stop": 0.50, "trail": 0.30}
+STOP_POL = {"stop": 0.50}
+P_LOW = [_sbar(0, 1.0, 1.2, 1.0, 1.2), _sbar(60, 1.2, 1.2, 0.45, 0.45)]    # peak 1.2x, never arms
+P_HIGH = [_sbar(0, 1.0, 1.6, 1.0, 1.6), _sbar(60, 1.6, 1.6, 1.1, 1.1)]     # peak 1.6x, arms
+check("simulate below the arm: on a 1.2x → 0.45x path trail_arm 1.5 keeps the trail INERT, so the exit is the "
+      "-50% stop at 0.50 — byte-identical to stop-only and strictly worse than the unarmed trail (0.84)",
+      abs(_sim(ARM_POL, P_LOW) - _sim(STOP_POL, P_LOW)) < 1e-12 and _sim(ARM_POL, P_LOW) < _sim(NOARM_POL, P_LOW) - 1e-9)
+check("simulate past the arm: on a 1.6x → 1.1x path the trail is live and fills at 1.12 (30% off the 1.6x "
+      "high-water mark) — identical to the unarmed trail, better than stop-only",
+      abs(_sim(ARM_POL, P_HIGH) - _sim(NOARM_POL, P_HIGH)) < 1e-12 and _sim(ARM_POL, P_HIGH) > _sim(STOP_POL, P_HIGH) + 1e-9)
+check("the arm changes the within-bar BRACKET in neither reading: below it the armed policy equals stop-only "
+      "pessimistically AND optimistically, above it the unarmed trail — so the arm removes exits, it never "
+      "invents a within-bar ordering",
+      all(abs(_sim(ARM_POL, P_LOW, q) - _sim(STOP_POL, P_LOW, q)) < 1e-12
+          and abs(_sim(ARM_POL, P_HIGH, q) - _sim(NOARM_POL, P_HIGH, q)) < 1e-12 for q in (True, False)))
+check("a trail policy can still score HIGHER pessimistically than optimistically (the optimistic reading "
+      "ratchets the high-water mark to this bar's high before the same bar's low tests the RAISED trail — "
+      "shipped behaviour of trail_30 since the 2026-08-12 anchor fix), and the arm reproduces exactly that "
+      "bracket, both readings finite for the price-only benchmark",
+      [_sim(ARM_POL, b, True) > _sim(ARM_POL, b, False) for b in (P_HIGH, P_LOW)]
+      == [_sim({"trail": 0.30}, b, True) > _sim({"trail": 0.30}, b, False) for b in (P_HIGH, P_LOW)]
+      == [True, False]
+      and all(math.isfinite(_sim(CAND_POL[CAND_BENCH], b, q)) for b in (P_LOW, P_HIGH) for q in (True, False)))
+
+_saved_lb2 = {k: _g[k] for k in ("BOOK_PATH", "FILLS_PATH", "TICKS_PATH", "FEED_STATE_PATH", "MISSED_PATH")}
+try:
+    with _policies({n: CAND_POL[n] for n in (CAND_BENCH, CAND_FLOW)}), tempfile.TemporaryDirectory() as d2:
+        _reset(d2)
+        check("simulate refuses to score the flow leg: an OHLCV bar carries no 5-minute buy/sell split, so a "
+              "flow policy returns NaN while the price-only benchmark returns a number",
+              math.isnan(POL.simulate(1.0, P_HIGH, POL.POLICIES[CAND_FLOW]))
+              and not math.isnan(POL.simulate(1.0, P_HIGH, POL.POLICIES[CAND_BENCH])))
+        _erows = [{"entry": 1.0, "bars": P_HIGH, "alert_ts": LT0 + 86400 * i, "res": "minute"} for i in range(6)]
+        _escore = EV.score(_erows)
+        check("evaluate.score drops the NaN rather than inventing one: the flow candidate scores n = 0 rows, the "
+              "benchmark scores all 6 (a bar backtest may never quote a number for the adaptive policy)",
+              _escore[CAND_FLOW]["ret"].size == 0 and _escore[CAND_BENCH]["ret"].size == 6)
+
+        ENTRY = 1.0
+        ARMED_PX = ENTRY * 1.6
+        FP = POL.POLICIES[CAND_FLOW]
+
+        def _flow(vol, buys, sells):
+            return {"vol_m5": vol, "buys_m5": buys, "sells_m5": sells, "vol_h1": vol * 10.0,
+                    "buys_h1": buys * 10, "sells_h1": sells * 10, "liq_usd": 50_000.0}
+
+        def _run_flow(scr):
+            """(reasons, state) for one script of (px, flow, gap_s) through flow_step alone."""
+            st = LB._new_policy_state()
+            st["peak_px"] = ENTRY
+            POL.flow_state_init(st)
+            out = []
+            for i, (px, fl, gap) in enumerate(scr):
+                st["peak_px"] = max(st["peak_px"], px)          # what _step_policy does first
+                out.append(POL.flow_step(st, FP, fl, px, ENTRY, LT0 + 60 * (i + 1), gap, 180.0))
+            return out, st
+
+        WEAK, STRONG = _flow(1000.0, 1, 9), _flow(1000.0, 9, 1)
+        _scr = [(ARMED_PX, STRONG, 60.0), (ARMED_PX, WEAK, 60.0), (ARMED_PX, WEAK, 60.0)]
+        r1, s1 = _run_flow(_scr)
+        r2, s2 = _run_flow(_scr)
+        check("flow_step is a pure function of (state, policy, flow, prices, now_s, gap): two independent state "
+              "dicts over one script give identical reasons and identical states, and the 2-tick weak streak "
+              "exits 'weak_flow' — never on the first weak tick",
+              r1 == r2 and s1 == s2 and r1 == [None, None, "weak_flow"] and s1["armed_ts"] == LT0 + 60, str(r1))
+        rN, sN = _run_flow([(ARMED_PX, STRONG, 60.0), (ARMED_PX, WEAK, 60.0), (ARMED_PX, None, 60.0),
+                            (ARMED_PX, WEAK, 60.0)])
+        rG, sG = _run_flow([(ARMED_PX, STRONG, 60.0), (ARMED_PX, WEAK, 60.0), (ARMED_PX, WEAK, 3600.0)])
+        check("the weak streak can span neither a dark tick nor a gap: a features-None tick (counted in "
+              "flow_dark_ticks, never an exit) and a 3600 s gap both reset weak_ticks, so neither script reaches "
+              "the 2-tick exit", rN == [None] * 4 and rG == [None] * 3 and sN["flow_dark_ticks"] == 1
+              and sG["flow_dark_ticks"] == 0, str((rN, rG)))
+        rV, sV = _run_flow([(ENTRY * 1.2, _flow(10_000.0, 9, 1), 60.0), (ARMED_PX, _flow(100.0, 9, 1), 60.0),
+                            (ARMED_PX, _flow(10.0, 9, 1), 60.0)])
+        check("the volume floor is structurally impossible on the ARMING tick: peak_vol_m5 is reset while "
+              "unarmed and set to this tick's own volume when the trail arms, so vol_m5 < 0.20 x peak cannot "
+              "hold there — it fires on the NEXT tick, when volume actually collapses",
+              rV == [None, None, "vol_dry"] and sV["armed"] is True and sV["peak_vol_m5"] == 100.0, str(rV))
+        rT, _ = _run_flow([(ARMED_PX, _flow(1000.0, 1, 3), 60.0), (ARMED_PX, _flow(1000.0, 1, 3), 60.0),
+                           (ARMED_PX, _flow(1000.0, 1, 3), 60.0)])
+        check("min_txns_m5 = 5: a window with only 4 trades is 'not enough flow' — it can neither extend nor "
+              "start the weak streak, however lopsided the buy share looks", rT == [None] * 3, str(rT))
+
+        def _pos_flow():
+            return {"token": "0x" + "9" * 40, "event_seq": 1, "symbol": "FLW", "tier": "A",
+                    "entry_px": ENTRY, "opened_ts": LT0, "max_gap_s": 0.0}
+
+        def _drive(name, mults, flows, gap=60.0):
+            """Step ONE policy through a tick script; (fill rows, state, index of the closing tick)."""
+            pos, st = _pos_flow(), LB._new_policy_state()
+            st["peak_px"] = ENTRY
+            rows, closed_at = [], None
+            for i, m in enumerate(mults):
+                fl = flows[i] if flows else None
+                rows.extend(LB._step_policy(pos, name, st, ENTRY * m, LT0 + 60 * (i + 1), 10.0 * m, gap, flow=fl))
+                if st["closed"] and closed_at is None:
+                    closed_at = i
+            return rows, st, closed_at
+
+        _rng = np.random.default_rng(config.SEED + int(hashlib.sha256(b"phase5 stop dominance").hexdigest()[:8], 16))
+        _late, _n_stop = [], 0
+        for _s in range(50):
+            _mults = [float(x) for x in np.exp(_rng.normal(0.0, 0.9, size=14))]
+            _flows = [_flow(float(_rng.uniform(10.0, 5000.0)), int(_rng.integers(0, 12)), int(_rng.integers(0, 12)))
+                      for _ in _mults]
+            _first = next((i for i, m in enumerate(_mults) if m <= 0.5), None)
+            if _first is None:
+                continue
+            _n_stop += 1
+            for _nm, _fl in ((CAND_BENCH, None), (CAND_FLOW, _flows)):
+                _, _st, _c = _drive(_nm, _mults, _fl)
+                if _c is None or _c > _first:
+                    _late.append((_s, _nm, _first, _c))
+        check(f"the -50% stop DOMINATES on {_n_stop} of 50 sha256-seeded tick scripts that reach it: the position "
+              "is already closed or closes on the very tick at or below 0.5 x entry, for both candidates — the "
+              "flow rule can only ever exit EARLIER, never later", not _late and _n_stop >= 20, str(_late[:3]))
+        _mseq = [1.0, 1.2, 1.6, 2.0, 1.4, 1.1, 0.9, 0.6, 0.4]
+        _rb, _sb, _cb = _drive(CAND_BENCH, _mseq, None)
+        _rf, _sf, _cf = _drive(CAND_FLOW, _mseq, [None] * len(_mseq))
+        _cols = ["side", "frac_of_original", "px", "usd_proceeds", "gap_s", "note"]
+        check("features dark ⇒ the adaptive policy IS the benchmark, tick for tick: every fill row matches on "
+              "every column but the policy name, the close reason and closing tick match, and the dark ticks are "
+              "counted rather than silently swallowed",
+              [[r[c] for c in _cols] for r in _rb] == [[r[c] for c in _cols] for r in _rf] and _cb == _cf
+              and _sb["close_reason"] == _sf["close_reason"] == "trail" and _sf["flow_dark_ticks"] > 0,
+              str((_cb, _cf, _sb["close_reason"], _sf["close_reason"])))
+        _p9, _s9 = _pos_flow(), LB._new_policy_state()
+        _s9["peak_px"] = ENTRY * 1.6
+        _s9["rungs_left"] = [[1.5, 0.5]]
+        POL.flow_state_init(_s9)
+        _s9.update(armed=True, armed_ts=LT0, peak_vol_m5=1000.0, weak_ticks=1)
+        _f9 = LB._step_policy(_p9, CAND_FLOW, _s9, ENTRY * 1.6, LT0 + 120, 16.0, 60.0, flow=WEAK)
+        check("on one tick that satisfies BOTH the 1.5x rung and the flow rule the pre-committed LIMIT fills "
+              "first, at exactly 1.5 x entry, and only the remainder leaves at the observed price as flow_exit "
+              "(crediting the rung at the observed price would be the fill-at-a-price-never-seen leak)",
+              [f["side"] for f in _f9] == ["tp_1.5x", "flow_exit"] and _f9[0]["px"] == ENTRY * 1.5
+              and _f9[1]["px"] == ENTRY * 1.6 and abs(_f9[0]["frac_of_original"] - 0.5) < 1e-9
+              and abs(_f9[1]["frac_of_original"] - 0.5) < 1e-9 and _f9[1]["note"] == "weak_flow"
+              and _s9["close_reason"] == "flow_exit", str([(f["side"], f["px"]) for f in _f9]))
+        _p10, _s10 = _pos_flow(), LB._new_policy_state()
+        _s10["peak_px"] = ENTRY * 1.6
+        _s10["rungs_left"] = []
+        POL.flow_state_init(_s10)
+        _s10.update(armed=True, armed_ts=LT0, peak_vol_m5=1000.0, weak_ticks=1)
+        # the STREAK rule cannot fire across a 3600 s gap (the gap resets it), so the gapped case is
+        # necessarily the volume floor — which is exactly why both must be marked the same way.
+        _f10 = LB._step_policy(_p10, CAND_FLOW, _s10, ENTRY * 1.6, LT0 + 3700, 16.0, 3600.0,
+                               flow=_flow(10.0, 9, 1))
+        check("a flow_exit is a MARKET close like stop / trail / time_exit: taken after a tick gap above "
+              f"LIVEBOOK_MAX_SCORABLE_GAP_S ({config.LIVEBOOK_MAX_SCORABLE_GAP_S:.0f} s) it is 'gapped' and the "
+              "scorer drops it (and the streak rule could not have fired there at all — the gap reset it)",
+              "flow_exit" in LB.MARKET_CLOSES and _s10["gapped"] is True
+              and _s10["close_reason"] == "flow_exit" and [f["side"] for f in _f10] == ["flow_exit"]
+              and _f10[0]["note"] == "vol_dry" and _s10["weak_ticks"] == 0)
+        _pol_state = dict(LB._new_policy_state(), closed=True, closed_ts=LT0 + 600, remaining=0.0)
+        _bk = {"0xflow:1": {"token": "0xflow", "event_seq": 1, "symbol": "FLW", "tier": "A", "cost_usd": 10.0,
+                            "entry_lag_s": 5.0, "opened_ts": LT0, "last_tick_ts": LT0 + 600, "done": True,
+                            "policies": {CAND_FLOW: dict(_pol_state, close_reason="flow_exit", realized_usd=12.0,
+                                                         flow_dark_ticks=3),
+                                         CAND_BENCH: dict(_pol_state, close_reason="trail", realized_usd=11.0)}}}
+        LB._save_atomic(_bk, LB.BOOK_PATH)
+        _ls = LB.live_stats_dict(LT0 + 600)
+        check("live_stats_dict reports the flow leg per policy — n_flow_exit (closed on the flow rule) and "
+              "n_flow_dark (closed after at least one tick whose features were dark) — and stays NaN-free JSON",
+              _ls["per_policy"][CAND_FLOW]["n_flow_exit"] == 1 and _ls["per_policy"][CAND_FLOW]["n_flow_dark"] == 1
+              and _ls["per_policy"][CAND_BENCH]["n_flow_exit"] == 0 and _ls["per_policy"][CAND_BENCH]["n_flow_dark"] == 0
+              and json.dumps(_ls, allow_nan=False))
+        check("POL.flow_policy_names() names exactly the policies carrying a flow dict (the livebook reads the "
+              "5-minute features only when one is live; the list is empty until registration)",
+              POL.flow_policy_names() == [CAND_FLOW]
+              and set(POL.FLOW_FEATURES) == {"vol_m5", "buys_m5", "sells_m5", "vol_h1", "buys_h1", "sells_h1", "liq_usd"})
+        check("POL.flow_from_market copies the seven features from a market dict and returns None (never a "
+              "fabricated zero) when any of vol_m5 / buys_m5 / sells_m5 is missing",
+              POL.flow_from_market({"vol_m5": 1.0, "buys_m5": 2, "sells_m5": 3, "vol_h1": 9.0, "buys_h1": 4,
+                                    "sells_h1": 5, "liq_usd": 6.0})
+              == {"vol_m5": 1.0, "buys_m5": 2, "sells_m5": 3, "vol_h1": 9.0, "buys_h1": 4, "sells_h1": 5,
+                  "liq_usd": 6.0}
+              and POL.flow_from_market({"vol_m5": 1.0, "buys_m5": None, "sells_m5": 3}) is None
+              and POL.flow_from_market(None) is None and POL.flow_from_market({}) is None)
+finally:
+    for k, v in _saved_lb2.items():
+        _g[k] = v
+check("the two adaptive-exit candidates are WRITTEN but NOT registered: registration is a permanent counted "
+      "trial (2026-09-20 at the earliest, by the operator), so POLICIES is still the pre-declared 16",
+      len(POL.POLICIES) == 16 and CAND_BENCH not in POL.POLICIES and CAND_FLOW not in POL.POLICIES
+      and not [c for c in REG_RAW["candidates"] if c.get("name") in (CAND_BENCH, CAND_FLOW)]
+      and not (set(json.load(open(config.TRIALS_PATH)).get("policies_ever_scored") or []) & {CAND_BENCH, CAND_FLOW}),
+      str(len(POL.POLICIES)))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════
 section("H. improve.py — the exit gate: thin evidence refuses, controls void, forward-only promotion")
 # ═══════════════════════════════════════════════════════════════════════════════════
 from selfimprove import improve as IM                   # noqa: E402
@@ -3127,6 +3454,22 @@ _r, out = _capture(alerts.send_all, ta, ba, dry_run=True)
 check("send_all(dry_run=True) prints the card and returns without touching the network", _r is None and "DRY RUN" in out and "MIZUKARA" in out)
 check("the degraded notice states that silence is not evidence of a quiet chain",
       "NOT evidence of a quiet chain" in alerts.format_degraded_notice("h", ["x"], ["template_ok"])[1])
+_PLAN_CLS = ("PLAN [champion cfg_ladder_stop — default, no policy has cleared the gate]: buy ~$10 · "
+             "hard-stop $0.5 (-50%) · TP 2x→sell 50%, 5x→sell 25%, 10x→sell 15%")
+with _policies({n: CAND_POL[n] for n in (CAND_BENCH, CAND_FLOW)}):
+    _pb = CH.describe_plan(CH.exit_plan(CAND_BENCH), 1.0)
+    _pf = CH.describe_plan(CH.exit_plan(CAND_FLOW), 1.0)
+    check("describe_plan states the arm ('armed at 1.5x') on both candidates and, for the adaptive one only, "
+          "that the cloud book runs the price legs while the paper book scores the flow leg; the alert card "
+          "renders whatever it returns",
+          "trail -30% off the high-water mark, armed at 1.5x" in _pb and "flow take-profit" not in _pb
+          and "trail -30% off the high-water mark, armed at 1.5x" in _pf
+          and ("flow take-profit (cloud book: price legs only; the keeper's paper book scores the flow leg)"
+               in _pf) and "hard-stop $0.5 (-50%)" in _pb and "exit ALL at +6 h" in _pb,
+          _pf)
+check("the arm/flow keys changed no existing PLAN line: cfg_ladder_stop renders byte-identically",
+      CH.describe_plan(CH.exit_plan("cfg_ladder_stop"), 1.0) == _PLAN_CLS,
+      CH.describe_plan(CH.exit_plan("cfg_ladder_stop"), 1.0))
 
 # ═══════════════════════════════════════════════════════════════════════════════════
 section("L. dashboard render, publish against a temp bare origin, the weekly summary")
