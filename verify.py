@@ -3515,4 +3515,28 @@ check("load_paths DROPS a record with no ledger row at either key and counts it 
       and EVA.LAST_LOAD_STATS["n_kept"] == 1,
       f"{[r['token'] for r in _ev_rows]} {EVA.LAST_LOAD_STATS}")
 
+# ── 8. the retrospective is descriptive and says so first ──────────────────────────
+# Three tokens chosen BECAUSE they ran is the textbook shape of a story that reads as evidence.
+# The document is allowed to exist only while its first section is the disclaimer and no rule is
+# derived in it; these checks are what keep a later edit from quietly turning it into a claim.
+_retro_path = os.path.join(ROOT, "docs", "RETRO_2026-09-16_hype_runners.md")
+check("docs/RETRO_2026-09-16_hype_runners.md exists", os.path.isfile(_retro_path))
+_retro = _read(_retro_path)
+check("the retrospective's FIRST section is 'What this cannot tell you' — the disclaimer leads, it is not a footnote",
+      _retro.split("\n## ")[1].startswith("What this cannot tell you"), _retro.split("\n## ")[1][:80])
+check("the retrospective says in as many words that no rule is derived from it, and pins its numbers to an origin/main SHA",
+      "no rule is derived" in _retro and "bcb7fa9" in _retro)
+check("the per-token table pins the data-quality columns ('| res | pages |') — a 1h bar cannot resolve a "
+      "token that peaks four minutes in, and page depth is the coverage it rests on",
+      "| res | pages |" in _retro)
+check("the retrospective claims no hit rate, lift or threshold from n = 3 (the refuses-to-claim list is the section, "
+      "not a sentence the table contradicts)",
+      "n = 3" in _retro and "Refuses to claim" in _retro)
+check("the retrospective carries no home path and never names the shared secrets file (public repo)",
+      "/Users/" not in _retro and "monitor_config" not in _retro and "vrp_backtest" not in _retro)
+check("README's file table carries the retrospective with its one honest bullet",
+      "RETRO_2026-09-16_hype_runners.md" in _readme
+      and "descriptive, n = 3, chosen on the outcome" in _readme
+      and "no rule is derived from it" in _readme)
+
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")

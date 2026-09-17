@@ -95,6 +95,7 @@ Claude session proposes new candidates that merge only if `verify.py` is green.
 | `launchd/` | The four Mac jobs: `dispatch` (5 min), `livebook` (60 s), `improve` (Sun 11:00), `research` (Sun 12:00). |
 | `.github/workflows/` | `screener.yml` (the cloud scan + Pages deploy) and `verify.yml` (the invariant suite on human pushes). |
 | `docs/DESIGN.md` | The reconciled design: resolved decisions and module contracts. |
+| `docs/RETRO_2026-09-16_hype_runners.md` | What three 2026-09-16 runners did minute by minute on ordered 1-minute paths — descriptive, n = 3, chosen on the outcome; no rule is derived from it. |
 
 ## Tiers, the control group and the event model
 
