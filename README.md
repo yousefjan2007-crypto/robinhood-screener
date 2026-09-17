@@ -69,8 +69,8 @@ soft-scored, one flat feature dict is built, every registered entry band is eval
 champion band alone sets tier A and alerts. Events become ledger rows with a monotonic `event_seq`;
 every band's verdict is recorded per event; forward returns fill from batched snapshots; A rows
 drive idempotent exit signals and paper fills at router quotes. The cloud commits `data/` and
-publishes `docs/` every run. On the Mac a 60 s ticker runs 16 exit policies and 2 controls off one
-shared fill per alert; on Sundays the improve jobs re-score both arms behind the gate and a headless
+publishes `docs/` every run. Inside the keeper a 60 s ticker runs 16 exit policies and 2 controls off
+one shared fill per alert (its state rides the scan's commit); on Sundays the improve jobs re-score both arms behind the gate and a headless
 Claude session proposes new candidates that merge only if `verify.py` is green.
 
 | File | Role |
@@ -88,11 +88,11 @@ Claude session proposes new candidates that merge only if `verify.py` is green.
 | `cloud_secrets.py` | Pipes the alert secrets into `gh secret set` over stdin. The human runs it. |
 | `verify.py` | The invariant suite — the only tests. Offline, fail-fast. |
 | `sources/` | One module per vendor (`rpc`, `blockscout`, `geckoterminal`, `dexscreener`, `scanhood`, `robinx`, `kyber`, `gmgn`) plus `safety.py`, the adapter that fuses them into the one flat safety dict with the pass-through rule. |
-| `selfimprove/` | The exit loop: `policies.py` (16 policies + 2 controls), `livebook.py` (the Mac's live multi-policy book), `paths.py`/`backfill.py`/`evaluate.py` (bar backtest), `improve.py` (the 7-check exit gate), `champion.py` (the sole writer of `champion.json`), `publish.py`, `weekly_summary.py`, `run_improve.sh`, `trials.json`. |
+| `selfimprove/` | The exit loop: `policies.py` (16 policies + 2 controls), `livebook.py` (the keeper's live multi-policy book), `paths.py`/`backfill.py`/`evaluate.py` (bar backtest), `improve.py` (the 7-check exit gate), `champion.py` (the sole writer of `champion.json`), `publish.py`, `weekly_summary.py`, `run_improve.sh`, `trials.json`. |
 | `selfimprove/entry_lab/` | The entry loop: `bands.py` (bands as pure functions + controls + the registry loader), `runtime.py` (feature normalizer, band evaluation, event decisions, watchlist), `store.py` (the verdict sidecar), `scorecard.py`, `improve_bands.py` (the 9-check entry gate). |
 | `selfimprove/candidates/` | The research pool: `registry.json`, `register.py --scan`, `_template.py`, and every candidate module the weekly session has proposed. |
 | `selfimprove/research/` | `run_research.sh` (the Sunday headless Claude session), `research_prompt.md`, `allowlist.py`, `proposals/`. |
-| `launchd/` | The four Mac jobs: `dispatch` (5 min), `livebook` (60 s), `improve` (Sun 11:00), `research` (Sun 12:00). |
+| `launchd/` | The Mac jobs: `dispatch` (5 min), `livebook` (60 s — retired at the cloud-book cutover; the keeper ticks the book), `improve` (Sun 11:00), `research` (Sun 12:00). |
 | `.github/workflows/` | `screener.yml` (the cloud scan + Pages deploy) and `verify.yml` (the invariant suite on human pushes). |
 | `docs/DESIGN.md` | The reconciled design: resolved decisions and module contracts. |
 | `docs/RETRO_2026-09-16_hype_runners.md` | What three 2026-09-16 runners did minute by minute on ordered 1-minute paths — descriptive, n = 3, chosen on the outcome; no rule is derived from it. |
@@ -261,9 +261,10 @@ slot and hands off through `data/keeper_handoff.json`; a `*/5` watchdog workflow
 keeper and alerts SCAN STALE past 30 min; the Mac dispatch job is retired (a one-shot `mode=run`
 exits without scanning while a keeper is alive). Discovery, horizons, the watchlist and rechecks are
 written to be correct at any cadence; the dashboard and the weekly summary report the **measured**
-runs in the last 24 h, never the nominal number. The Mac still runs the 60 s live book (it reads
-`origin/main` with `git fetch` + `git show`, never `git pull`), the Sunday improve chain (11:00) and
-the research session (12:00).
+runs in the last 24 h, never the nominal number. The 60 s live book runs inside the keeper too (one
+tick per minute under the scan's lock, its four state files committed with the scan; the Mac's launchd
+tick is retired at the cutover); the Mac runs the Sunday improve chain (11:00) and the research
+session (12:00) on the pulled snapshot.
 
 ## Running it
 
@@ -275,7 +276,7 @@ python3 run.py --send                               # write AND alert (what the 
 python3 preflight.py                                # probe every source from here; commits nothing
 python3 ledger.py                                   # the A-vs-B scorecard
 python3 paper_exec.py                               # the paper A book (add --live to mark it)
-python3 selfimprove/livebook.py --tick              # one live-book cycle (launchd, every 60 s)
+python3 selfimprove/livebook.py --tick              # one live-book cycle (the keeper runs this; never on the Mac after the cutover)
 python3 selfimprove/livebook.py --scorecard         # per-policy live P&L
 python3 selfimprove/improve.py                      # exit gate, dry (add --apply --send on Sundays)
 python3 selfimprove/entry_lab/improve_bands.py      # entry-band gate, dry

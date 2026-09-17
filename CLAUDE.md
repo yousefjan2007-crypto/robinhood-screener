@@ -29,7 +29,7 @@ python3 sources/gmgn.py                             # one live Trenches pull + o
 python3 ledger.py                                   # A-vs-B scorecard, promoted-B n, suspect line
 python3 paper_exec.py                               # paper A book (--live marks the open book: one Multicall3)
 python3 dashboard.py --write                        # render docs/index.html (no flag = smoke test only)
-python3 selfimprove/livebook.py --tick|--scorecard  # the Mac 60 s book / per-policy live P&L
+python3 selfimprove/livebook.py --scorecard         # per-policy live P&L from the pulled snapshot (--tick runs inside the keeper ONLY)
 python3 selfimprove/improve.py [--apply --send]     # exit gate; --selftest = offline only
 python3 selfimprove/entry_lab/improve_bands.py [--apply --send]   # entry gate; --selftest
 python3 selfimprove/entry_lab/scorecard.py --markdown
@@ -50,7 +50,8 @@ python3 watchdog.py                                                   # offline 
 
 Mac launchd jobs (`launchd/`, labels `com.yousefjan.robinhood-*`, all exit 0): `dispatch`
 (StartInterval 240 → `gh workflow run robinhood-screener -f trigger=dispatch`; a scan job runs ~5 min so runs go back to back), `livebook`
-(StartInterval 60, `livebook.py --tick`), `improve` (Sun 11:00, `run_improve.sh`), `research`
+(StartInterval 60, `livebook.py --tick` — retired at the cloud-book cutover: booted out, never
+re-loaded; the keeper ticks the book), `improve` (Sun 11:00, `run_improve.sh`), `research`
 (Sun 12:00, `run_research.sh`). The retired `robinhood-screener` / `robinhood-dashboard` labels
 must stay absent. `--send` on the two gates means **event alerts only** (PROMOTED / DEMOTED /
 NOMINATED / APPARATUS FAULT / PUBLISH FAILED / PAUSED); the weekly summary is sent once, by
@@ -62,10 +63,11 @@ NOMINATED / APPARATUS FAULT / PUBLISH FAILED / PAUSED); the weekly summary is se
 `dashboard.py --write`, commit `data/` + `docs/` as `robinhood-screener[bot]`, deploy Pages from
 the workflow. The trigger is the Mac's dispatch job; GitHub's cron is the fallback (measured
 13.7 fires/day against a nominal 288 on this account). `latest_scan.json.trigger` records which.
-The Mac runs the live book, the Sunday gates and the research session, and publishes
-`selfimprove/*` + `data/proposals/` + `data/livebook_summary.json` through `publish.py` from a
-detached temp worktree — path sets disjoint from the runner's, so `git pull --rebase` on both sides
-is conflict-free.
+The keeper also ticks the live book (`KEEPER_BOOK=1`: a 60 s `livebook.py --tick` under the
+scan's lock, four state files committed with the scan). The Mac runs the Sunday gates and the
+research session on the pulled snapshot, and publishes `selfimprove/*` + `data/proposals/` +
+`data/livebook_summary.json` through `publish.py` from a detached temp worktree — path sets
+disjoint from the runner's, so `git pull --rebase` on both sides is conflict-free.
 
 **Discovery.** `data/discovery_cursor.json` is a block cursor over `DISCOVERY_LOG_SOURCES`; log
 tokens are never truncated (`DISCOVERY_MAX_LOG_TOKENS_PER_RUN` caps the window; the cursor advances
@@ -105,12 +107,23 @@ and Kyber *and* ScanHood explicit no-route; any unanswered probe on the active b
 The ledger's death test is different by design: index-absence for `DEAD_CONFIRM_TICKS` polls.
 
 **The live book.** `selfimprove/livebook.py` keys positions by `(token, event_seq)` — a promotion
-row opens a second position beside the token's B row. Feed from `origin/main:data/ledger.csv` via
-`publish.origin_blob` (fetch + show, exit 128 ⇒ empty, silently). One shared buy per alert, one
-`quote_sell_many` per tick, the quote-integrity gate (R1 implausible multiple, R2 uncorroborated
-jump vs Dexscreener, R3 `amount_out > reserve_weth`; downside never gated), `suspect` after 5,
-`unpriced` after 30 deferred, `gap_s` on every tick and fill, `gapped` = NaN for that policy when a
-market-decision close follows a gap > `LIVEBOOK_MAX_SCORABLE_GAP_S`. Every state file is gitignored.
+row opens a second position beside the token's B row. It ticks INSIDE the keeper (`.github/keeper.sh`
+`book_loop`, `KEEPER_BOOK=1`, `0` disables): one `--tick` per `LIVEBOOK_TICK_INTERVAL_S` under
+`with_lock` — the same flock the scan's commit+push holds — started after `await_predecessor`
+(and only once `data/livebook.json` is tracked in the checkout: the seed precedes the first tick),
+stopped before `finish`'s final commit. The feed reads THIS checkout (`LIVEBOOK_FEED_SOURCE=worktree`:
+`data/ledger.csv` + `data/band_verdicts.csv`, no git in a tick; `origin` = the retired Mac mode,
+fetch + `publish.origin_blob`). Four state files — `data/livebook.json`, `livebook_fills.csv`,
+`livebook_feed.json`, `livebook_missed.jsonl` — are COMMITTED with the scan; `data/livebook_ticks.jsonl`
+stays gitignored and rides the run's artifact. One shared buy per alert, one `quote_sell_many` per
+tick, the quote-integrity gate (R1 implausible multiple, R2 uncorroborated jump vs Dexscreener, R3
+`amount_out > reserve_weth`; downside never gated), at most one batched flow read (`flow_fn`, inert
+until a policy carries a `flow` schema), `suspect` after 5, `unpriced` after 30 deferred, `gap_s` on
+every tick and fill, `gapped` = NaN for that policy when a market-decision close follows a gap >
+`LIVEBOOK_MAX_SCORABLE_GAP_S` (a keeper handoff is such a gap; the constant is a scoring parameter,
+never raised for it). Every new row is stamped `sidecar_true`; `LIVEBOOK_BAND_UNDER_TEST` (None, or a
+registered non-control band) admits that band's picks at the cap under
+`LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN` (refused `band_under_test_full` past it).
 
 **The gates.** Exit (`improve.py`): apparatus faults first ⇒ VOID, then seven checks, sticky
 nomination stamping `alert_seq`, forward-only prefix, one-shot judgment, renomination cooldown, the
@@ -241,13 +254,21 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   reached pass 2) — the one wall-clock in a source module, pinned by verify to `gmgn._query`. Its
   Trenches allow-list omits `pons_v2` and bare V2/V3/V4 pools, so the feed is a hedge, never the cursor.
 - **The workflow does `git add data/ docs/`** — anything new and non-ignored under `data/` is
-  committed automatically; the livebook files, `cache/` and `data/backups/` are gitignored.
+  committed automatically; the four livebook state files ride it on purpose (verify: no other
+  `git add` line in the workflow / keeper / `selfimprove/*.sh` can stage a `data/livebook*` path);
+  `data/livebook_ticks.jsonl`, `cache/` and `data/backups/` are gitignored.
+- **Never run `livebook.py --tick` on the Mac** after the cloud-book cutover: the four state
+  files are tracked, so a Mac tick diverges the tree and the Sunday ff-merge refuses.
+  `--scorecard` reads the pulled snapshot. The per-process `http_client` throttle means the
+  keeper's scan and book can reach 2× a host's rate; `RH_HTTP_RATE_SCALE=0.5` is the operator's
+  knob for the book process only if its `deferred` tick counts rise (verify pins the unscaled rates).
 - **Alerts go out EARLY in a run**: tokens the champion band selects on pass-1 facts get pass 2
   first and are alerted before the rest of pass 2, the watchlist refresh and the forward update;
   `latest_scan.json.stage_seconds.alert_sent` is the measured latency inside the run.
-- **Entry lag is 3–8 min by construction** (dispatch + run + commit + fetch); refusals past
-  `MAX_ENTRY_LAG_S` land in `data/livebook_missed.jsonl`. Read `entry_lag_s` before trusting a
-  live number.
+- **Entry lag inside the keeper is the scan's wall time after `alert_ts` plus at most one tick**
+  (the retired Mac mode's 3–8 min came from dispatch + run + commit + fetch); refusals past
+  `MAX_ENTRY_LAG_S` land in `data/livebook_missed.jsonl` (committed). Read `entry_lag_s` before
+  trusting a live number.
 - Everything is stdlib urllib + certifi; system certs fail with `CERTIFICATE_VERIFY_FAILED`.
 - Never `echo` a key into a config file; `cloud_secrets.py` and `load_credentials()` are the only
   paths, and an assistant may not enter credentials.

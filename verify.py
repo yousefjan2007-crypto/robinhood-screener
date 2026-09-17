@@ -313,6 +313,21 @@ rate_names = {n: getattr(config, n) for n in dir(config) if n.endswith("_RATE_HZ
 unmapped = [h for h, hz in http_client._HOST_HZ.items() if hz not in rate_names.values()]
 check("every http_client._HOST_HZ value is a config.*_RATE_HZ constant (no literals in http_client)",
       not unmapped and dict(http_client._HOST_HZ) == dict(config.HOST_RATE_HZ), str(unmapped))
+check("HTTP_RATE_SCALE: with RH_HTTP_RATE_SCALE unset the assembled HOST_RATE_HZ is exactly today's constants (scale 1.0, no "
+      "arithmetic applied)",
+      config.HTTP_RATE_SCALE == 1.0 and config.HOST_RATE_HZ == {
+          "api.dexscreener.com": config.DEXSCREENER_RATE_HZ, "api.geckoterminal.com": config.GECKOTERMINAL_RATE_HZ,
+          "robinhoodchain.blockscout.com": config.BLOCKSCOUT_RATE_HZ, "rpc.mainnet.chain.robinhood.com": config.RPC_RATE_HZ,
+          "scanhood.xyz": config.SCANHOOD_RATE_HZ, "api.robinx.io": config.ROBINX_RATE_HZ,
+          "aggregator-api.kyberswap.com": config.KYBER_RATE_HZ, "openapi.gmgn.ai": config.GMGN_RATE_HZ}, str(config.HOST_RATE_HZ))
+_rs = subprocess.run([sys.executable, "-c", "import config, json; print(json.dumps(config.HOST_RATE_HZ))"], cwd=ROOT,
+                     env=dict(os.environ, RH_HTTP_RATE_SCALE="0.5"), capture_output=True, text=True)
+_rs0 = subprocess.run([sys.executable, "-c", "import config"], cwd=ROOT, env=dict(os.environ, RH_HTTP_RATE_SCALE="0"),
+                      capture_output=True, text=True)
+check("RH_HTTP_RATE_SCALE=0.5 halves every assembled rate (a multiplier applied where HOST_RATE_HZ is assembled — the operator's knob "
+      "for the keeper's book process only, never verify); a non-positive scale is refused at import (the throttle divides by hz)",
+      _rs.returncode == 0 and json.loads(_rs.stdout) == {h: hz * 0.5 for h, hz in config.HOST_RATE_HZ.items()} and _rs0.returncode != 0,
+      (_rs.stderr or _rs.stdout)[-300:])
 gt_hz = http_client._HOST_HZ["api.geckoterminal.com"]
 check("GeckoTerminal <= 0.4 Hz everywhere and == 0.25 Hz on the Mac (30/min per IP is shared with "
       "solana-listener/-livebook; 0.4 Hz measured 47% 429s)",
@@ -410,7 +425,8 @@ def _bash_fn(src, name):
     return m.group(0) if m else ""
 for needle in ("set -u -o pipefail", "_keeper_state()", "keeper_state()", "running_state()", "circuit_open()", "--circuit-open",
                "_push_marker()", "push_marker()", "marker_only_local_commit()", "rev-list --count origin/main..HEAD",
-               "config.KEEPER_CIRCUIT_FAILURES, config.KEEPER_CIRCUIT_WINDOW_S)"):
+               "config.KEEPER_CIRCUIT_FAILURES, config.KEEPER_CIRCUIT_WINDOW_S, int(config.LIVEBOOK_TICK_INTERVAL_S), "
+               "config.KEEPER_BOOK_STOP_WAIT_S)"):
     check(f"keeper.sh contains {needle!r}", needle in _ks)
 _fn = {n: _bash_fn(_ks, n) for n in ("_keeper_state", "keeper_alive", "ensure_keeper", "maybe_dispatch_successor",
                                      "_commit_push", "_push_marker", "await_predecessor", "finish")}
@@ -442,6 +458,35 @@ check("keeper.sh: the successor's wait breaks on a DEFINITE none from running_st
       and "unknown" in _fn["await_predecessor"]
       and "circuit_open; c=$?" in _fn["finish"] and _fn["finish"].index("circuit_open") < _fn["finish"].index("dispatch_keeper")
       and 'if [ "$c" != 1 ]' in _fn["finish"] and 'none)  dispatch_keeper "$(other_slot)" keeper' in _fn["finish"])
+# Phase 4: the paper book inside the keeper — same lock, after await_predecessor, stopped before `done`
+for needle in ("KEEPER_BOOK", "export LIVEBOOK_FEED_SOURCE=worktree", "book_loop()", "book_start()", "book_stop()",
+               "book_last_tick_ts()", "with_lock python3 -u selfimprove/livebook.py --tick", "book first tick: gap since snapshot's last_tick_ts",
+               "data/livebook_ticks.jsonl"):
+    check(f"keeper.sh contains {needle!r}", needle in _ks)
+_fnb = {n: _bash_fn(_ks, n) for n in ("book_loop", "book_start", "book_stop", "keeper_main", "finish", "read_config")}
+check("keeper.sh: the book functions, keeper_main and read_config are top-level `name() {` … `}` blocks",
+      all(_fnb.values()), str([k for k, v in _fnb.items() if not v]))
+check("keeper.sh: the tick runs under with_lock — the SAME lock the scan's commit+push holds — inside book_loop, which naps between "
+      "ticks (never a bare sleep, never a negative nap) and logs every 10th tick plus every non-zero rc",
+      "with_lock python3 -u selfimprove/livebook.py --tick" in _fnb["book_loop"] and "nap " in _fnb["book_loop"]
+      and not re.search(r"^\s*sleep\b", _fnb["book_loop"], re.M) and "n % 10" in _fnb["book_loop"] and '"$rc" != 0' in _fnb["book_loop"]
+      and '-gt 0 ] && nap' in _fnb["book_loop"] and "trap 'BOOK_STOP=1' TERM" in _fnb["book_loop"])
+check("keeper.sh: book_start runs AFTER await_predecessor and BEFORE main_loop (a successor never ticks before the predecessor's "
+      "`done` or its absence), exports LIVEBOOK_FEED_SOURCE=worktree, backgrounds book_loop and honours KEEPER_BOOK=0",
+      _fnb["keeper_main"].index("await_predecessor") < _fnb["keeper_main"].index("book_start") < _fnb["keeper_main"].index("main_loop")
+      and "export LIVEBOOK_FEED_SOURCE=worktree" in _fnb["book_start"] and "book_loop &" in _fnb["book_start"]
+      and '"$KEEPER_BOOK" != 1' in _fnb["book_start"])
+check("keeper.sh: book_start refuses to start the loop while data/livebook.json is not TRACKED in the checkout (the cloud book must be "
+      "seeded before the first tick, or a fresh book collides with the seed at the next commit_push)",
+      "git ls-files --error-unmatch data/livebook.json" in _fnb["book_start"]
+      and _fnb["book_start"].index("git ls-files --error-unmatch") < _fnb["book_start"].index("book_loop &"))
+check("keeper.sh: finish stops the book loop (TERM + a bounded wait for the in-flight tick) BEFORE the final commit_push, which "
+      "precedes push_marker done — the predecessor's last tick rides its final snapshot",
+      _fnb["finish"].index("book_stop") < _fnb["finish"].index("commit_push") < _fnb["finish"].index("push_marker done")
+      and "kill -TERM" in _fnb["book_stop"] and "BOOK_STOP_WAIT_S" in _fnb["book_stop"] and "kill -0" in _fnb["book_stop"])
+check("keeper.sh: read_config prints the tick interval and the stop bound from config (no tick literal in the script)",
+      "int(config.LIVEBOOK_TICK_INTERVAL_S)" in _fnb["read_config"] and "config.KEEPER_BOOK_STOP_WAIT_S" in _fnb["read_config"]
+      and "BOOK_TICK_S" in _fnb["read_config"] and "BOOK_STOP_WAIT_S" in _fnb["read_config"])
 pub_src = _read(os.path.join(ROOT, "selfimprove", "publish.py"))
 res_src = _read(os.path.join(ROOT, "selfimprove", "research", "run_research.sh"))
 check("publish.py adds its detached worktree under tempfile.mkdtemp() (never a repo-relative path a "
@@ -495,6 +540,11 @@ check("screener.yml: the Keeper step runs only in keeper mode and the one-shot R
       and 'bash .github/keeper.sh --keeper-alive; alive=$?' in yml and '[ "$alive" != 1 ]' in yml and "one-shot skipped" in yml
       and 'bash .github/keeper.sh --keeper-alive; then' not in yml
       and 'bash .github/keeper.sh --ensure-keeper; rc=$?' in yml and '2) echo "keeper state unknown; nothing dispatched"' in yml)
+_kstep = yml[yml.index("name: Keeper"):yml.index("name: Run screener")]
+check("screener.yml: the Keeper step's env carries KEEPER_BOOK: \"1\" and LIVEBOOK_FEED_SOURCE: worktree (the book ticks inside the keeper "
+      "and reads THIS checkout), and the always() artifact step keeps retention-days (data/livebook_ticks.jsonl rides it, never the commit)",
+      'KEEPER_BOOK: "1"' in _kstep and "LIVEBOOK_FEED_SOURCE: worktree" in _kstep and "retention-days:" in yml
+      and yml.index("retention-days:") > yml.index("upload-artifact@v4") and "livebook_ticks.jsonl" in yml)
 vyml = _read(os.path.join(ROOT, ".github", "workflows", "verify.yml"))
 check("verify.yml runs verify.py with fetch-depth 0 on human pushes only (never inside the 5-min job)",
       "fetch-depth: 0" in vyml and "python verify.py" in vyml and "screener state" in vyml
@@ -566,21 +616,39 @@ def _ignored(rel: str) -> bool:
     return any(rel.startswith(p.rstrip("/")) or rel.endswith(p.lstrip("*")) for p in pats)
 
 
-must_ignore = ["cache/x.json", "config.local.json", "run.out.log", "livebook.err.log", "data/livebook.json",
-               "data/livebook_fills.csv", "data/livebook_ticks.jsonl", "data/livebook_feed.json",
-               "data/livebook_missed.jsonl", "data/backups/livebook_20260912.json", "selfimprove/PAUSE",
+must_ignore = ["cache/x.json", "config.local.json", "run.out.log", "livebook.err.log", "data/livebook_ticks.jsonl",
+               "data/livebook.json.123.tmp", "data/backups/livebook_20260912.json", "selfimprove/PAUSE",
                "selfimprove/research/context/context_2026-09-13.md", "selfimprove/research/logs/run_2026-09-13.log",
-               "data/archive/proven_dev/social_verdicts.json", "data/archive/proven_dev/history.bundle"]
+               "data/archive/proven_dev/social_verdicts.json", "data/archive/proven_dev/history.bundle", "data/.keeper.lock"]
 must_keep = ["data/proposals/entry-20260913-000000.md", "selfimprove/champion.json", "selfimprove/trials.json",
              "selfimprove/candidates/registry.json", "data/ledger.csv", "data/livebook_summary.json",
+             "data/livebook.json", "data/livebook_fills.csv", "data/livebook_feed.json", "data/livebook_missed.jsonl",
              "selfimprove/research/proposals/PROPOSAL_2026-09-13.md"]
 not_ign = [p for p in must_ignore if not _ignored(p)]
 wrongly = [p for p in must_keep if _ignored(p)]
-check(".gitignore covers cache/, config.local.json, *.out.log/*.err.log, the five data/livebook* state "
-      "files, data/backups/, selfimprove/PAUSE, research context/ + logs/, the offline archive files",
+check(".gitignore covers cache/, config.local.json, *.out.log/*.err.log, data/livebook_ticks.jsonl (the per-tick log: artifact only), "
+      "the book's *.tmp, data/backups/, selfimprove/PAUSE, research context/ + logs/, the offline archive files, the flock file",
       not not_ign, str(not_ign))
-check(".gitignore does NOT ignore data/proposals/, champion.json, trials.json, registry.json, ledger.csv, "
-      "livebook_summary.json, research proposals", not wrongly, str(wrongly))
+check(".gitignore does NOT ignore data/proposals/, champion.json, trials.json, registry.json, ledger.csv, livebook_summary.json, "
+      "research proposals, nor the four COMMITTED book files (livebook.json, _fills.csv, _feed.json, _missed.jsonl — they ride the "
+      "keeper's `git add data/`)", not wrongly, str(wrongly))
+check("none of the four committed book file names contains 'ledger' (a sibling voice assistant globs *ledger*.csv under this repo)",
+      not any("ledger" in os.path.basename(f_) for f_ in must_keep if "livebook" in f_))
+_stage_bad = []
+for _f in sorted(set(glob.glob(os.path.join(ROOT, ".github", "workflows", "*.yml")) + glob.glob(os.path.join(ROOT, ".github", "*.sh"))
+                     + glob.glob(os.path.join(ROOT, "selfimprove", "*.sh")) + glob.glob(os.path.join(ROOT, "launchd", "*.sh")))):
+    for i, ln in enumerate(_read(_f).splitlines(), 1):
+        s_ = ln.strip()
+        m_ = re.search(r"\bgit\b(?:\s+-C\s+\S+)?\s+add\b(.*)$", s_)
+        if s_.startswith("#") or not m_:
+            continue
+        args_ = m_.group(1).split("#")[0].split()
+        if _rel(_f) == ".github/keeper.sh" and args_ == ["data/", "docs/"]:
+            continue                                   # the ONE staging line the four book files ride
+        if any(t in ("-A", "--all", ".", "data", "data/", "-u", "--update") or t.startswith("data/livebook") for t in args_):
+            _stage_bad.append(f"{_rel(_f)}:{i}")
+check("only keeper.sh's `git add data/ docs/` can stage a data/livebook* path: no other git add line in .github/workflows/*.yml, "
+      ".github/*.sh, selfimprove/*.sh or launchd/*.sh stages -A / . / data/ / a livebook file", not _stage_bad, str(_stage_bad))
 
 cs_bad = []
 cs_input = False
@@ -1439,6 +1507,12 @@ from selfimprove import livebook as LB                  # noqa: E402
 from selfimprove import policies as POL                 # noqa: E402
 
 _g = vars(LB)
+_lb_tree = _tree(os.path.join(ROOT, "selfimprove", "livebook.py"))
+check("livebook.py never sleeps (the keeper's loop naps between ticks; a tick holds the scan's lock) and its docstring documents "
+      "the four committed state files, the ticks log as artifact and the two feed modes — not 'all gitignored'",
+      not any(isinstance(n, ast.Call) and _attr_chain(n.func) in (["time", "sleep"], ["sleep"]) for n in ast.walk(_lb_tree))
+      and "gitignored (data/livebook.json" not in LB.__doc__ and "LIVEBOOK_FEED_SOURCE" in LB.__doc__ and "worktree" in LB.__doc__
+      and "livebook_ticks.jsonl" in LB.__doc__ and "COMMITTED" in LB.__doc__)
 _saved_lb = {k: _g[k] for k in ("BOOK_PATH", "FILLS_PATH", "TICKS_PATH", "FEED_STATE_PATH", "MISSED_PATH")}
 _saved_max_open = config.LIVEBOOK_MAX_OPEN
 TOK_RAW = 10 ** 24
@@ -3523,6 +3597,19 @@ check("CLAUDE.md's Commands block carries the chain's start / see / off switch a
       and "gh run list -w robinhood-screener -L 5" in _claude_md
       and "robinhood-screener robinhood-keeper-watchdog; do gh workflow disable" in _claude_md   # one name per call
       and "gh run cancel" in _claude_md and "keeper.sh" in _claude_md)
+_design = _read(os.path.join(ROOT, "docs", "DESIGN.md"))
+check("DESIGN.md carries the livebook-in-the-keeper rows: feed source, state ownership, the band under test, the operator cutover "
+      "(bootout, seed from the Mac snapshot, mv to backups, ff-merge, never tick on the Mac again) and HTTP_RATE_SCALE",
+      all(w in _design for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "HTTP_RATE_SCALE", "LIVEBOOK_BAND_UNDER_TEST",
+                                 "launchctl bootout gui/$UID/com.yousefjan.robinhood-livebook", "publish.publish_files(['data/livebook.json'",
+                                 "data/backups/", "git merge --ff-only origin/main", "livebook_ticks.jsonl", "RH_HTTP_RATE_SCALE=0.5")),
+      str([w for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "HTTP_RATE_SCALE", "LIVEBOOK_BAND_UNDER_TEST", "RH_HTTP_RATE_SCALE=0.5") if w not in _design]))
+check("CLAUDE.md's live-book paragraph is the keeper's (KEEPER_BOOK, LIVEBOOK_FEED_SOURCE, the four committed files, the ticks log as "
+      "artifact, the band under test) and the gotchas say never to tick on the Mac after the cutover",
+      all(w in _claude_md for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "livebook_ticks.jsonl", "LIVEBOOK_BAND_UNDER_TEST"))
+      and "never run `livebook.py --tick` on the mac" in _claude_md.lower())
+check("README says the live book runs inside the keeper and keeps its measured numbers",
+      "inside the keeper" in _readme and "13.7×/day" in _readme)
 
 # ═══════════════════════════════════════════════════════════════════════════════════
 section("P. price paths — paging, deferred propagation, unmatched rows")

@@ -82,6 +82,8 @@ KEEPER_STALE_S = 1800              # the tripwire (dashboard red, watchdog SCAN 
 PAGES_EVERY_N_ITERATIONS = 2       # dispatch the Pages deploy on every 2nd successful push (its own workflow/group)
 KEEPER_CIRCUIT_FAILURES = 3        # keeper runs concluded `failure` inside KEEPER_CIRCUIT_WINDOW_S that open the breaker:
 KEEPER_CIRCUIT_WINDOW_S = 7200     # no watchdog restart and no exit-3 self-dispatch until a human looks (2 h)
+KEEPER_BOOK_STOP_WAIT_S = 90       # finish waits this long for the book loop's in-flight tick before its final commit
+                                   # (a tick is seconds; the flock timeout bounds a hung one either way)
 
 # ── statistical guards (selfimprove/) ────────────────────────────────────────────
 # Read by ~/entry_bot/stats.py (imported by sys.path APPEND so THIS config wins).
@@ -122,6 +124,16 @@ HOST_RATE_HZ = {                   # assembled from the named constants — http
     "aggregator-api.kyberswap.com": KYBER_RATE_HZ,
     "openapi.gmgn.ai": GMGN_RATE_HZ,
 }
+# The throttle is per PROCESS. Inside the keeper the scan and the paper book are two processes
+# on one IP, so a host can see up to 2x its rate; RH_HTTP_RATE_SCALE multiplies every rate above
+# (1 = today's rates, untouched — no arithmetic is applied at all). The operator sets it to 0.5
+# for the BOOK process only if its `deferred` tick counts rise (docs/DESIGN.md); never for
+# verify, whose rate pins read the unscaled constants.
+HTTP_RATE_SCALE = float(os.environ.get("RH_HTTP_RATE_SCALE", "1"))
+if not HTTP_RATE_SCALE > 0:
+    raise ValueError("RH_HTTP_RATE_SCALE must be > 0 (the throttle divides by the rate)")
+if HTTP_RATE_SCALE != 1.0:
+    HOST_RATE_HZ = {h: hz * HTTP_RATE_SCALE for h, hz in HOST_RATE_HZ.items()}
 DEFAULT_RATE_HZ = 2.0
 HOST_429_TERMINAL = ("openapi.gmgn.ai",)   # a 429 here is a BAN: one request, deferred, dark for the run (no wait-and-retry)
 ENRICH_CACHE_MIN = 2         # dexscreener market snapshots
@@ -486,7 +498,7 @@ WETH_PX_CACHE_S = 120
 KYBER_ROUTES_URL = "https://aggregator-api.kyberswap.com/robinhood/api/v1/routes"
 SCANHOOD_QUOTE_URL = "https://scanhood.xyz/api/quote"
 
-# ── live multi-policy paper book (selfimprove/livebook.py; Mac, gitignored state) ──
+# ── live multi-policy paper book (selfimprove/livebook.py; inside the keeper, committed state) ──
 LIVEBOOK_FEED_TIERS = ("A", "B")   # B = passed hard gates, failed the champion band: the control
 LIVEBOOK_MAX_OPEN = 40             # A/promotion rows always admitted; B refused when full
 # The band under test: a REGISTERED non-control band name (verify checks), or None. A ledger

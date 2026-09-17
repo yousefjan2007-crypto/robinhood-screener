@@ -69,6 +69,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRIGGER: keeper
           KEEPER_SLOT: ${{ inputs.slot || 'a' }}
+          KEEPER_BOOK: "1"                  # the paper book ticks inside the keeper (0 = leave it off)
+          LIVEBOOK_FEED_SOURCE: worktree    # the book reads THIS checkout's ledger + sidecar, never git
         run: bash .github/keeper.sh
       - name: Run screener (one-shot; skipped while a keeper is alive)
         id: scan
@@ -120,6 +122,8 @@ jobs:
           set +e; bash .github/keeper.sh --ensure-keeper; rc=$?; set -e
           case "$rc" in 0) ;; 2) echo "keeper state unknown; nothing dispatched" ;; *) echo "keeper dispatch failed (rc=$rc)"; exit "$rc" ;; esac
       - name: Upload data/ (keeper runs; forensics after an exit 3 — the successor starts from a clean checkout)
+        # the directory as on disk, gitignored files included: data/livebook_ticks.jsonl (the book's
+        # per-tick log, ~3.5 MB/day) lives ONLY here, never in the commit
         if: ${{ always() && inputs.mode == 'keeper' }}
         uses: actions/upload-artifact@v4
         with:

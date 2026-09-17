@@ -1,8 +1,12 @@
 """
 Live multi-policy paper book — every exit policy trading the same alerts, simultaneously,
-on Robinhood Chain. Runs on the Mac under launchd every 60 s; EVERY state file it writes is
-gitignored (data/livebook.json, livebook_fills.csv, livebook_ticks.jsonl, livebook_feed.json,
-livebook_missed.jsonl). Ported from solana_screener/selfimprove/livebook.py (2026-09-12).
+on Robinhood Chain. Runs INSIDE the scan keeper on GitHub Actions (.github/keeper.sh,
+KEEPER_BOOK=1: one `--tick` per LIVEBOOK_TICK_INTERVAL_S under the scan's lock). Four state
+files — data/livebook.json, livebook_fills.csv, livebook_feed.json, livebook_missed.jsonl —
+are COMMITTED with the scan (`git add data/`), so a successor keeper restores the book from
+its checkout; data/livebook_ticks.jsonl (~3.5 MB/day) stays gitignored and rides the run's
+artifact. The Mac ran this under launchd until the cloud-book cutover and must never tick
+again (tracked state). Ported from solana_screener/selfimprove/livebook.py (2026-09-12).
 
 WHY THIS EXISTS, AND WHY IT IS THE RIGHT NEXT STEP RATHER THAN MORE BACKTESTING.
 The bar backtest (selfimprove/evaluate.py over selfimprove/paths.py bars) has three weaknesses
@@ -74,9 +78,21 @@ WHAT THIS PORT CHANGES, AND THE INCIDENTS BEHIND EACH CHANGE.
   * DURABILITY: the book is saved atomically FIRST, then fills are flushed. On 2026-08-15 a
     KeyError mid-loop meant the state write never ran, so every policy re-fired on the next tick
     and appended again — `sell_30m` logged 199 fills from ONE position.
-  * ENTRY LAG: the cloud runner writes the ledger, the Mac reads origin/main (git fetch + show,
-    never pull); a row older than MAX_ENTRY_LAG_S is refused and logged with its lag, so the book
-    judges "exit policy given a late entry" and says so (entry_lag_s on every position).
+  * ENTRY LAG: the ledger of record is read in the feed's mode (config.LIVEBOOK_FEED_SOURCE).
+    `worktree` — the keeper's: this checkout's data/ledger.csv, which run.py writes in ONE
+    tmp + os.replace and the tick reads under the same lock, so the lag is the scan's wall
+    time after alert_ts plus at most one tick. `origin` — the Mac's, retired: origin/main via
+    git fetch + show, never pull (dispatch + run + commit + fetch: 3–8 min). Either way a row
+    older than MAX_ENTRY_LAG_S is refused and logged with its lag, so the book judges "exit
+    policy given a late entry" and says so (entry_lag_s on every position).
+  * HANDOFFS: a successor keeper's first tick follows the predecessor's last by about one
+    push/poll cycle; last_tick_ts, max_gap_s and `gapped` make that gap visible (a market-
+    decision close after a gap > LIVEBOOK_MAX_SCORABLE_GAP_S scores NaN). That is a scoring
+    parameter, never raised to hide a slow handoff — the cutover is gated on the measured gap.
+  * THE BAND UNDER TEST: every new row is stamped `sidecar_true` (the bands whose verdict at
+    that event_seq is 1, from data/band_verdicts.csv); when config.LIVEBOOK_BAND_UNDER_TEST
+    names a registered non-control band, its picks are admitted at the cap under their own
+    sub-cap, so a candidate's rows reach the book beside the champion's. None = inert.
 
 Reproducibility: `now_s` is always passed in by the caller (time.time() ONCE in main()); the
 only other clock is time.monotonic() around the tick for the tick_wall_s log line. No keys, no
@@ -102,7 +118,8 @@ from selfimprove import policies as POL         # noqa: E402
 from selfimprove import publish                 # noqa: E402
 from sources import dexscreener, rpc            # noqa: E402
 
-# ── files (all gitignored; the weekly summary in config.LIVEBOOK_SUMMARY_PATH is not ours) ──
+# ── files (four committed with the scan; the ticks log gitignored, the run's artifact carries
+#    it; the weekly summary in config.LIVEBOOK_SUMMARY_PATH is not ours) ──
 BOOK_PATH = os.path.join(config.DATA_DIR, "livebook.json")
 FILLS_PATH = os.path.join(config.DATA_DIR, "livebook_fills.csv")
 TICKS_PATH = os.path.join(config.DATA_DIR, "livebook_ticks.jsonl")
@@ -1101,7 +1118,7 @@ def main(argv=None) -> int:
         return 0
     print(__doc__.strip().split("\n")[0])
     print("\nusage:")
-    print("  python3 selfimprove/livebook.py --tick        # one feed + tick cycle (launchd, 60 s)")
+    print("  python3 selfimprove/livebook.py --tick        # one feed + tick cycle (the keeper's book loop, 60 s)")
     print("  python3 selfimprove/livebook.py --scorecard   # per-policy live P&L")
     print("  python3 selfimprove/livebook.py               # offline smoke test, then the scorecard")
     print("  python3 selfimprove/livebook.py --live        # one real feed + tick against origin/main")

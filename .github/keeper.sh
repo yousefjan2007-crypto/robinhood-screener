@@ -9,8 +9,10 @@
 #   sees ready: last commit, pulls origin, ──────────▶    sees done — or no keeper running any
 #   writes {"done"} on THAT base, exits 0                 more — pull --rebase, enters the loop
 #
-# Every git write happens under flock on data/.keeper.lock (Phase 4 puts the paper book under the
-# same lock) and follows ONE routine (commit_push): add data/ docs/ → commit → up to 5× (pull
+# Every git write happens under flock on data/.keeper.lock — and so does every tick of the paper
+# book (book_loop: selfimprove/livebook.py --tick every LIVEBOOK_TICK_INTERVAL_S, KEEPER_BOOK=1),
+# whose four state files ride the same commit. Every write follows ONE routine (commit_push):
+# add data/ docs/ → commit → up to 5× (pull
 # --rebase --autostash → push), a failed rebase aborted, never forced; three iterations without a
 # successful push ⇒ exit 3 (the workflow's always() step uploads data/ as an artifact and the
 # successor starts from a clean checkout). The handoff marker has its own routine (push_marker):
@@ -51,14 +53,17 @@ SLOT="${KEEPER_SLOT:-a}"
 T0=0; READY_TS=0; STOP=0; REASON=""; DISPATCHED=0; SUNDAY_DONE=0
 KEEPER_CADENCE_S=0; KEEPER_MAX_S=0; KEEPER_HANDOFF_LEAD_S=0; KEEPER_HANDOFF_WAIT_S=0; PAGES_EVERY_N=0
 CIRCUIT_FAILURES=0; CIRCUIT_WINDOW_S=0
+# the paper book loop: KEEPER_BOOK=1 (the workflow's default; 0 = the book stays off) ticks
+# livebook.py every BOOK_TICK_S beside the scan, under the same lock
+KEEPER_BOOK="${KEEPER_BOOK:-1}"; BOOK_TICK_S=0; BOOK_STOP_WAIT_S=0; BOOK_PID=""; BOOK_STOP=""
 
 log() { echo "$(date -u +%FT%TZ) keeper $*"; }
 now() { date +%s; }
 elapsed() { echo $(( $(now) - T0 )); }
 
-read_config() {  # ONE python call; the script never carries a cadence or a breaker literal
-  read -r KEEPER_CADENCE_S KEEPER_MAX_S KEEPER_HANDOFF_LEAD_S PAGES_EVERY_N KEEPER_HANDOFF_WAIT_S CIRCUIT_FAILURES CIRCUIT_WINDOW_S \
-    < <(python3 -c "import config; print(config.KEEPER_CADENCE_S, config.KEEPER_MAX_S, config.KEEPER_HANDOFF_LEAD_S, config.PAGES_EVERY_N_ITERATIONS, config.KEEPER_HANDOFF_WAIT_S, config.KEEPER_CIRCUIT_FAILURES, config.KEEPER_CIRCUIT_WINDOW_S)") \
+read_config() {  # ONE python call; the script never carries a cadence, a breaker or a tick literal
+  read -r KEEPER_CADENCE_S KEEPER_MAX_S KEEPER_HANDOFF_LEAD_S PAGES_EVERY_N KEEPER_HANDOFF_WAIT_S CIRCUIT_FAILURES CIRCUIT_WINDOW_S BOOK_TICK_S BOOK_STOP_WAIT_S \
+    < <(python3 -c "import config; print(config.KEEPER_CADENCE_S, config.KEEPER_MAX_S, config.KEEPER_HANDOFF_LEAD_S, config.PAGES_EVERY_N_ITERATIONS, config.KEEPER_HANDOFF_WAIT_S, config.KEEPER_CIRCUIT_FAILURES, config.KEEPER_CIRCUIT_WINDOW_S, int(config.LIVEBOOK_TICK_INTERVAL_S), config.KEEPER_BOOK_STOP_WAIT_S)") \
     || { log "config unreadable"; exit 1; }
 }
 
@@ -258,6 +263,76 @@ pace() {  # sleep until $1 + KEEPER_CADENCE_S in POLL_S slices (never a fixed sl
   done
 }
 
+# ── the paper book: livebook.py --tick beside the scan, under the SAME lock ───────
+# KEEPER_BOOK=1 runs a background loop of one tick per BOOK_TICK_S. The tick runs under
+# with_lock — the lock the scan's commit+push holds — so a snapshot can never capture
+# livebook.json from tick N beside fills from tick N+1 (the 199-fills class) and never a
+# mid-rebase tree. The tick itself never sleeps; the loop naps between ticks. It starts only
+# AFTER await_predecessor (a successor never ticks before the predecessor's `done`, or its
+# absence) and is stopped — the in-flight tick waited for — BEFORE finish's final commit, so
+# the predecessor's last tick is in its final snapshot and the successor's first tick follows
+# it by about one push/poll cycle (the first tick logs the gap it actually saw). Four state
+# files ride `git add data/`; data/livebook_ticks.jsonl stays gitignored — the run's artifact
+# carries it. The feed reads THIS checkout (LIVEBOOK_FEED_SOURCE=worktree): no git in a tick.
+book_last_tick_ts() {  # the restored snapshot's newest last_tick_ts (integer s); empty when no book
+  python3 -c 'import json
+try:
+    b = json.load(open("data/livebook.json"))
+    ts = [float(p.get("last_tick_ts") or 0) for p in b.values() if isinstance(p, dict)]
+    if ts:
+        print(int(max(ts)))
+except Exception:
+    pass' 2>/dev/null
+}
+
+book_loop() {  # the background loop; TERM ⇒ finish the in-flight tick, then leave
+  trap 'BOOK_STOP=1' TERM
+  local n=0 t rc last s
+  last=$(book_last_tick_ts)
+  while [ -z "$BOOK_STOP" ]; do
+    n=$(( n + 1 )); t=$(now)
+    if [ "$n" = 1 ]; then
+      if [ -n "$last" ]; then log "book first tick: gap since snapshot's last_tick_ts = $(( t - last )) s"
+      else log "book first tick: no snapshot (empty book)"; fi
+    fi
+    with_lock python3 -u selfimprove/livebook.py --tick; rc=$?
+    if [ "$rc" != 0 ] || [ $(( n % 10 )) = 0 ]; then log "book tick n=$n rc=$rc wall=$(( $(now) - t ))s"; fi
+    [ -z "$BOOK_STOP" ] || break
+    s=$(( t + BOOK_TICK_S - $(now) ))
+    [ "$s" -gt 0 ] && nap "$s"
+  done
+  log "book loop exit after $n tick(s)"
+}
+
+book_start() {  # after await_predecessor; KEEPER_BOOK=0 leaves the book off
+  if [ "$KEEPER_BOOK" != 1 ]; then log "book loop disabled (KEEPER_BOOK=$KEEPER_BOOK)"; return 0; fi
+  # never before the seed: with the .gitignore flip merged but the Mac snapshot not yet published,
+  # a fresh book here would collide with the seed on livebook.json at the next commit_push
+  # (five aborted rebases ⇒ exit 3 and ~12 min of unpushed scan state). Tracked ⇒ seeded.
+  if ! git ls-files --error-unmatch data/livebook.json >/dev/null 2>&1; then
+    log "book loop disabled: data/livebook.json is not tracked in this checkout — seed the cloud book first (docs/DESIGN.md, the cutover row)"
+    return 0
+  fi
+  export LIVEBOOK_FEED_SOURCE=worktree      # the tick reads THIS checkout's ledger + sidecar, never git
+  book_loop &
+  BOOK_PID=$!
+  log "book loop started pid=$BOOK_PID tick=${BOOK_TICK_S}s feed=worktree"
+}
+
+book_stop() {  # before finish's final commit: TERM the loop, wait (bounded) for the in-flight tick
+  [ -n "$BOOK_PID" ] || return 0
+  kill -TERM "$BOOK_PID" 2>/dev/null
+  local i=0
+  while kill -0 "$BOOK_PID" 2>/dev/null && [ "$i" -lt "$BOOK_STOP_WAIT_S" ]; do sleep 1; i=$(( i + 1 )); done
+  if kill -0 "$BOOK_PID" 2>/dev/null; then
+    log "book loop still running after ${BOOK_STOP_WAIT_S}s — not waited for further (the lock bounds the commit)"
+  else
+    wait "$BOOK_PID" 2>/dev/null
+    log "book loop stopped (${i}s)"
+  fi
+  BOOK_PID=""
+}
+
 # ── the keeper ────────────────────────────────────────────────────────────────────
 keeper_start() {
   gh auth status >/dev/null 2>&1 || { log "gh auth status FAILED (GH_TOKEN?)"; exit 1; }
@@ -265,7 +340,7 @@ keeper_start() {
   read_config
   trap on_signal TERM INT
   T0=$(now)
-  log "START run_id=$RUN_ID slot=$SLOT cadence=${KEEPER_CADENCE_S}s max=${KEEPER_MAX_S}s lead=${KEEPER_HANDOFF_LEAD_S}s wait=${KEEPER_HANDOFF_WAIT_S}s pages_every=$PAGES_EVERY_N circuit=${CIRCUIT_FAILURES}/${CIRCUIT_WINDOW_S}s"
+  log "START run_id=$RUN_ID slot=$SLOT cadence=${KEEPER_CADENCE_S}s max=${KEEPER_MAX_S}s lead=${KEEPER_HANDOFF_LEAD_S}s wait=${KEEPER_HANDOFF_WAIT_S}s pages_every=$PAGES_EVERY_N circuit=${CIRCUIT_FAILURES}/${CIRCUIT_WINDOW_S}s book=$KEEPER_BOOK/${BOOK_TICK_S}s"
 }
 
 await_predecessor() {  # successor side: announce `ready`, wait for `done` — or for the predecessor
@@ -319,6 +394,7 @@ finish() {  # $1 = main_loop rc. The final commit + push, the marker, the reason
     done
     [ -n "$REASON" ] || REASON=max-time
   fi
+  book_stop                                                 # the book's last tick rides the final snapshot
   commit_push; log "final push rc=$?"                       # straggler state first (usually 10: none)
   push_marker done "$(now)"; log "done marker rc=$?"        # true on every exit, written on origin's base:
   log "EXIT reason=$REASON elapsed=$(elapsed)s dispatched_successor=$DISPATCHED"   # a waiting successor is released at once
@@ -343,6 +419,7 @@ finish() {  # $1 = main_loop rc. The final commit + push, the marker, the reason
 keeper_main() {
   keeper_start
   await_predecessor
+  book_start                                # never before the predecessor's `done` (or its absence)
   main_loop; local rc=$?
   finish "$rc"
 }

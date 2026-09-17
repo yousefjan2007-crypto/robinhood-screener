@@ -5,13 +5,12 @@ config.local.json
 __pycache__/
 *.pyc
 *.tmp
-# live multi-policy paper book (selfimprove/livebook.py) — local state rewritten every 60s;
-# must never conflict with what the cloud commits back. The weekly summary IS committed.
-data/livebook.json
-data/livebook_fills.csv
+# the paper book (selfimprove/livebook.py --tick inside .github/keeper.sh): livebook.json,
+# livebook_fills.csv, livebook_feed.json and livebook_missed.jsonl are COMMITTED state riding the
+# scan's `git add data/` — never tick or hand-edit them on the Mac (the tree would diverge from
+# origin/main and the Sunday ff-merge refuses). Only the per-tick log stays out of git: it grows
+# ~3.5 MB/day and rides the keeper run's artifact instead. The weekly summary IS committed.
 data/livebook_ticks.jsonl
-data/livebook_feed.json
-data/livebook_missed.jsonl
 # research-session scratch
 selfimprove/research/context/
 selfimprove/research/logs/
