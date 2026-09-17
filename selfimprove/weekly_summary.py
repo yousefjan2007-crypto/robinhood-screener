@@ -35,7 +35,7 @@ TWO DERIVED LINES THAT MUST NEVER BE CONSTANTS:
   * the K5 kill condition (BAND_KILL_AFTER_DAYS: no band net of round-trip cost above zero ->
     'no entry signal') is re-evaluated on the matured rows with the day-clustered lower bound
     from selfimprove/evaluate.cluster_lb, and the champion's DSR at len(bands_ever_scored) via
-    ~/entry_bot/stats.py (sys.path APPEND so our config wins; NaN fails closed when missing).
+    the vendored selfimprove/dsr.py (numpy only; NaN fails closed on any failure).
 
 Reproducibility: time.time() is read ONCE in main() and threaded through as now_s; every
 bootstrap uses np.random.default_rng(config.SEED + offset). Not financial advice.
@@ -54,8 +54,6 @@ import config                                  # noqa: E402
 import ledger                                  # noqa: E402  (module level: ledger_section spells it too,
                                                # and a function-local import binds a LOCAL name — the
                                                # NameError compose swallowed as "ledger: unavailable")
-
-sys.path.append(os.path.join(config.HOME, "entry_bot"))   # stats.py only; APPEND so our config wins
 
 MAX_LINES = 30
 _EMPTY = ("", "nan", "None", "NaN", "NA")
@@ -362,14 +360,14 @@ def kill_section(led, wide, champion_band: str, now_s: float, P: dict) -> list:
     # the champion's DSR on its selected day means at len(bands_ever_scored); NaN fails closed
     dsr = float("nan")
     try:
-        import stats as ST                                 # ~/entry_bot/stats.py
+        from selfimprove import dsr as DSR                 # the vendored Deflated Sharpe
         sel = _selected_mask(mat, wide, champion_band) if len(mat) else np.zeros(0, dtype=bool)
         dm: dict = {}
         for v, d in zip(mat["_ret"].to_numpy(dtype=float)[sel] - cost, mat["_day"].to_numpy()[sel]):
             dm.setdefault(d, []).append(v)
         n_tr = max(1, trials.family_count("bands", P["trials"]))
         if len(dm) >= config.MIN_BOOTSTRAP_CLUSTERS:
-            dsr = float(ST.deflated_sharpe_ratio([float(np.mean(v)) for v in dm.values()], n_tr))
+            dsr = float(DSR.deflated_sharpe_ratio([float(np.mean(v)) for v in dm.values()], n_tr))
     except Exception:
         dsr = float("nan")
     line += f"; champion DSR {'n/a' if dsr != dsr else '%.2f' % dsr} (gate {config.BAND_DSR_GATE})"

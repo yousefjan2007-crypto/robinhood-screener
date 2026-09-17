@@ -70,6 +70,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import config                                        # noqa: E402
 from selfimprove import champion as CH               # noqa: E402
+from selfimprove import dsr as DSR                   # noqa: E402  (norm_ppf without scipy)
 from selfimprove import policies as POL              # noqa: E402
 from selfimprove import trials as TR                 # noqa: E402
 from selfimprove.entry_lab import bands as B         # noqa: E402
@@ -163,21 +164,19 @@ def forward_prefix(series: pd.DataFrame, s: np.ndarray, after_seq: int) -> dict:
 
 def dsr_bar(n_days: int, n_trials: int) -> float:
     """The per-day Sharpe a NORMAL day-mean series would need for DSR >= BAND_DSR_GATE over
-    n_days at n_trials (skew 0, kurtosis 3): the bar the floors imply. NaN without scipy."""
-    try:
-        from scipy import stats as _st
-    except Exception:
-        return float("nan")
+    n_days at n_trials (skew 0, kurtosis 3): the bar the floors imply. The quantiles come from
+    selfimprove/dsr.norm_ppf (statistics.NormalDist) — it returned NaN on the runner while it
+    needed scipy."""
     n = max(int(n_days), 2)
     z = max(int(n_trials), 1)
-    e = 0.5772156649
+    e = DSR.EULER_MASCHERONI
     if z == 1:
         emax = 0.0
     else:
-        emax = (1.0 / math.sqrt(n)) * ((1 - e) * _st.norm.ppf(1 - 1.0 / z)
-                                       + e * _st.norm.ppf(1 - 1.0 / (z * math.e)))
+        emax = (1.0 / math.sqrt(n)) * ((1 - e) * DSR.norm_ppf(1 - 1.0 / z)
+                                       + e * DSR.norm_ppf(1 - 1.0 / (z * math.e)))
     # DSR = Φ((sr − emax)·√(n−1) / √(1 + (k−1)/4·sr²)) with k=3 ⇒ denom √(1 + sr²/2); solve numerically
-    target = _st.norm.ppf(config.BAND_DSR_GATE)
+    target = DSR.norm_ppf(config.BAND_DSR_GATE)
     lo, hi = 0.0, 10.0
     for _ in range(60):
         mid = (lo + hi) / 2

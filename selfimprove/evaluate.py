@@ -3,8 +3,8 @@ Score every pre-declared exit policy on the ledger's real price paths, with the 
 
 PORTED from solana_screener/selfimprove/evaluate.py (2026-09-12). Same criterion, same guards;
 records are keyed by `token` (EVM address), the trial counter is delegated to
-selfimprove/trials.py, and every constant comes from THIS repo's config (entry_bot/stats.py is
-imported by sys.path APPEND so it reads our FDR_Q / BOOTSTRAP_REPS / SEED).
+selfimprove/trials.py, the Deflated Sharpe is the vendored selfimprove/dsr.py (numpy only — the
+Sunday statistics run on the Actions runner), and every constant comes from THIS repo's config.
 
 THE DECISION CRITERION, stated before any number is computed: a policy is interesting only if its
 DAY-CLUSTERED bootstrap 2.5th percentile beats `hold_to_end`'s, at >= config.MIN_BOOTSTRAP_CLUSTERS
@@ -45,14 +45,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config                                  # noqa: E402
-
-# entry_bot goes at the END, never the front. Both repos have a top-level `config.py`, so
-# inserting entry_bot first makes `import config` resolve to ITS config — which is the "dual
-# imports" trap entry_bot/CLAUDE.md documents (two module objects for the same name). Appending
-# means our config wins and entry_bot/stats.py reads OUR FDR_Q / BOOTSTRAP_REPS / SEED, which is
-# exactly the intent: borrow the guards, keep our own constants.
-sys.path.append(os.path.join(config.HOME, "entry_bot"))        # for stats.py only
-
+from selfimprove import dsr as DSR             # noqa: E402  (the vendored Deflated Sharpe: numpy only)
 from selfimprove import policies as POL        # noqa: E402
 
 PATHS = os.path.join(config.CACHE_DIR, "paths.jsonl")  # regenerable cache, not committed state
@@ -289,7 +282,6 @@ def paired_reality_check(A: np.ndarray, reps: int | None = None,
 
 
 def table(rows: list, label: str, n_trials: int) -> None:
-    import stats as ST                              # entry_bot/stats.py (sys.path APPEND above)
     if not rows:
         print(f"\n{label}: no priced rows yet")
         return
@@ -334,7 +326,7 @@ def table(rows: list, label: str, n_trials: int) -> None:
     # DSR ON ROWS, NOT DAYS. deflated_sharpe_ratio needs the per-observation return series for
     # its skew/kurtosis correction; the day-cluster structure is handled by the bound above,
     # not here. n_trials is the CUMULATIVE count from trials.json, never len(POLICIES).
-    dsr = ST.deflated_sharpe_ratio(best[2].tolist(), n_trials)
+    dsr = DSR.deflated_sharpe_ratio(best[2].tolist(), n_trials)
     print(f"  deflated Sharpe of {best[1]!r} at {n_trials} CUMULATIVE trials: {dsr:.3f} "
           f"(signal_lab promotes at >= 0.95)")
 

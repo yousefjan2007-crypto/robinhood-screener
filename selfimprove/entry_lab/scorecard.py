@@ -20,9 +20,9 @@ row's entry price), this module builds one outcome series and scores every band 
   boot_p_one_sided    the paired-lift resample's share ≤ 0 (a bootstrap p-value, one-sided)
   by_reject           Benjamini–Yekutieli over the family's p-values (valid under ARBITRARY
                       dependence — the bands are correlated restatements of each other)
-  dsr_day_means       Deflated Sharpe (entry_bot/stats.py) on the per-DAY mean of selected returns
-                      at the family's cumulative trial count; NaN (fails closed) when entry_bot is
-                      absent or there are < 8 days
+  dsr_day_means       Deflated Sharpe (the vendored selfimprove/dsr.py) on the per-DAY mean of
+                      selected returns at the family's cumulative trial count; NaN (fails closed)
+                      when there are < 8 days
   inert / coverage / median_age   apparatus checks and the timing column
 
 WHY STRATIFIED BY DAY AND AGE BUCKET (the measured incidents this shape answers). Alerts arrive in
@@ -70,14 +70,14 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import config                                        # noqa: E402
+from selfimprove import dsr as DSR                   # noqa: E402  (the vendored Deflated Sharpe: numpy only)
 from selfimprove import evaluate as EV               # noqa: E402
 from selfimprove.entry_lab import bands as B         # noqa: E402
 from selfimprove.entry_lab import store              # noqa: E402
 
 INVERSE = "ctl_inverse_band"
-ENTRY_BOT_DIR = os.path.join(config.HOME, "entry_bot")     # stats.py, sys.path APPEND (our config wins)
 _EMPTY = ("", "nan", "None", "NaN", "NA")
-DSR_MIN_DAYS = 8                                           # entry_bot's own floor; below it, NaN
+DSR_MIN_DAYS = 8                                           # the DSR's own floor (0.0 there); below it, NaN here
 SHUFFLE_INNER_REPS = 400                                   # cheap inner bound inside the permutation loop
 
 # REQUIRES field -> the source that answers it (substring rules, first match wins). A row whose
@@ -507,30 +507,17 @@ def by_reject(pvals, q: float | None = None) -> list:
 
 
 def _dsr_fn():
-    """entry_bot/stats.deflated_sharpe_ratio, or None when entry_bot is absent (fails closed).
-    sys.path APPEND so THIS repo's config wins inside stats.py."""
-    if not os.path.isfile(os.path.join(ENTRY_BOT_DIR, "stats.py")):
-        return None
-    if ENTRY_BOT_DIR not in sys.path:
-        sys.path.append(ENTRY_BOT_DIR)
-    try:
-        import stats as ST                      # noqa: F401  (entry_bot/stats.py)
-        fn = getattr(ST, "deflated_sharpe_ratio", None)
-        if fn is None or not callable(fn):
-            return None
-        return fn
-    except Exception:
-        return None
+    """The Deflated Sharpe function: the vendored selfimprove/dsr.py (it lived in the sibling
+    repo's stats.py until 2026-09-17 and was NaN on the runner, which had no sibling)."""
+    return DSR.deflated_sharpe_ratio
 
 
 def dsr_day_means(s, r, days, n_trials: int) -> float:
-    """Deflated Sharpe on the per-DAY mean of the selected rows' returns (entry_bot/stats.py
-    scales by sqrt(n−1): feeding rows where the honest cluster count is days inflates the
-    statistic ~4x — measured 17% false pass IID vs 0% over day means on the exit book).
-    NaN when entry_bot is absent or fewer than DSR_MIN_DAYS days."""
+    """Deflated Sharpe on the per-DAY mean of the selected rows' returns (the DSR scales by
+    sqrt(n−1): feeding rows where the honest cluster count is days inflates the statistic
+    ~4x — measured 17% false pass IID vs 0% over day means on the exit book). NaN when fewer
+    than DSR_MIN_DAYS days."""
     fn = _dsr_fn()
-    if fn is None:
-        return float("nan")
     a, rr = _as_sel(s), np.asarray(r, dtype=float)
     m = (a == 1) & np.isfinite(rr)
     dm: dict = {}
@@ -814,7 +801,8 @@ if __name__ == "__main__":
     except ImportError:
         print("  statsmodels not importable — BY checked against the hand computation only")
 
-    # 6. DSR on day means: planted high, and NaN when entry_bot is missing (fails closed)
+    # 6. DSR on day means: planted high, random low, NaN below the day floor (fails closed); the
+    #    function is the vendored one, so this runs on the runner too
     n_tr = len(B.BUILTINS)
     dsr_p = dsr_day_means(s_p, r, days, n_tr)
     dsr_r = dsr_day_means(s_rand, r, days, n_tr)
@@ -822,14 +810,8 @@ if __name__ == "__main__":
     assert dsr_p >= config.BAND_DSR_GATE and dsr_r < config.BAND_DSR_GATE
     assert dsr_day_means(s_p[:24], r[:24], days[:24], n_tr) != dsr_day_means(s_p[:24], r[:24], days[:24], n_tr), \
         "fewer than 8 days must be NaN"
-    _saved_dir, _saved_path = ENTRY_BOT_DIR, list(sys.path)
-    ENTRY_BOT_DIR = os.path.join(tempfile.gettempdir(), "no_such_entry_bot_dir")
-    sys.path = [p for p in sys.path if not p.endswith("entry_bot")]
-    sys.modules.pop("stats", None)
-    v = dsr_day_means(s_p, r, days, n_tr)
-    ENTRY_BOT_DIR, sys.path = _saved_dir, _saved_path
-    assert v != v, "entry_bot absent must yield NaN"
-    print("  DSR with entry_bot absent: NaN (fails closed)")
+    assert _dsr_fn() is DSR.deflated_sharpe_ratio
+    print(f"  DSR below {DSR_MIN_DAYS} days: NaN (fails closed); function = selfimprove/dsr.py")
 
     # 7. inert detection; median age for the timing column
     assert inert(s_p, s_p.copy()) and not inert(s_p, s_c)

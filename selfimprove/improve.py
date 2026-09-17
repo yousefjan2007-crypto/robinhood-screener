@@ -87,15 +87,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config                                   # noqa: E402
 import alerts                                   # noqa: E402
 from selfimprove import champion                # noqa: E402
+from selfimprove import dsr as DSR              # noqa: E402  (the vendored Deflated Sharpe: numpy only)
 from selfimprove import evaluate as EV          # noqa: E402
 from selfimprove import livebook as LB          # noqa: E402
 from selfimprove import policies as POL         # noqa: E402
 from selfimprove import trials as TR            # noqa: E402
-
-# entry_bot goes at the END, never the front: both repos have a top-level config.py, and an
-# insert would make `import config` resolve to entry_bot's. Appending means OUR config wins and
-# entry_bot/stats.py reads our BOOTSTRAP_REPS / SEED (stats.py only).
-sys.path.append(os.path.join(config.HOME, "entry_bot"))
 
 RANDOM_EXIT_ADMISSIBLE = ("random_exit", "no_route")   # the rows ctl_random_exit actually acted on
 _CONTROLS = getattr(POL, "CONTROLS", {})
@@ -234,13 +230,12 @@ def _day_means(r: np.ndarray, clusters: list) -> list:
 
 
 def _dsr(r: np.ndarray, clusters: list, n_trials: int) -> float:
-    """Deflated Sharpe on DAY MEANS, not rows. entry_bot/stats.py scales the z-score by
+    """Deflated Sharpe on DAY MEANS, not rows. selfimprove/dsr.py scales the z-score by
     sqrt(n-1), so feeding 639 rows where the honest cluster count is 41 days inflates the
     statistic ~4x (measured false-pass rate of DSR >= 0.95 under a zero-mean day-clustered null:
-    17.0% over rows, 0.0% over day means). NaN fails closed when stats.py is unavailable."""
+    17.0% over rows, 0.0% over day means). NaN fails closed on any failure."""
     try:
-        import stats as ST                       # entry_bot/stats.py (sys.path APPEND above)
-        return float(ST.deflated_sharpe_ratio(_day_means(r, clusters), int(n_trials)))
+        return float(DSR.deflated_sharpe_ratio(_day_means(r, clusters), int(n_trials)))
     except Exception:
         return float("nan")
 
@@ -248,7 +243,7 @@ def _dsr(r: np.ndarray, clusters: list, n_trials: int) -> float:
 def implied_sharpe_bar(n_days: int, n_trials: int, gate: float | None = None) -> float:
     """The per-day Sharpe a NORMAL day-mean series needs for the DSR gate to pass at these
     floors — the bar the gate actually sets, printed beside every DSR so a reader can see how
-    far a policy is from it. Same expected-maximum formula as entry_bot/stats.py, solved by
+    far a policy is from it. Same expected-maximum formula as selfimprove/dsr.py, solved by
     bisection with skew 0 / kurtosis 3 (a real skewed series needs MORE)."""
     gate = config.IMPROVE_DSR_GATE if gate is None else gate
     n, z = int(n_days), max(int(n_trials), 1)

@@ -6,9 +6,12 @@ THE invariant suite for robinhood_screener — this project's tests. Run after a
 
 Every section is OFFLINE: injected fakes, temp dirs, monkeypatched module functions. Nothing
 here sends (every send_all is dry_run=True), commits, pushes or touches the network. Sections
-that need the Mac (entry_bot/stats.py + scipy for the Deflated Sharpe pin, statsmodels for the
-Benjamini-Yekutieli comparison, launchctl, a git identity for publish's temp bare origin) are
-tagged mac_only and print SKIP under config.IS_CI or when the dependency is absent.
+that need the Mac (statsmodels for the Benjamini-Yekutieli comparison, the cross-pin of the
+vendored Deflated Sharpe against the sibling repo's copy, launchctl, a git identity for publish's
+temp bare origin) are tagged mac_only and print SKIP under config.IS_CI or when the dependency is
+absent. The Deflated Sharpe itself (selfimprove/dsr.py: numpy + statistics.NormalDist) runs on
+BOTH partitions — the Sunday gates run on the Actions runner, which has no sibling repo and no
+scipy.
 
 Every check corresponds to a real mistake, cited in the check name where there is one:
   $Cubrate            a wallet farm that looked impossibly good at 20 min (age/rate gates)
@@ -91,7 +94,7 @@ def _have(mod: str) -> bool:
         return False
 
 
-DSR_REAL = MAC and os.path.isfile(ENTRY_BOT_STATS) and _have("scipy")
+DSR_XPIN = MAC and os.path.isfile(ENTRY_BOT_STATS) and _have("scipy")   # the cross-pin only; the DSR is vendored
 HAVE_GIT = shutil.which("git") is not None
 
 
@@ -626,7 +629,7 @@ check("the cloud import chain (run.py + dashboard.py + paper_exec.py, transitive
       "scipy/statsmodels/sklearn (requirements.txt is pandas + certifi)",
       not ({"scipy", "statsmodels", "sklearn"} & _ext), str(sorted(_ext)))
 check("selfimprove/champion.py is in the cloud import chain (paper_exec/alerts read exit.champion) and "
-      "improve.py / scorecard.py are not (Mac-only modules)",
+      "improve.py / scorecard.py are not (they run in weekly.yml on the runner, never inside the scan)",
       os.path.join(ROOT, "selfimprove", "champion.py") in _graph
       and os.path.join(ROOT, "selfimprove", "improve.py") not in _graph
       and os.path.join(ROOT, "selfimprove", "entry_lab", "scorecard.py") not in _graph)
@@ -2737,7 +2740,7 @@ import alerts                                           # noqa: E402
 _saved_im = {"BOOK_PATH": LB.BOOK_PATH, "MISSED_PATH": LB.MISSED_PATH, "CHAMPION_PATH": config.CHAMPION_PATH,
              "TRIALS_PATH": config.TRIALS_PATH, "IMPROVE_HISTORY_PATH": config.IMPROVE_HISTORY_PATH,
              "PROPOSALS_DIR": config.PROPOSALS_DIR, "LIVEBOOK_SUMMARY_PATH": config.LIVEBOOK_SUMMARY_PATH,
-             "PAUSE_PATH": config.PAUSE_PATH, "send_all": alerts.send_all, "_dsr": IM._dsr}
+             "PAUSE_PATH": config.PAUSE_PATH, "send_all": alerts.send_all}
 _tmp_im = tempfile.mkdtemp(prefix="verify_improve_")
 sent: list = []
 try:
@@ -2750,11 +2753,8 @@ try:
     config.LIVEBOOK_SUMMARY_PATH = os.path.join(_tmp_im, "livebook_summary.json")
     config.PAUSE_PATH = os.path.join(_tmp_im, "PAUSE")
     alerts.send_all = lambda title, body, dry_run=True: sent.append((title, dry_run))
-    if DSR_REAL:
-        print("  (Deflated Sharpe from ~/entry_bot/stats.py — real)")
-    else:
-        skip("Deflated Sharpe pin via entry_bot/stats.py (mac_only)", "entry_bot/scipy absent or IS_CI; DSR injected as 0.99")
-        IM._dsr = lambda r, c, n: 0.99
+    # the Deflated Sharpe below is the REAL one on both partitions (selfimprove/dsr.py) — it was
+    # injected as 0.99 under CI while it lived in the sibling repo
     DEF = config.IMPROVE_DEFAULT_EXIT_CHAMPION
     CHL = "sell_3h"
     D, P = config.IMPROVE_PROMOTE_MIN_CLUSTERS + 2, 8
@@ -2882,7 +2882,6 @@ finally:
     config.LIVEBOOK_SUMMARY_PATH = _saved_im["LIVEBOOK_SUMMARY_PATH"]
     config.PAUSE_PATH = _saved_im["PAUSE_PATH"]
     alerts.send_all = _saved_im["send_all"]
-    IM._dsr = _saved_im["_dsr"]
     shutil.rmtree(_tmp_im, ignore_errors=True)
 
 
@@ -3200,19 +3199,11 @@ if MAC and _have("statsmodels"):
 else:
     skip("by_reject == statsmodels fdr_by (mac_only)", "statsmodels absent or IS_CI")
 n_tr = len(B.BUILTINS)
-if DSR_REAL:
-    check("DSR on day means: planted >= gate, random < gate; < 8 days is NaN (mac_only)",
-          SC.dsr_day_means(s_p, r_, days, n_tr) >= config.BAND_DSR_GATE and SC.dsr_day_means(s_r, r_, days, n_tr) < config.BAND_DSR_GATE
-          and math.isnan(SC.dsr_day_means(s_p[:24], r_[:24], days[:24], n_tr)))
-else:
-    skip("DSR on day means via entry_bot/stats.py (mac_only)", "entry_bot/scipy absent or IS_CI")
-_sd, _sp = SC.ENTRY_BOT_DIR, list(sys.path)
-SC.ENTRY_BOT_DIR = os.path.join(tempfile.gettempdir(), "no_such_entry_bot_dir")
-sys.path = [x for x in sys.path if not x.endswith("entry_bot")]
-sys.modules.pop("stats", None)
-v_nan = SC.dsr_day_means(s_p, r_, days, n_tr)
-SC.ENTRY_BOT_DIR, sys.path = _sd, _sp
-check("DSR fails CLOSED (NaN) when entry_bot is absent", math.isnan(v_nan))
+check("DSR on day means (selfimprove/dsr.py, both partitions): planted >= gate, random < gate; < 8 days is NaN",
+      SC.dsr_day_means(s_p, r_, days, n_tr) >= config.BAND_DSR_GATE and SC.dsr_day_means(s_r, r_, days, n_tr) < config.BAND_DSR_GATE
+      and math.isnan(SC.dsr_day_means(s_p[:24], r_[:24], days[:24], n_tr)))
+check("scorecard carries no sibling-repo path (ENTRY_BOT_DIR is gone) and fails CLOSED (NaN) below DSR_MIN_DAYS days",
+      not hasattr(SC, "ENTRY_BOT_DIR") and math.isnan(SC.dsr_day_means(s_p[:24], r_[:24], days[:24], n_tr)))
 inv = SC.sel(ser.assign(**{CHAMP: ser[CHAMP].where(ser.index != 0)}), "ctl_inverse_band", CHAMP)
 check("scorecard recomputes ctl_inverse_band on the fly from the champion column (NaN where the champion is NaN)",
       math.isnan(inv[0]) and inv[1] == 1.0 - float(ser.loc[1, CHAMP]))
@@ -3267,8 +3258,6 @@ alerts.send_all = lambda title, body, dry_run=True: None
 base_dir = tempfile.mkdtemp(prefix="verify_entry_lab_")
 SH = 200
 try:
-    if not DSR_REAL:
-        SC.dsr_day_means = lambda s_, rr, dd, n: 0.99
     planted = "band_score60"
     d = os.path.join(base_dir, "i"); os.makedirs(d)
     Pi = IB._fixture(d)
@@ -4958,5 +4947,96 @@ check("README's file table carries the retrospective with its one honest bullet"
       "RETRO_2026-09-16_hype_runners.md" in _readme
       and "descriptive, n = 3, chosen on the outcome" in _readme
       and "no rule is derived from it" in _readme)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+section("Q. the vendored Deflated Sharpe, the paper gate, the Sunday job on GitHub")
+# ═══════════════════════════════════════════════════════════════════════════════════
+from selfimprove import dsr as DSR                      # noqa: E402
+from selfimprove import evaluate as EVQ                 # noqa: E402
+
+# ── 1. dsr.py — the same function as the sibling repo's, numpy + NormalDist, on BOTH partitions ──
+_q_rng = np.random.default_rng(config.SEED)
+_q_planted, _q_zero = _q_rng.normal(0.5, 1.0, 60), _q_rng.normal(0.0, 1.0, 60)
+check("dsr.deflated_sharpe_ratio: a planted positive series >= 0.95 at 16 trials, a zero-mean series < 0.95, n < 8 ⇒ 0.0, a "
+      "constant series ⇒ 0.0 (no sibling repo, no scipy — the checks that used to SKIP under CI)",
+      DSR.deflated_sharpe_ratio(_q_planted, 16) >= 0.95 and DSR.deflated_sharpe_ratio(_q_zero, 16) < 0.95
+      and DSR.deflated_sharpe_ratio(_q_planted[:7], 16) == 0.0 and DSR.deflated_sharpe_ratio([1.0] * 20, 16) == 0.0,
+      f"planted {DSR.deflated_sharpe_ratio(_q_planted, 16):.4f} zero {DSR.deflated_sharpe_ratio(_q_zero, 16):.4f}")
+check("dsr.norm_ppf / norm_cdf are statistics.NormalDist (ppf(0.975) = 1.959964; cdf∘ppf is the identity to 1e-12; cdf(0) = 0.5)",
+      abs(DSR.norm_ppf(0.975) - 1.959963984540054) < 1e-9 and abs(DSR.norm_cdf(DSR.norm_ppf(0.3)) - 0.3) < 1e-12
+      and DSR.norm_cdf(0.0) == 0.5)
+_q_tree = _tree(os.path.join(ROOT, "selfimprove", "dsr.py"))
+check("dsr.py imports numpy / statistics (+ the smoke test's os/sys/config) and nothing else — never scipy, never the sibling's stats",
+      not (_top_imports(_q_tree) - {"__future__", "numpy", "statistics", "math", "os", "sys", "config"}), str(_top_imports(_q_tree)))
+_q_r = np.random.default_rng(config.SEED + 1).normal(0.3, 0.6, 120)
+_q_d = ["d%02d" % (i % 30) for i in range(120)]
+check("improve._dsr is the vendored DSR on the DAY MEANS (never rows) at the given trial count",
+      abs(IM._dsr(_q_r, _q_d, 16) - DSR.deflated_sharpe_ratio(IM._day_means(_q_r, _q_d), 16)) < 1e-12)
+check("scorecard._dsr_fn returns the vendored function and improve_bands.dsr_bar is finite without scipy (it returned NaN on the runner)",
+      SC._dsr_fn() is DSR.deflated_sharpe_ratio and 0.3 < IB.dsr_bar(40, 10) < 1.5 and math.isfinite(IB.dsr_bar(12, 40)),
+      f"{IB.dsr_bar(40, 10)} {IB.dsr_bar(12, 40)}")
+if DSR_XPIN:
+    import importlib.util as _ilu
+    _q_spec = _ilu.spec_from_file_location("_entry_bot_stats", ENTRY_BOT_STATS)
+    _q_ebs = _ilu.module_from_spec(_q_spec)
+    _q_spec.loader.exec_module(_q_ebs)                 # its `import config` resolves to OURS (already in sys.modules)
+    _q_x = np.random.default_rng(config.SEED).normal(0.2, 1.0, 50)
+    check("cross-pin (mac_only): the vendored DSR equals entry_bot/stats.deflated_sharpe_ratio to 1e-9 on a seeded series and on the "
+          "planted / zero-mean series at 16 trials (scipy's biased skew/kurtosis ARE the plain moment ratios; NormalDist ≡ norm.ppf/cdf)",
+          abs(DSR.deflated_sharpe_ratio(_q_x, 16) - _q_ebs.deflated_sharpe_ratio(_q_x, 16)) < 1e-9
+          and abs(DSR.deflated_sharpe_ratio(_q_planted, 16) - _q_ebs.deflated_sharpe_ratio(_q_planted, 16)) < 1e-9
+          and abs(DSR.deflated_sharpe_ratio(_q_zero, 16) - _q_ebs.deflated_sharpe_ratio(_q_zero, 16)) < 1e-9,
+          f"{DSR.deflated_sharpe_ratio(_q_x, 16)!r} vs {_q_ebs.deflated_sharpe_ratio(_q_x, 16)!r}")
+else:
+    skip("cross-pin of the vendored DSR against entry_bot/stats.py (mac_only)", "sibling repo or scipy absent, or IS_CI")
+_q_vals = np.random.default_rng(config.SEED).normal(-0.10, 0.50, 200)
+_q_days = ["d%02d" % (i % 25) for i in range(200)]
+_q_lb, _q_ng = EVQ.cluster_lb(_q_vals, _q_days)
+check("cluster_lb is PINNED on a fixed seeded series (-0.1868845841 over 25 clusters; numpy 2.0.2 on the Mac): a numpy upgrade on either "
+      "partition cannot move a bound silently — a FAIL here is the finding, not a nuisance",
+      _q_ng == 25 and abs(_q_lb - (-0.1868845841239552)) < 1e-9, repr(_q_lb))
+
+
+def _imports_outside_main(tree) -> set:
+    out = set()
+    for n in _compute_nodes(tree):
+        if isinstance(n, ast.Import):
+            out.update(a.name.split(".")[0] for a in n.names)
+        elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
+            out.add(n.module.split(".")[0])
+    return out
+
+
+_q_bad_append, _q_bad_sib = [], []
+for _p in _py_files():
+    if not _rel(_p).startswith("selfimprove" + os.sep):
+        continue
+    _t = _tree(_p)
+    _doc_ids = set()
+    for _n in ast.walk(_t):
+        if isinstance(_n, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and _n.body \
+                and isinstance(_n.body[0], ast.Expr) and isinstance(_n.body[0].value, ast.Constant) \
+                and isinstance(_n.body[0].value.value, str):
+            _doc_ids.add(id(_n.body[0].value))
+    for _n in ast.walk(_t):
+        if isinstance(_n, ast.Call) and _attr_chain(_n.func) == ["sys", "path", "append"]:
+            _q_bad_append.append(f"{_rel(_p)}:{_n.lineno}")
+        if isinstance(_n, ast.Constant) and isinstance(_n.value, str) and "entry_bot" in _n.value and id(_n) not in _doc_ids:
+            _q_bad_sib.append(f"{_rel(_p)}:{_n.lineno}")
+        if isinstance(_n, ast.Import) and any(a.name.split(".")[0] == "stats" for a in _n.names):
+            _q_bad_sib.append(f"{_rel(_p)}:{_n.lineno} import stats")
+check("no file under selfimprove/ appends to sys.path (the sibling-repo import path is gone with the vendoring)",
+      not _q_bad_append, str(_q_bad_append))
+check("no file under selfimprove/ names entry_bot in CODE — a string constant outside a docstring, or `import stats` (comments and "
+      "docstrings that cite the sibling's measured incidents are history, not a dependency)", not _q_bad_sib, str(_q_bad_sib))
+for _rel_ in ("selfimprove/improve.py", "selfimprove/entry_lab/improve_bands.py", "selfimprove/weekly_summary.py",
+              "selfimprove/evaluate.py", "selfimprove/dsr.py"):
+    _imps = _top_imports(_tree(os.path.join(ROOT, _rel_)))
+    check(f"{_rel_} never imports scipy / statsmodels / sklearn anywhere (the Sunday gates run on the runner: numpy only)",
+          not (_imps & {"scipy", "statsmodels", "sklearn"}), str(sorted(_imps)))
+_imps = _imports_outside_main(_tree(os.path.join(ROOT, "selfimprove", "entry_lab", "scorecard.py")))
+check("selfimprove/entry_lab/scorecard.py imports scipy / statsmodels / sklearn nowhere outside its __main__ (the statsmodels BY "
+      "cross-check in the smoke test is mac_only by construction)", not (_imps & {"scipy", "statsmodels", "sklearn"}), str(sorted(_imps)))
 
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")
