@@ -14,7 +14,10 @@ Two calls, both keyed (X-APIKEY header + timestamp/client_id query, GMGN's "exis
                            feed_tokens) and as pass-2 features (safety._apply_gmgn).
   token_info(token)        GET /v1/token/info — stat + wallet_tags_stat → the bundler RATIO
                            (bundler wallets / holders: organic 0.00-0.01, the $Cubrate wallet
-                           farm 1.42), the same hold rates, holders, smart-money count.
+                           farm 1.42), the same hold rates, holders, smart-money count, and
+                           progress (the info payload's key is `launchpad_progress`, NOT
+                           `progress`). The wash-trading flag is NOT in this payload at all —
+                           it comes ONLY from the Trenches row (features_from_row).
 
 THE BODY SHAPE IS LOAD-BEARING. GMGN's own client (OpenApiClient.ts buildTrenchesBody) sends
 {"version": "v2", "<column>": {"filters": [...], "launchpad_platform_v2": true, "limit": 80,
@@ -236,7 +239,7 @@ def token_info(token: str, cache_s=None):
     out = empty_features()
     out.update({
         "gmgn_launchpad_platform": _str(data.get("launchpad_platform")),
-        "gmgn_progress": _f(data.get("progress")),
+        "gmgn_progress": _f(data.get("launchpad_progress")),
         "gmgn_bundler_ratio": (None if bundlers is None or holders is None
                                else round(bundlers / max(holders, 1), 6)),
         "gmgn_sniper_hold_pct": _pct(stat.get("top70_sniper_hold_rate")),
@@ -244,7 +247,6 @@ def token_info(token: str, cache_s=None):
         "gmgn_fresh_wallet_pct": _pct(stat.get("fresh_wallet_rate")),
         "gmgn_rat_vol_pct": _pct(stat.get("top_rat_trader_percentage")),
         "gmgn_smart_degen_count": _i(tags.get("smart_wallets")),
-        "gmgn_is_wash_trading": _b(data.get("is_wash_trading")),
         "gmgn_holders": holders,
     })
     return out

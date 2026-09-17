@@ -2692,18 +2692,27 @@ try:
           got is None and len(_gm_reqs) == n0 + 1 and http_client.is_blocked(GM_HOST), str(len(_gm_reqs) - n0))
     check("while blocked, a second call makes no request", GM.trenches(cache_s=0) is None and len(_gm_reqs) == n0 + 1)
     http_client.reset_health()
-    _info_body = {"code": 0, "data": {"stat": {"holder_count": 1000, "top70_sniper_hold_rate": 0.01, "suspected_insider_hold_rate": 0.0,
+    _info_body = {"code": 0, "data": {"launchpad_progress": 0.28,
+                                      "stat": {"holder_count": 1000, "top70_sniper_hold_rate": 0.01, "suspected_insider_hold_rate": 0.0,
                                                "fresh_wallet_rate": 0.1, "top_rat_trader_percentage": 0.004},
                                       "wallet_tags_stat": {"bundler_wallets": 10, "sniper_wallets": 3, "smart_wallets": 2}}}
     http_client._urlopen = _gm_fake(lambda u, d: json.dumps(_info_body).encode())
     _TI = "0x" + "c1" * 20
     ti = GM.token_info(_TI, cache_s=0)
     check("token_info: GET /v1/token/info?chain=robinhood&address=… -> gmgn_bundler_ratio = bundler_wallets / holder_count, the "
-          "hold rates x100, smart-money count, holders",
+          "hold rates x100, smart-money count, holders, gmgn_progress from launchpad_progress (NOT the legacy 'progress' key), "
+          "and gmgn_is_wash_trading always None (the info payload carries no such key — the row is the only source for it)",
           isinstance(ti, dict) and abs(ti["gmgn_bundler_ratio"] - 0.01) < 1e-9 and ti["gmgn_holders"] == 1000
           and abs(ti["gmgn_sniper_hold_pct"] - 1.0) < 1e-9 and ti["gmgn_smart_degen_count"] == 2
           and abs(ti["gmgn_rat_vol_pct"] - 0.4) < 1e-9 and "/v1/token/info?" in _gm_reqs[-1][0]
-          and f"address={_TI}" in _gm_reqs[-1][0] and "chain=robinhood" in _gm_reqs[-1][0], str(ti))
+          and f"address={_TI}" in _gm_reqs[-1][0] and "chain=robinhood" in _gm_reqs[-1][0]
+          and abs(ti["gmgn_progress"] - 0.28) < 1e-9 and ti["gmgn_is_wash_trading"] is None, str(ti))
+    _legacy_body = {"code": 0, "data": {"progress": 0.9, "stat": {"holder_count": 5}, "wallet_tags_stat": {}}}
+    http_client._urlopen = _gm_fake(lambda u, d: json.dumps(_legacy_body).encode())
+    ti_legacy = GM.token_info(_TI, cache_s=0)
+    check("token_info never reads the legacy 'progress' key — a payload carrying ONLY 'progress' (no launchpad_progress) "
+          "yields gmgn_progress is None, so the old key can never silently come back",
+          isinstance(ti_legacy, dict) and ti_legacy["gmgn_progress"] is None)
     http_client._urlopen = _gm_fake(lambda u, d: _http_error(u, 404))
     check("token_info on an unknown token is ABSENT (NOT_FOUND), a fact — not deferred",
           http_client.is_absent(GM.token_info("0x" + "c2" * 20, cache_s=0)))
@@ -2750,6 +2759,9 @@ try:
     check("token_info fills the bundler ratio and holders on top of the row's fields (the row's platform/progress survive)",
           _s_farm["gmgn_bundler_ratio"] == 1.42 and _s_farm["gmgn_holders"] == 62 and _s_farm["gmgn_launchpad_platform"] == "longxyz"
           and _s_farm["gmgn_progress"] == 0.83 and "gmgn" in _s_farm["sources_used"] and "gmgn" not in _s_farm["sources_dark"])
+    check("_apply_gmgn: a Trenches row's is_wash_trading survives the token_info merge — the row's gmgn_is_wash_trading (False) is "
+          "never clobbered by info's None (info never carries that key at all)",
+          _row["is_wash_trading"] is False and _s_farm["gmgn_is_wash_trading"] is False)
 finally:
     GM.token_info = _saved_ti
 
