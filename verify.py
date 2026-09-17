@@ -35,6 +35,7 @@ import os
 import plistlib
 import re
 import shutil
+import fcntl
 import subprocess
 import sys
 import tempfile
@@ -458,17 +459,21 @@ check("keeper.sh: the successor's wait breaks on a DEFINITE none from running_st
       and "unknown" in _fn["await_predecessor"]
       and "circuit_open; c=$?" in _fn["finish"] and _fn["finish"].index("circuit_open") < _fn["finish"].index("dispatch_keeper")
       and 'if [ "$c" != 1 ]' in _fn["finish"] and 'none)  dispatch_keeper "$(other_slot)" keeper' in _fn["finish"])
-# Phase 4: the paper book inside the keeper — same lock, after await_predecessor, stopped before `done`
+# Phase 4: the paper book inside the keeper — the Python side holds the lock, after await_predecessor, stopped before `done`
 for needle in ("KEEPER_BOOK", "export LIVEBOOK_FEED_SOURCE=worktree", "book_loop()", "book_start()", "book_stop()",
-               "book_last_tick_ts()", "with_lock python3 -u selfimprove/livebook.py --tick", "book first tick: gap since snapshot's last_tick_ts",
-               "data/livebook_ticks.jsonl"):
+               "book_last_tick_ts()", "python3 -u selfimprove/livebook.py --tick; rc=$?", "book first tick: gap since snapshot's last_tick_ts",
+               "data/livebook_ticks.jsonl", 'LOCK="data/.keeper.lock"', "commit_push() { with_lock _commit_push; }",
+               "push_marker() { with_lock _push_marker"):
     check(f"keeper.sh contains {needle!r}", needle in _ks)
 _fnb = {n: _bash_fn(_ks, n) for n in ("book_loop", "book_start", "book_stop", "keeper_main", "finish", "read_config")}
 check("keeper.sh: the book functions, keeper_main and read_config are top-level `name() {` … `}` blocks",
       all(_fnb.values()), str([k for k, v in _fnb.items() if not v]))
-check("keeper.sh: the tick runs under with_lock — the SAME lock the scan's commit+push holds — inside book_loop, which naps between "
-      "ticks (never a bare sleep, never a negative nap) and logs every 10th tick plus every non-zero rc",
-      "with_lock python3 -u selfimprove/livebook.py --tick" in _fnb["book_loop"] and "nap " in _fnb["book_loop"]
+check("keeper.sh (fix round 1): the tick is NOT run under with_lock — livebook._state_lock takes flock(2) on the same file around its "
+      "reads and its write phase only, so a 26–160 s quote phase never holds a commit up — while commit_push and push_marker keep "
+      "with_lock (flock(1) on data/.keeper.lock); book_loop naps between ticks (never a bare sleep, never a negative nap) and logs "
+      "every 10th tick plus every non-zero rc",
+      "python3 -u selfimprove/livebook.py --tick; rc=$?" in _fnb["book_loop"] and "with_lock" not in _fnb["book_loop"]
+      and "nap " in _fnb["book_loop"]
       and not re.search(r"^\s*sleep\b", _fnb["book_loop"], re.M) and "n % 10" in _fnb["book_loop"] and '"$rc" != 0' in _fnb["book_loop"]
       and '-gt 0 ] && nap' in _fnb["book_loop"] and "trap 'BOOK_STOP=1' TERM" in _fnb["book_loop"])
 check("keeper.sh: book_start runs AFTER await_predecessor and BEFORE main_loop (a successor never ticks before the predecessor's "
@@ -1508,12 +1513,67 @@ from selfimprove import policies as POL                 # noqa: E402
 
 _g = vars(LB)
 _lb_tree = _tree(os.path.join(ROOT, "selfimprove", "livebook.py"))
-check("livebook.py never sleeps (the keeper's loop naps between ticks; a tick holds the scan's lock) and its docstring documents "
-      "the four committed state files, the ticks log as artifact and the two feed modes — not 'all gitignored'",
+check("livebook.py never sleeps (the keeper's loop naps between ticks; only the write phase holds the scan's lock) and its docstring "
+      "documents the four committed state files, the ticks log as artifact and the two feed modes — not 'all gitignored'",
       not any(isinstance(n, ast.Call) and _attr_chain(n.func) in (["time", "sleep"], ["sleep"]) for n in ast.walk(_lb_tree))
       and "gitignored (data/livebook.json" not in LB.__doc__ and "LIVEBOOK_FEED_SOURCE" in LB.__doc__ and "worktree" in LB.__doc__
       and "livebook_ticks.jsonl" in LB.__doc__ and "COMMITTED" in LB.__doc__)
-_saved_lb = {k: _g[k] for k in ("BOOK_PATH", "FILLS_PATH", "TICKS_PATH", "FEED_STATE_PATH", "MISSED_PATH")}
+# ── fix round 1: the lock is held around the state reads and the write phase only, never a quote ──
+check("livebook.LOCK_PATH is keeper.sh's LOCK (data/.keeper.lock under config.DATA_DIR = ROOT/data): flock(1) there and fcntl.flock "
+      "here are both flock(2) on ONE file, so commit_push and a write phase exclude each other",
+      LB.LOCK_PATH == os.path.join(config.DATA_DIR, ".keeper.lock") and config.DATA_DIR == os.path.join(config.ROOT, "data")
+      and 'LOCK="data/.keeper.lock"' in _read(KEEPER_SH) and "data/.keeper.lock" in _read(os.path.join(ROOT, ".gitignore")).splitlines())
+_lb_fns = {n.name: n for n in _lb_tree.body if isinstance(n, ast.FunctionDef)}
+
+
+def _lock_map(fn_node) -> dict:
+    """{call key: [the innermost enclosing `with _state_lock():` node, or None, per call]} over one function's body,
+    nested defs included (they run where they are called, which is never inside a hold)."""
+    out: dict = {}
+
+    def visit(node, cur):
+        if isinstance(node, ast.With) and any(isinstance(it.context_expr, ast.Call)
+                                              and _attr_chain(it.context_expr.func) == ["_state_lock"] for it in node.items):
+            cur = node
+        if isinstance(node, ast.Call):
+            out.setdefault(".".join(_attr_chain(node.func)) or "?", []).append(cur)
+        for ch in ast.iter_child_nodes(node):
+            visit(ch, None if isinstance(ch, (ast.FunctionDef, ast.Lambda)) else cur)
+    for st_ in fn_node.body:
+        visit(st_, None)
+    return out
+
+
+_WRITES = ("_save_atomic", "_append_fill", "_append_jsonl")
+_UNDER_LOCK_OK = {"_state_lock", "_save_atomic", "_append_fill", "_append_jsonl", "_load", "open", "csv.DictReader", "dict",
+                  "fh.read", "_pos_key"}
+_NEVER_UNDER_LOCK = ("quote_buy_fn", "quote_many_fn", "weth_px_fn", "dex_fn", "flow_fn", "_default_dex", "rows_fn", "_prepare_open",
+                     "_sidecar_true", "_step_policy", "subprocess.run", "publish.origin_blob", "_quote_rounds", "_row_item",
+                     "_stamp_item", "decimals_fn", "rpc.decimals")
+_lm = {n: _lock_map(_lb_fns[n]) for n in ("tick", "feed_from_ledger", "open_alert", "_cloud_ledger_rows", "_sidecar_true")}
+_bad_under = {n: sorted(k for k, ws in m.items() if any(w is not None for w in ws) and k not in _UNDER_LOCK_OK) for n, m in _lm.items()}
+_quote_under = {n: sorted(k for k in _NEVER_UNDER_LOCK if any(w is not None for w in m.get(k, []))) for n, m in _lm.items()}
+check("livebook.py (AST): inside `with _state_lock():` only the state I/O primitives run (_load / open / csv / _save_atomic / "
+      "_append_*) — no quote, no rows_fn, no sidecar read, no _prepare_open, no _step_policy, no subprocess, in tick, "
+      "feed_from_ledger, open_alert, _cloud_ledger_rows or _sidecar_true",
+      not any(_bad_under.values()) and not any(_quote_under.values()), str((_bad_under, _quote_under)))
+_module_writes = [(k, w) for fname, fn_ in _lb_fns.items() if fname != "_smoke" for k, ws in _lock_map(fn_).items() if k in _WRITES for w in ws]
+check("livebook.py (AST): EVERY _save_atomic / _append_fill / _append_jsonl call in the module (outside _smoke) sits inside a "
+      "`with _state_lock():` block — no state write ever lands outside the lock",
+      _module_writes and all(w is not None for _k, w in _module_writes), str([k for k, w in _module_writes if w is None]))
+_tick_w = {w for k, ws in _lm["tick"].items() if k in _WRITES for w in ws}
+_feed_w = {w for k, ws in _lm["feed_from_ledger"].items() if k in _WRITES for w in ws}
+_feed_logs = {w for k, ws in _lm["feed_from_ledger"].items() if k in ("_append_fill", "_append_jsonl") for w in ws}
+_feed_reads = {w for w in _lm["feed_from_ledger"].get("_load", [])}
+check("livebook.py (AST): the tick's write phase is ONE hold (its book save, fill flush and tick flush share one With node) and its "
+      "book read is a separate, earlier hold; feed_from_ledger's write phase is ONE hold (book save, fills, missed lines, feed state "
+      "in one With node) besides the first-run watermark save, and its book + feed-state read is one hold",
+      len(_tick_w) == 1 and len(_feed_logs) == 1 and len(_feed_w) == 2 and _feed_logs <= _feed_w
+      and sum(1 for w in _lm["feed_from_ledger"]["_save_atomic"] if w in _feed_logs) == 2
+      and len(_feed_reads) == 1 and None not in _feed_reads and len(_lm["feed_from_ledger"]["_load"]) == 2
+      and len(_lm["tick"]["_load"]) == 1 and _lm["tick"]["_load"][0] is not None and _lm["tick"]["_load"][0] not in _tick_w,
+      str((len(_tick_w), len(_feed_w), len(_feed_logs), len(_feed_reads))))
+_saved_lb = {k: _g[k] for k in ("BOOK_PATH", "FILLS_PATH", "TICKS_PATH", "FEED_STATE_PATH", "MISSED_PATH", "LOCK_PATH")}
 _saved_max_open = config.LIVEBOOK_MAX_OPEN
 TOK_RAW = 10 ** 24
 LUSD = config.STACK_USD * config.POSITION_PCT
@@ -1603,11 +1663,25 @@ def ticks():
 def _reset(d):
     for name, base in (("BOOK_PATH", "livebook.json"), ("FILLS_PATH", "livebook_fills.csv"),
                        ("TICKS_PATH", "livebook_ticks.jsonl"), ("FEED_STATE_PATH", "livebook_feed.json"),
-                       ("MISSED_PATH", "livebook_missed.jsonl")):
+                       ("MISSED_PATH", "livebook_missed.jsonl"), ("LOCK_PATH", ".keeper.lock")):
         _g[name] = os.path.join(d, base)
         if os.path.exists(_g[name]):
             os.remove(_g[name])
     script.clear(); dex_mult.clear(); flow_market.clear()
+
+
+def _lock_free() -> bool:
+    """Probe: is data/.keeper.lock free RIGHT NOW? A fresh fd's LOCK_EX|LOCK_NB succeeds only when no other open file
+    description (this process's _state_lock included — flock(2) locks are per description, not per process) holds it."""
+    fd = os.open(LB.LOCK_PATH, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        return True
+    except OSError:
+        return False
+    finally:
+        os.close(fd)
 
 
 def _no_nan(c):
@@ -1907,6 +1981,8 @@ try:
             tu = LT0 + 20_000
             _write_sidecar([])
             _feed([], tu)                                              # the watermark
+            # every event row has its sidecar lines, as store.append_verdicts writes them (72's carry no 1: unstamped)
+            _write_sidecar([(71, "0x" + "7" * 40, tu + 10, "band_a_strict", 1), (72, "0x" + "8" * 40, tu + 10, "band_y", 0)])
             _feed([lrow("0x" + "7" * 40, 71, tier="A", kind="promotion", ats=tu + 10),
                    lrow("0x" + "8" * 40, 72, tier="A", kind="promotion", ats=tu + 10)], tu + 20)
             config.LIVEBOOK_MAX_OPEN = len([p_ for p_ in book().values() if not p_.get("done")])   # the book is now FULL
@@ -1926,15 +2002,25 @@ try:
             TB2, TB3, TB4, TB5 = ("0x" + "a" * 39 + "2", "0x" + "a" * 39 + "3", "0x" + "a" * 39 + "4", "0x" + "a" * 39 + "5")
             _write_sidecar([(82, TB2, tu + 50, "band_x", 0)]); _feed([lrow(TB2, 82, tier="B", kind="first_sighting", ats=tu + 50)], tu + 60)
             _write_sidecar([(83, TB3, tu + 60, "band_x", "NA")]); _feed([lrow(TB3, 83, tier="B", kind="first_sighting", ats=tu + 60)], tu + 70)
-            _write_sidecar([(99, TB4, tu + 70, "band_x", 1)]); _feed([lrow(TB4, 84, tier="B", kind="first_sighting", ats=tu + 70)], tu + 80)
+            _write_sidecar([(99, TB4, tu + 70, "band_x", 1)])
+            stf84 = _feed([lrow(TB4, 84, tier="B", kind="first_sighting", ats=tu + 70)], tu + 80)
+            pend84 = LB._load(LB.FEED_STATE_PATH, {})["pending"]
+            check("worktree mode: a row with a sidecar line for ANOTHER event_seq only (none of its own) is not yet stamped — it waits "
+                  "in feed.pending (stamp_wait 1, sidecar_pending 1): not missed, not opened, nothing decided on a stamp that had "
+                  "not landed",
+                  stf84["pending"] == 1 and stf84["stamp_wait"] == 1 and stf84["missed"] == 0 and stf84["opened"] == 0
+                  and len(pend84) == 1 and pend84[0]["event_seq"] == 84 and pend84[0]["sidecar_pending"] == 1
+                  and pend84[0]["sidecar_true"] == [] and LB._pos_key(TB4, 84) not in book(), str((stf84, pend84)))
             config.BAND_VERDICTS_PATH = d                               # a directory: the sidecar is unreadable
-            _feed([lrow(TB5, 85, tier="B", kind="first_sighting", ats=tu + 80)], tu + 90)
+            _feed([lrow(TB5, 85, tier="B", kind="first_sighting", ats=tu + 80)], tu + 90)   # 84 is re-stamped here: unreadable ⇒ [] at once
             config.BAND_VERDICTS_PATH = os.path.join(d, "band_verdicts.csv")
             got = {m["event_seq"]: m["reason"] for m in _missed()}
-            check("verdict 0 / NA / a line for ANOTHER event_seq / an unreadable sidecar ⇒ the B row is 'book_full' (fail closed: "
-                  "nothing is always-admitted on a stamp the feed cannot read)",
+            check("verdict 0 / NA / an unreadable sidecar ⇒ the B row is 'book_full' at once, and the row that waited on a missing line "
+                  "is 'book_full' on the next call when the sidecar has gone unreadable (fail closed: nothing is always-admitted on a "
+                  "stamp the feed cannot read, and a dark sidecar never parks a row)",
                   all(got.get(q) == "book_full" for q in (82, 83, 84, 85))
-                  and not any(LB._pos_key(t_, q) in book() for t_, q in ((TB2, 82), (TB3, 83), (TB4, 84), (TB5, 85))), str(got))
+                  and not any(LB._pos_key(t_, q) in book() for t_, q in ((TB2, 82), (TB3, 83), (TB4, 84), (TB5, 85)))
+                  and LB._load(LB.FEED_STATE_PATH, {})["pending"] == [], str(got))
             config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN = 1                # one under-test position (81) is open: the sub-cap is reached
             TB6, TA7 = "0x" + "a" * 39 + "6", "0x" + "a" * 39 + "7"
             _write_sidecar([(86, TB6, tu + 90, "band_x", 1), (87, TA7, tu + 90, "band_x", 1)])
@@ -1967,12 +2053,53 @@ try:
             d2 = LB.live_stats_dict(tu + 200)
             check("live_stats_dict: sidecar_coverage {n_stamped, n_unstamped} and band_under_test {name, n_open, n_done, n_refused_full} "
                   "(the band_under_test_full lines in the missed log); NaN-free JSON",
-                  d2["sidecar_coverage"] == {"n_stamped": 3, "n_unstamped": 2}
+                  d2["sidecar_coverage"] == {"n_stamped": 4, "n_unstamped": 1}
                   and d2["band_under_test"] == {"name": "band_x", "n_open": 3, "n_done": 0, "n_refused_full": 1}
                   and json.dumps(d2, allow_nan=False), str((d2["sidecar_coverage"], d2["band_under_test"])))
             _rc_sc, _out_sc = _capture(LB.scorecard, tu + 200)
             check("--scorecard prints the one sidecar / band-under-test line",
-                  "sidecar: 3 stamped / 2 unstamped; band under test: band_x" in _out_sc, _out_sc[:300])
+                  "sidecar: 4 stamped / 1 unstamped; band under test: band_x" in _out_sc, _out_sc[:300])
+            # fix round 1 (the ruling): a row whose sidecar lines had not landed is NOT stamped [] for good
+            TC1, TC2 = "0x" + "c" * 39 + "1", "0x" + "c" * 39 + "2"
+            _write_sidecar([(87, TA7, tu + 90, "band_x", 1)])          # lines exist; none for 90 yet
+            n_sc = _sc_calls["n"]
+            stf = _feed([lrow(TC1, 90, tier="B", kind="first_sighting", ats=tu + 210)], tu + 220)
+            pend = LB._load(LB.FEED_STATE_PATH, {})["pending"]
+            ok1 = (stf["pending"] == 1 and stf["stamp_wait"] == 1 and stf["opened"] == 0 and stf["missed"] == 0 and len(pend) == 1
+                   and pend[0]["sidecar_pending"] == 1 and pend[0]["sidecar_true"] == [] and _sc_calls["n"] == n_sc + 1
+                   and LB._pos_key(TC1, 90) not in book() and not any(m["event_seq"] == 90 for m in _missed()))
+            _write_sidecar([(90, TC1, tu + 210, "band_x", 1), (90, TC1, tu + 210, "band_a_strict", 0)])   # the append lands
+            stf2 = _feed([], tu + 280)                                  # no new rows: the one read is for the waiting row
+            p90 = book().get(LB._pos_key(TC1, 90))
+            check("(ruling) a feed call that sees a row with NO sidecar line leaves it pending — one read, nothing opened or missed — "
+                  "and the next feed call (the line has landed) stamps it ['band_x'] and admits it at the cap under the band-under-test "
+                  "rule; still one sidecar read per feed call",
+                  ok1 and stf2["opened"] == 1 and stf2["stamp_wait"] == 0 and stf2["pending"] == 0 and _sc_calls["n"] == n_sc + 2
+                  and p90 is not None and p90["sidecar_true"] == ["band_x"], str((stf, pend, stf2, p90 and p90.get("sidecar_true"))))
+            _write_sidecar([(90, TC1, tu + 210, "band_x", 1)])         # a line for 90 only: 91 has none, and never will
+            n_sc = _sc_calls["n"]
+            stf = _feed([lrow(TC2, 91, tier="B", kind="first_sighting", ats=tu + 290)], tu + 300)
+            stf2 = _feed([], tu + 360)
+            m91 = [m for m in _missed() if m["event_seq"] == 91]
+            check(f"the wait is bounded by LIVEBOOK_SIDECAR_WAIT_TICKS = {config.LIVEBOOK_SIDECAR_WAIT_TICKS}: a row whose line never "
+                  "lands waits that many calls, then is stamped [] and settled under plain B rules ('book_full' at the cap) — a missing "
+                  "line can never park a row until the lag cap",
+                  config.LIVEBOOK_SIDECAR_WAIT_TICKS == 1 and stf["stamp_wait"] == 1 and stf["missed"] == 0
+                  and stf2["stamp_wait"] == 0 and stf2["missed"] == 1 and len(m91) == 1 and m91[0]["reason"] == "book_full"
+                  and _sc_calls["n"] == n_sc + 2 and LB._load(LB.FEED_STATE_PATH, {})["pending"] == [], str((stf, stf2, m91)))
+
+            def _stamped(mode, stamps, n=0):
+                it = {"event_seq": 5, "sidecar_true": [], "sidecar_pending": n}
+                config.LIVEBOOK_FEED_SOURCE = mode
+                LB._stamp_item(it, stamps)
+                return it["sidecar_true"], it["sidecar_pending"]
+            _mx = (_stamped("worktree", {5: ["band_x"]}), _stamped("worktree", {5: []}), _stamped("worktree", None),
+                   _stamped("worktree", {}), _stamped("worktree", {}, n=1), _stamped("origin", {}))
+            config.LIVEBOOK_FEED_SOURCE = "worktree"
+            check("_stamp_item: lines with a 1 ⇒ stamped; lines with no 1 ⇒ [] at once; an unreadable sidecar (None) ⇒ [] at once, "
+                  "never a wait; no line ⇒ waits in worktree mode (pending 1), then [] once the bound is spent; origin mode never "
+                  "waits (ledger and sidecar come from one commit, so a missing line is a fact)",
+                  _mx == ((["band_x"], 0), ([], 0), ([], 0), ([], 1), ([], 0), ([], 0)), str(_mx))
             config.LIVEBOOK_BAND_UNDER_TEST = None
             TB9 = "0x" + "a" * 39 + "9"
             _write_sidecar([(89, TB9, tu + 300, "band_x", 1)])
@@ -1995,6 +2122,7 @@ try:
             LB.subprocess.run = _fake_run
             LB.publish.origin_blob = lambda rel, root=None: ("token,event_seq,alert_ts,tier\n0xdef,6,2.0,A\n" if rel == LB.LEDGER_REL
                                                              else "event_seq,token,alert_ts,band,verdict\n7,0xq,1.0,band_x,1\n7,0xq,1.0,band_z,0\n"
+                                                             "8,0xr,1.0,band_z,0\n"
                                                              if rel == LB.VERDICTS_REL else None)
             config.LIVEBOOK_FEED_SOURCE = "worktree"
             rows_wt = LB._cloud_ledger_rows()
@@ -2002,21 +2130,166 @@ try:
             config.LIVEBOOK_FEED_SOURCE = "origin"
             rows_or = LB._cloud_ledger_rows()
             n_or = _sp["n"]
-            st_or = _orig_sidecar({7, 8})
+            st_or = _orig_sidecar({7, 8, 9})
             check("LIVEBOOK_FEED_SOURCE=worktree reads config.LEDGER_PATH with csv.DictReader and NO subprocess; origin mode fetches "
                   "ONCE and reads origin/main:data/ledger.csv through publish.origin_blob; the sidecar in origin mode rides the same "
-                  "fetch (origin_blob(VERDICTS_REL), no second fetch)",
+                  "fetch (origin_blob(VERDICTS_REL), no second fetch) and answers three-way: a seq with a 1 ⇒ its bands, a seq with "
+                  "lines but no 1 ⇒ [], a seq with no line ⇒ absent",
                   rows_wt == [{"token": "0xabc", "event_seq": "5", "alert_ts": "1.0", "tier": "B"}] and n_wt == 0
                   and rows_or == [{"token": "0xdef", "event_seq": "6", "alert_ts": "2.0", "tier": "A"}] and n_or == 1
-                  and st_or == {7: ["band_x"]} and _sp["n"] == n_or, str((rows_wt, rows_or, st_or, _sp)))
+                  and st_or == {7: ["band_x"], 8: []} and _sp["n"] == n_or, str((rows_wt, rows_or, st_or, _sp)))
             config.LIVEBOOK_FEED_SOURCE = "worktree"
             config.LEDGER_PATH = os.path.join(d, "nope.csv")
-            check("a missing worktree ledger is [] and a missing sidecar is {} (a feed outage never kills the tick loop)",
-                  LB._cloud_ledger_rows() == [] and _orig_sidecar({1}) == {} and _orig_sidecar(set()) == {})
+            _present_no_line = _orig_sidecar({1})                       # the fixture's sidecar exists: no line for 1 ⇒ {}
+            config.BAND_VERDICTS_PATH = os.path.join(d, "nope_verdicts.csv")
+            check("a missing worktree ledger is [] and a missing sidecar is None — the failure value, distinct from a present sidecar "
+                  "with no line ({}) — while nothing asked is {} (a feed outage never kills the tick loop)",
+                  LB._cloud_ledger_rows() == [] and _present_no_line == {} and _orig_sidecar({1}) is None and _orig_sidecar(set()) == {})
         finally:
             (config.LIVEBOOK_BAND_UNDER_TEST, config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN, config.LIVEBOOK_FEED_SOURCE,
              config.BAND_VERDICTS_PATH, config.LEDGER_PATH, config.LIVEBOOK_MAX_OPEN,
              LB.subprocess.run, LB.publish.origin_blob, _g["_sidecar_true"]) = _saved_c2
+
+        # ── fix round 1: the lock at runtime — free during every quote, held during every write, ONE write hold per call,
+        #    exclusive against ANOTHER process's flock(2) holder (what util-linux flock(1) is); the --tick / --live cutover guard ──
+        _reset(d)
+        _saved_r1 = (config.LIVEBOOK_FEED_SOURCE, config.BAND_VERDICTS_PATH, config.ROOT, _g["_state_lock"], _g["_save_atomic"],
+                     _g["_append_fill"], _g["_append_jsonl"], _g["_live"], _g["feed_from_ledger"], _g["tick"], LB.quotes.weth_price_usd)
+        _lk = {"n": 0, "free_at_quote": [], "held_at_write": []}
+        _orig_lock, _orig_save2, _orig_fill2, _orig_jsonl2 = _g["_state_lock"], _g["_save_atomic"], _g["_append_fill"], _g["_append_jsonl"]
+
+        @contextlib.contextmanager
+        def _counting_lock():
+            _lk["n"] += 1
+            with _orig_lock():
+                yield
+
+        def _probe_save(obj, path):
+            _lk["held_at_write"].append(not _lock_free())
+            return _orig_save2(obj, path)
+
+        def _probe_fill(row):
+            _lk["held_at_write"].append(not _lock_free())
+            return _orig_fill2(row)
+
+        def _probe_jsonl(path, obj):
+            _lk["held_at_write"].append(not _lock_free())
+            return _orig_jsonl2(path, obj)
+
+        def buy_probe(token, usd, now_s, *, weth_px=None):
+            _lk["free_at_quote"].append(_lock_free())
+            return buy_ok(token, usd, now_s, weth_px=weth_px)
+
+        def sell_probe(items, now_s, *, weth_px=None):
+            _lk["free_at_quote"].append(_lock_free())
+            return sell_many(items, now_s, weth_px=weth_px)
+        try:
+            config.LIVEBOOK_FEED_SOURCE = "worktree"
+            config.BAND_VERDICTS_PATH = os.path.join(d, "band_verdicts.csv")
+            _g["_state_lock"], _g["_save_atomic"], _g["_append_fill"], _g["_append_jsonl"] = _counting_lock, _probe_save, _probe_fill, _probe_jsonl
+            TL1, TL2 = "0x" + "e" * 39 + "1", "0x" + "e" * 39 + "2"
+            tl = LT0 + 30_000
+            LB.feed_from_ledger(tl, quote_buy_fn=buy_probe, rows_fn=lambda: [], weth_px=WPX, decimals_fn=lambda t: 18, verbose=False)
+            n_init = _lk["n"]
+            with open(config.BAND_VERDICTS_PATH, "w", newline="") as fh:
+                fh.write("event_seq,token,alert_ts,band,verdict\n101,%s,%r,band_a_strict,1\n102,%s,%r,band_a_strict,1\n"
+                         % (TL1, tl + 10, TL2, tl + 10))
+            stf = LB.feed_from_ledger(tl + 20, quote_buy_fn=buy_probe, rows_fn=lambda: [lrow(TL1, 101, ats=tl + 10), lrow(TL2, 102, ats=tl + 10)],
+                                      weth_px=WPX, decimals_fn=lambda t: 18, verbose=False)
+            n_feed = _lk["n"] - n_init
+            script[TL1] = {"status": "ok", "mult": 2.5}; script[TL2] = {"status": "ok", "mult": 1.0}
+            n0 = _lk["n"]
+            st_t = LB.tick(tl + 80, quote_many_fn=sell_probe, dex_fn=dex_fn, flow_fn=flow_fn, weth_px=WPX, verbose=False)
+            n_tick = _lk["n"] - n0
+            n0 = _lk["n"]
+            st_idle = LB.tick(tl + 90, quote_many_fn=sell_probe, dex_fn=dex_fn, flow_fn=flow_fn, weth_px=WPX, verbose=False)
+            n_idle = _lk["n"] - n0
+            check("at runtime: the first-run feed takes 2 holds (state read, watermark save); a feed with new rows exactly 3 (state read, "
+                  "sidecar read, the ONE write phase); a tick with due positions exactly 2 (book read, the ONE write phase); an idle tick 1 "
+                  "(read only). The lock was FREE at every buy and sell quote and HELD at every _save_atomic / _append_fill / _append_jsonl",
+                  n_init == 2 and stf["opened"] == 2 and n_feed == 3 and st_t["fills"] >= 1 and n_tick == 2 and st_idle["due"] == 0
+                  and n_idle == 1 and len(_lk["free_at_quote"]) == 3 and all(_lk["free_at_quote"])
+                  and len(_lk["held_at_write"]) >= 8 and all(_lk["held_at_write"]),
+                  str((n_init, stf, n_feed, st_t["fills"], n_tick, n_idle, _lk["free_at_quote"], _lk["held_at_write"])))
+            # two processes. (1) a holder that already has the lock: the tick's book READ waits for it (a read never lands in a
+            # `git pull --rebase` transient), so its quote runs only after the release; (2) a holder that takes the lock DURING the
+            # quote phase (a commit_push starting mid-tick): the quote phase is untouched and the WRITE phase waits for the release
+            _holder_src = ("import fcntl, os, sys, time\nfd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT)\n"
+                           "fcntl.flock(fd, fcntl.LOCK_EX)\nprint('held', flush=True)\ntime.sleep(float(sys.argv[2]))\n"
+                           "fcntl.flock(fd, fcntl.LOCK_UN)\nprint('released', flush=True)\n")
+
+            def _spawn_holder(hold_s):
+                p = subprocess.Popen([sys.executable, "-c", _holder_src, LB.LOCK_PATH, str(hold_s)], stdout=subprocess.PIPE, text=True)
+                assert p.stdout.readline().strip() == "held"
+                return p, time.monotonic()
+            script[TL1] = {"status": "ok", "mult": 1.0}; script[TL2] = {"status": "ok", "mult": 1.0}
+            _q = {}
+
+            def sell_stamp(items, now_s, *, weth_px=None):
+                _q["t"] = time.monotonic(); _q["free"] = _lock_free()
+                return sell_many(items, now_s, weth_px=weth_px)
+            hp, t_held = _spawn_holder(1.5)
+            st_x = LB.tick(tl + 150, quote_many_fn=sell_stamp, dex_fn=dex_fn, flow_fn=flow_fn, weth_px=WPX, verbose=False)
+            t_done = time.monotonic(); hp.wait(timeout=10)
+            read_waited = _q["t"] - t_held >= 1.2 and _q["free"] is True and t_done - t_held >= 1.2 and st_x["quoted"] == 2
+            _q.clear()
+
+            def sell_then_hold(items, now_s, *, weth_px=None):
+                _q["p"], _q["t_held"] = _spawn_holder(1.5)          # a commit starting DURING the quote phase
+                _q["t"] = time.monotonic()
+                return sell_many(items, now_s, weth_px=weth_px)
+            mt0 = os.path.getmtime(LB.BOOK_PATH); t_start = time.monotonic()
+            st_y = LB.tick(tl + 210, quote_many_fn=sell_then_hold, dex_fn=dex_fn, flow_fn=flow_fn, weth_px=WPX, verbose=False)
+            t_done = time.monotonic(); _q["p"].wait(timeout=10)
+            write_waited = (_q["t"] - t_start < 1.0 and t_done - _q["t_held"] >= 1.2 and st_y["quoted"] == 2
+                            and os.path.getmtime(LB.BOOK_PATH) >= mt0 and _q["p"].returncode == 0 and hp.returncode == 0)
+            check("two processes: (1) with another process already holding flock(2) on data/.keeper.lock the tick's book read waited "
+                  "≥ 1.2 s for the release and only then quoted (the lock free by then); (2) a holder taking the lock during the quote "
+                  "phase left the quote phase untouched and the write phase waited ≥ 1.2 s for its release — the book was saved after it",
+                  read_waited and write_waited, str((_q.get("t", 0) - t_start, t_done - _q.get("t_held", 0), st_x, st_y)))
+            hold_probe = []
+            with _orig_lock():                                          # the Python side held: another process's LOCK_NB fails…
+                hold_probe.append(subprocess.run([sys.executable, "-c", "import fcntl, os, sys\nfd = os.open(sys.argv[1], os.O_RDWR)\n"
+                                                  "try:\n    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\nexcept OSError:\n    sys.exit(1)\n",
+                                                  LB.LOCK_PATH], timeout=30).returncode)
+            hold_probe.append(subprocess.run([sys.executable, "-c", "import fcntl, os, sys\nfd = os.open(sys.argv[1], os.O_RDWR)\n"
+                                              "fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n", LB.LOCK_PATH], timeout=30).returncode)
+            check("…and the reverse: while _state_lock is held here, another process's LOCK_EX|LOCK_NB on the same file fails (rc 1); "
+                  "after the release it succeeds (rc 0) — the fence is symmetric, as flock(1) in commit_push needs it to be",
+                  hold_probe == [1, 0], str(hold_probe))
+            # the cutover guard: --tick / --live refuse (rc 2, nothing run) when data/livebook.json is TRACKED in the checkout unless
+            # LIVEBOOK_FEED_SOURCE=worktree (the keeper) — the Mac must never write tracked book state after the cutover
+            gd = os.path.join(d, "repo"); os.makedirs(os.path.join(gd, "data"))
+            subprocess.run(["git", "init", "-q", gd], check=True, timeout=60)
+            with open(os.path.join(gd, "data", "livebook.json"), "w") as fh:
+                fh.write("{}\n")
+            subprocess.run(["git", "-C", gd, "add", "data/livebook.json"], check=True, timeout=60)
+            subprocess.run(["git", "-C", gd, "-c", "user.name=t", "-c", "user.email=t@x", "commit", "-qm", "seed"], check=True, timeout=60)
+            _calls: list = []
+            _g["_live"] = lambda: _calls.append("live") or 0
+            _g["feed_from_ledger"] = lambda now_s, **kw: _calls.append("feed") or {}
+            _g["tick"] = lambda now_s, **kw: _calls.append("tick") or {}
+            LB.quotes.weth_price_usd = lambda now_s: _calls.append("weth") or ("deferred", None)
+            config.ROOT = gd
+            config.LIVEBOOK_FEED_SOURCE = "origin"
+            rc_l, out_l = _capture(LB.main, ["--live"]); rc_t, out_t = _capture(LB.main, ["--tick"])
+            refused_ok = rc_l == 2 and rc_t == 2 and _calls == [] and "refused" in out_l and "tracked" in out_t and "--scorecard" in out_t
+            config.LIVEBOOK_FEED_SOURCE = "worktree"
+            rc_l2, _ = _capture(LB.main, ["--live"]); rc_t2, _ = _capture(LB.main, ["--tick"])
+            keeper_ok = rc_l2 == 0 and rc_t2 == 0 and _calls == ["live", "weth", "feed", "tick"]
+            subprocess.run(["git", "-C", gd, "rm", "-q", "--cached", "data/livebook.json"], check=True, timeout=60)
+            config.LIVEBOOK_FEED_SOURCE = "origin"
+            rc_l3, _ = _capture(LB.main, ["--live"])
+            untracked_ok = rc_l3 == 0 and _calls[-1] == "live" and len(_calls) == 5
+            config.ROOT = os.path.join(d, "not-a-repo"); os.makedirs(config.ROOT)
+            nonrepo_ok = LB._tracked_state() is False
+            check("the cutover guard: `--tick` and `--live` refuse with rc 2 and run NOTHING (no WETH read, no feed, no tick) when "
+                  "data/livebook.json is tracked in the checkout and LIVEBOOK_FEED_SOURCE != worktree; the keeper (worktree) passes; an "
+                  "untracked checkout passes; a non-repo is not a finding (only rc 0 from git ls-files --error-unmatch is)",
+                  refused_ok and keeper_ok and untracked_ok and nonrepo_ok, str((rc_l, rc_t, rc_l2, rc_t2, rc_l3, _calls, out_l[:200])))
+        finally:
+            (config.LIVEBOOK_FEED_SOURCE, config.BAND_VERDICTS_PATH, config.ROOT, _g["_state_lock"], _g["_save_atomic"],
+             _g["_append_fill"], _g["_append_jsonl"], _g["_live"], _g["feed_from_ledger"], _g["tick"], LB.quotes.weth_price_usd) = _saved_r1
 
         # ── restore honesty across a keeper handoff gap (the state is committed and restored on the successor) ──
         _reset(d)
@@ -3599,11 +3872,16 @@ check("CLAUDE.md's Commands block carries the chain's start / see / off switch a
       and "gh run cancel" in _claude_md and "keeper.sh" in _claude_md)
 _design = _read(os.path.join(ROOT, "docs", "DESIGN.md"))
 check("DESIGN.md carries the livebook-in-the-keeper rows: feed source, state ownership, the band under test, the operator cutover "
-      "(bootout, seed from the Mac snapshot, mv to backups, ff-merge, never tick on the Mac again) and HTTP_RATE_SCALE",
+      "(bootout, seed from the Mac snapshot, mv to backups, ff-merge, never tick on the Mac again) and HTTP_RATE_SCALE — as a knob for "
+      "whichever process sets it, with the 'RH_HTTP_RATE_SCALE=0.5 for the book' recommendation dropped (halving the book's rate "
+      "lengthens its ticks); the lock row names _state_lock, os.replace as the ledger's guarantee and the rebase transient",
       all(w in _design for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "HTTP_RATE_SCALE", "LIVEBOOK_BAND_UNDER_TEST",
                                  "launchctl bootout gui/$UID/com.yousefjan.robinhood-livebook", "publish.publish_files(['data/livebook.json'",
-                                 "data/backups/", "git merge --ff-only origin/main", "livebook_ticks.jsonl", "RH_HTTP_RATE_SCALE=0.5")),
-      str([w for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "HTTP_RATE_SCALE", "LIVEBOOK_BAND_UNDER_TEST", "RH_HTTP_RATE_SCALE=0.5") if w not in _design]))
+                                 "data/backups/", "git merge --ff-only origin/main", "livebook_ticks.jsonl", "whichever process sets it",
+                                 "lengthens its ticks", "_state_lock", "`os.replace`", "transient", "sidecar_pending", "LIVEBOOK_SIDECAR_WAIT_TICKS"))
+      and "RH_HTTP_RATE_SCALE=0.5" not in _design,
+      str([w for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "HTTP_RATE_SCALE", "LIVEBOOK_BAND_UNDER_TEST", "whichever process sets it",
+                       "lengthens its ticks", "_state_lock", "sidecar_pending") if w not in _design]))
 check("CLAUDE.md's live-book paragraph is the keeper's (KEEPER_BOOK, LIVEBOOK_FEED_SOURCE, the four committed files, the ticks log as "
       "artifact, the band under test) and the gotchas say never to tick on the Mac after the cutover",
       all(w in _claude_md for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "livebook_ticks.jsonl", "LIVEBOOK_BAND_UNDER_TEST"))

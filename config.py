@@ -61,8 +61,11 @@ for _d in (DATA_DIR, CACHE_DIR, PROPOSALS_DIR):
 
 IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"   # the Actions runner has its own IP
 # Where the paper book (selfimprove/livebook.py) reads the ledger of record and the band-verdict
-# sidecar from: "worktree" = this checkout's data/ files, no git (the keeper's mode: the tick
-# holds the scan's lock, so it sees the old or the new file, never a partial one); "origin" =
+# sidecar from: "worktree" = this checkout's data/ files, no git (the keeper's mode). A reader
+# there sees the old or the new ledger and never a partial one because run.py writes it in ONE
+# tmp + os.replace — not because of the keeper's lock (the scan does not run under it; only
+# commit_push does). The sidecar is APPENDED after that replace, so a read in the gap sees the
+# row and no sidecar line: the book waits for it (LIVEBOOK_SIDECAR_WAIT_TICKS). "origin" =
 # `git fetch` + `git show origin/main:` (the Mac's mode, never `git pull`). The keeper exports
 # worktree; the default is origin so a Mac tick before the cutover behaves exactly as before.
 LIVEBOOK_FEED_SOURCE = os.environ.get("LIVEBOOK_FEED_SOURCE", "origin")
@@ -509,6 +512,12 @@ LIVEBOOK_MAX_OPEN = 40             # A/promotion rows always admitted; B refused
 # construction) and never the champion (its rows are tier A, always admitted).
 LIVEBOOK_BAND_UNDER_TEST = None
 LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN = 20
+# In worktree mode a new row with NO sidecar line at all is a row whose lines have not landed
+# (the scan appends data/band_verdicts.csv AFTER the ledger's os.replace): it waits in
+# feed.pending and is re-stamped on the next feed call, for at most this many calls, then is
+# stamped [] (fail closed). A row whose lines exist but carry no 1, and an unreadable sidecar,
+# are [] at once — a dark sidecar must never starve the book.
+LIVEBOOK_SIDECAR_WAIT_TICKS = 1
 MAX_ENTRY_LAG_S = 15 * 60          # keeper cadence 240 s + run ≤3 min + tick ≤1 min ⇒ 3-8 min expected
 LIVEBOOK_TICK_INTERVAL_S = 60.0
 LIVEBOOK_TICK_INTERVAL_LATE_S = 900.0

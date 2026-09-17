@@ -63,8 +63,9 @@ NOMINATED / APPARATUS FAULT / PUBLISH FAILED / PAUSED); the weekly summary is se
 `dashboard.py --write`, commit `data/` + `docs/` as `robinhood-screener[bot]`, deploy Pages from
 the workflow. The trigger is the Mac's dispatch job; GitHub's cron is the fallback (measured
 13.7 fires/day against a nominal 288 on this account). `latest_scan.json.trigger` records which.
-The keeper also ticks the live book (`KEEPER_BOOK=1`: a 60 s `livebook.py --tick` under the
-scan's lock, four state files committed with the scan). The Mac runs the Sunday gates and the
+The keeper also ticks the live book (`KEEPER_BOOK=1`: a 60 s `livebook.py --tick` whose state
+reads and write phase take the scan's lock from Python, four state files committed with the
+scan). The Mac runs the Sunday gates and the
 research session on the pulled snapshot, and publishes `selfimprove/*` + `data/proposals/` +
 `data/livebook_summary.json` through `publish.py` from a detached temp worktree — path sets
 disjoint from the runner's, so `git pull --rebase` on both sides is conflict-free.
@@ -108,12 +109,18 @@ The ledger's death test is different by design: index-absence for `DEAD_CONFIRM_
 
 **The live book.** `selfimprove/livebook.py` keys positions by `(token, event_seq)` — a promotion
 row opens a second position beside the token's B row. It ticks INSIDE the keeper (`.github/keeper.sh`
-`book_loop`, `KEEPER_BOOK=1`, `0` disables): one `--tick` per `LIVEBOOK_TICK_INTERVAL_S` under
-`with_lock` — the same flock the scan's commit+push holds — started after `await_predecessor`
-(and only once `data/livebook.json` is tracked in the checkout: the seed precedes the first tick),
-stopped before `finish`'s final commit. The feed reads THIS checkout (`LIVEBOOK_FEED_SOURCE=worktree`:
-`data/ledger.csv` + `data/band_verdicts.csv`, no git in a tick; `origin` = the retired Mac mode,
-fetch + `publish.origin_blob`). Four state files — `data/livebook.json`, `livebook_fills.csv`,
+`book_loop`, `KEEPER_BOOK=1`, `0` disables): one `--tick` per `LIVEBOOK_TICK_INTERVAL_S`, NOT under
+`with_lock` — `livebook._state_lock` takes `flock(2)` on the same `data/.keeper.lock` around the
+tick's state reads and its write phase only (one hold: book save, then the fill/tick/missed/feed
+flushes), never around a quote, so a 26–160 s tick never holds `commit_push` up and a commit never
+interleaves with a write — started after `await_predecessor` (and only once `data/livebook.json`
+is tracked in the checkout: the seed precedes the first tick), stopped before `finish`'s final
+commit. The ledger is safe to read because `run.py` writes it in one tmp + `os.replace` (the scan
+does not run under the lock); the sidecar is appended after that replace, so a row with no sidecar
+line yet waits one feed call for it (`sidecar_pending`). `--tick`/`--live` refuse when the book is
+tracked in the checkout unless `LIVEBOOK_FEED_SOURCE=worktree` (the keeper). The feed reads THIS
+checkout (`LIVEBOOK_FEED_SOURCE=worktree`: `data/ledger.csv` + `data/band_verdicts.csv`, no git in
+a tick; `origin` = the retired Mac mode, fetch + `publish.origin_blob`). Four state files — `data/livebook.json`, `livebook_fills.csv`,
 `livebook_feed.json`, `livebook_missed.jsonl` — are COMMITTED with the scan; `data/livebook_ticks.jsonl`
 stays gitignored and rides the run's artifact. One shared buy per alert, one `quote_sell_many` per
 tick, the quote-integrity gate (R1 implausible multiple, R2 uncorroborated jump vs Dexscreener, R3
@@ -259,9 +266,11 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   `data/livebook_ticks.jsonl`, `cache/` and `data/backups/` are gitignored.
 - **Never run `livebook.py --tick` on the Mac** after the cloud-book cutover: the four state
   files are tracked, so a Mac tick diverges the tree and the Sunday ff-merge refuses.
-  `--scorecard` reads the pulled snapshot. The per-process `http_client` throttle means the
-  keeper's scan and book can reach 2× a host's rate; `RH_HTTP_RATE_SCALE=0.5` is the operator's
-  knob for the book process only if its `deferred` tick counts rise (verify pins the unscaled rates).
+  `--scorecard` reads the pulled snapshot (and `--tick`/`--live` refuse on tracked state unless
+  `LIVEBOOK_FEED_SOURCE=worktree`). The per-process `http_client` throttle means the keeper's scan
+  and book can reach 2× a host's rate; `RH_HTTP_RATE_SCALE` scales the rates of whichever process
+  sets it — halving the book's rate lengthens its ticks in proportion, so it is not a recommended
+  setting there (verify pins the unscaled rates).
 - **Alerts go out EARLY in a run**: tokens the champion band selects on pass-1 facts get pass 2
   first and are alerted before the rest of pass 2, the watchlist refresh and the forward update;
   `latest_scan.json.stage_seconds.alert_sent` is the measured latency inside the run.

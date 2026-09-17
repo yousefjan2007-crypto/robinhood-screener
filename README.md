@@ -262,8 +262,9 @@ keeper and alerts SCAN STALE past 30 min; the Mac dispatch job is retired (a one
 exits without scanning while a keeper is alive). Discovery, horizons, the watchlist and rechecks are
 written to be correct at any cadence; the dashboard and the weekly summary report the **measured**
 runs in the last 24 h, never the nominal number. The 60 s live book runs inside the keeper too (one
-tick per minute under the scan's lock, its four state files committed with the scan; the Mac's launchd
-tick is retired at the cutover); the Mac runs the Sunday improve chain (11:00) and the research
+tick per minute; its state reads and its write phase take the scan's lock, its quotes do not; its four
+state files are committed with the scan; the Mac's launchd tick is retired at the cutover and a tick
+refuses to run on tracked state); the Mac runs the Sunday improve chain (11:00) and the research
 session (12:00) on the pulled snapshot.
 
 ## Running it

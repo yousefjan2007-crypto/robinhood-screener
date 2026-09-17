@@ -9,9 +9,11 @@
 #   sees ready: last commit, pulls origin, ──────────▶    sees done — or no keeper running any
 #   writes {"done"} on THAT base, exits 0                 more — pull --rebase, enters the loop
 #
-# Every git write happens under flock on data/.keeper.lock — and so does every tick of the paper
-# book (book_loop: selfimprove/livebook.py --tick every LIVEBOOK_TICK_INTERVAL_S, KEEPER_BOOK=1),
-# whose four state files ride the same commit. Every write follows ONE routine (commit_push):
+# Every git write happens under flock on data/.keeper.lock. The paper book (book_loop:
+# selfimprove/livebook.py --tick every LIVEBOOK_TICK_INTERVAL_S, KEEPER_BOOK=1) takes the SAME
+# flock(2) from Python (livebook._state_lock) around its state reads and its write phase only —
+# never around a quote, so a 26–160 s tick never holds a commit up and a commit never interleaves
+# with a write; its four state files ride the same commit. Every write follows ONE routine (commit_push):
 # add data/ docs/ → commit → up to 5× (pull
 # --rebase --autostash → push), a failed rebase aborted, never forced; three iterations without a
 # successful push ⇒ exit 3 (the workflow's always() step uploads data/ as an artifact and the
@@ -54,7 +56,8 @@ T0=0; READY_TS=0; STOP=0; REASON=""; DISPATCHED=0; SUNDAY_DONE=0
 KEEPER_CADENCE_S=0; KEEPER_MAX_S=0; KEEPER_HANDOFF_LEAD_S=0; KEEPER_HANDOFF_WAIT_S=0; PAGES_EVERY_N=0
 CIRCUIT_FAILURES=0; CIRCUIT_WINDOW_S=0
 # the paper book loop: KEEPER_BOOK=1 (the workflow's default; 0 = the book stays off) ticks
-# livebook.py every BOOK_TICK_S beside the scan, under the same lock
+# livebook.py every BOOK_TICK_S beside the scan; the tick fences its own reads and writes with
+# the same lock from Python
 KEEPER_BOOK="${KEEPER_BOOK:-1}"; BOOK_TICK_S=0; BOOK_STOP_WAIT_S=0; BOOK_PID=""; BOOK_STOP=""
 
 log() { echo "$(date -u +%FT%TZ) keeper $*"; }
@@ -263,17 +266,23 @@ pace() {  # sleep until $1 + KEEPER_CADENCE_S in POLL_S slices (never a fixed sl
   done
 }
 
-# ── the paper book: livebook.py --tick beside the scan, under the SAME lock ───────
-# KEEPER_BOOK=1 runs a background loop of one tick per BOOK_TICK_S. The tick runs under
-# with_lock — the lock the scan's commit+push holds — so a snapshot can never capture
-# livebook.json from tick N beside fills from tick N+1 (the 199-fills class) and never a
-# mid-rebase tree. The tick itself never sleeps; the loop naps between ticks. It starts only
-# AFTER await_predecessor (a successor never ticks before the predecessor's `done`, or its
-# absence) and is stopped — the in-flight tick waited for — BEFORE finish's final commit, so
-# the predecessor's last tick is in its final snapshot and the successor's first tick follows
-# it by about one push/poll cycle (the first tick logs the gap it actually saw). Four state
-# files ride `git add data/`; data/livebook_ticks.jsonl stays gitignored — the run's artifact
-# carries it. The feed reads THIS checkout (LIVEBOOK_FEED_SOURCE=worktree): no git in a tick.
+# ── the paper book: livebook.py --tick beside the scan; the Python side holds the lock ─
+# KEEPER_BOOK=1 runs a background loop of one tick per BOOK_TICK_S. The tick is NOT run under
+# with_lock: livebook._state_lock takes flock(2) on the same data/.keeper.lock (compatible with
+# util-linux flock(1) — both are flock(2)) around the tick's state reads and its write phase
+# only, and every quote runs outside it. A whole tick under the lock measured p50 26 s / max
+# 161 s on the Mac book (45 Kyber-quoted positions at 1 Hz): commit_push would wait behind it
+# and with_lock's 120 s timeout would trip. What the lock still guarantees: a snapshot never
+# captures livebook.json from tick N beside fills from tick N+1 (the 199-fills class) — the
+# write phase is one hold and commit_push holds the same file — and no read of the book or the
+# ledger lands in `git pull --rebase`'s transient rewrite of the checkout. The tick itself
+# never sleeps; the loop naps between ticks. It starts only AFTER await_predecessor (a
+# successor never ticks before the predecessor's `done`, or its absence) and is stopped — the
+# in-flight tick waited for — BEFORE finish's final commit, so the predecessor's last tick is
+# in its final snapshot and the successor's first tick follows it by about one push/poll cycle
+# (the first tick logs the gap it actually saw). Four state files ride `git add data/`;
+# data/livebook_ticks.jsonl stays gitignored — the run's artifact carries it. The feed reads
+# THIS checkout (LIVEBOOK_FEED_SOURCE=worktree): no git in a tick.
 book_last_tick_ts() {  # the restored snapshot's newest last_tick_ts (integer s); empty when no book
   python3 -c 'import json
 try:
@@ -295,7 +304,7 @@ book_loop() {  # the background loop; TERM ⇒ finish the in-flight tick, then l
       if [ -n "$last" ]; then log "book first tick: gap since snapshot's last_tick_ts = $(( t - last )) s"
       else log "book first tick: no snapshot (empty book)"; fi
     fi
-    with_lock python3 -u selfimprove/livebook.py --tick; rc=$?
+    python3 -u selfimprove/livebook.py --tick; rc=$?   # the lock is taken inside, around the writes
     if [ "$rc" != 0 ] || [ $(( n % 10 )) = 0 ]; then log "book tick n=$n rc=$rc wall=$(( $(now) - t ))s"; fi
     [ -z "$BOOK_STOP" ] || break
     s=$(( t + BOOK_TICK_S - $(now) ))
@@ -325,7 +334,7 @@ book_stop() {  # before finish's final commit: TERM the loop, wait (bounded) for
   local i=0
   while kill -0 "$BOOK_PID" 2>/dev/null && [ "$i" -lt "$BOOK_STOP_WAIT_S" ]; do sleep 1; i=$(( i + 1 )); done
   if kill -0 "$BOOK_PID" 2>/dev/null; then
-    log "book loop still running after ${BOOK_STOP_WAIT_S}s — not waited for further (the lock bounds the commit)"
+    log "book loop still running after ${BOOK_STOP_WAIT_S}s — not waited for further (its write phase is under the lock; the commit cannot interleave)"
   else
     wait "$BOOK_PID" 2>/dev/null
     log "book loop stopped (${i}s)"
