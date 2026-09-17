@@ -295,7 +295,7 @@ check("every .py (cache/, data/ excluded) begins with 'from __future__ import an
       not missing_future, str(missing_future))
 
 leaks = []
-for base in (os.path.join(ROOT, "docs"), os.path.join(ROOT, "selfimprove", "research")):
+for base in (os.path.join(ROOT, "docs"), os.path.join(ROOT, "selfimprove", "research"), os.path.join(ROOT, ".github")):
     for dp, dns, fns in os.walk(base):
         dns[:] = [d for d in dns if d not in ("context", "logs", "__pycache__")]   # gitignored scratch
         for fn in fns:
@@ -306,7 +306,7 @@ for base in (os.path.join(ROOT, "docs"), os.path.join(ROOT, "selfimprove", "rese
                 continue
             if "/Users/" in txt or "vrp_backtest" in txt:
                 leaks.append(_rel(p))
-check("no file under docs/ or selfimprove/research/ contains '/Users/' or 'vrp_backtest' (public-repo scrub)",
+check("no file under docs/, selfimprove/research/ or .github/ contains '/Users/' or 'vrp_backtest' (public-repo scrub)",
       not leaks, str(leaks))
 
 rate_names = {n: getattr(config, n) for n in dir(config) if n.endswith("_RATE_HZ") and n != "HOST_RATE_HZ"}
@@ -379,6 +379,29 @@ for rel in ("selfimprove/research/run_research.sh", "selfimprove/run_improve.sh"
             sh_git.append(f"{rel}:{i}")
 check("the shell wrappers run git checkout/reset only inside the temp worktree (-C \"$WT\"), never on the Mac tree",
       not sh_git, str(sh_git))
+# the keeper (runner-only) is allowed `git pull --rebase --autostash` on ITS checkout — it is the
+# committer — but never checkout/reset/stash: a rebase that goes wrong is aborted, never forced
+KEEPER_SH = os.path.join(ROOT, ".github", "keeper.sh")
+keeper_git = []
+for i, ln in enumerate(_read(KEEPER_SH).splitlines(), 1):
+    s = ln.strip()
+    if s.startswith("#"):
+        continue
+    if re.search(r"\bgit\b[^|&;]*\b(checkout|reset|stash)\b", s):
+        keeper_git.append(f".github/keeper.sh:{i}")
+check("keeper.sh never runs git checkout/reset/stash (a failed rebase is aborted; --autostash on the pull instead)",
+      not keeper_git, str(keeper_git))
+_ks = _read(KEEPER_SH)
+for needle in ("flock", "git add data/ docs/", "--autostash", "rebase --abort", "trap", "gh auth status",
+               "gh workflow run robinhood-pages", "-f mode=keeper", "keeper_handoff.json", "--keeper-alive",
+               "--ensure-keeper", "set -u", "KEEPER_CADENCE_S", "KEEPER_MAX_S", "KEEPER_HANDOFF_LEAD_S",
+               "KEEPER_HANDOFF_WAIT_S", "PAGES_EVERY_N_ITERATIONS", "robinhood-weekly", "exit 3"):
+    check(f"keeper.sh contains {needle!r}", needle in _ks)
+check("keeper.sh reads its constants from config (never a hardcoded cadence) and defines the modes as functions",
+      "import config" in _ks and "print(config.KEEPER_CADENCE_S" in _ks
+      and all(f"{fn}()" in _ks for fn in ("keeper_alive", "ensure_keeper", "commit_push", "with_lock", "write_handoff")))
+_bn = subprocess.run(["bash", "-n", KEEPER_SH], capture_output=True, text=True)
+check("bash -n .github/keeper.sh parses", _bn.returncode == 0, _bn.stderr[-300:])
 pub_src = _read(os.path.join(ROOT, "selfimprove", "publish.py"))
 res_src = _read(os.path.join(ROOT, "selfimprove", "research", "run_research.sh"))
 check("publish.py adds its detached worktree under tempfile.mkdtemp() (never a repo-relative path a "
@@ -406,12 +429,29 @@ check("the retired launchd labels com.yousefjan.robinhood-screener / -dashboard 
       not (retired & set(labels)) and not any(os.path.basename(p).replace(".plist", "") in retired for p in plists))
 
 yml = _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
-for needle in ("*/5", "cancel-in-progress: false", 'python-version: "3.11"', "git add data/ docs/",
-               "robinhood-screener[bot]", "dashboard.py --write", "deploy-pages", "workflow_dispatch"):
+for needle in ("cancel-in-progress: false", 'python-version: "3.11"', "git add data/ docs/",
+               "robinhood-screener[bot]", "dashboard.py --write", "workflow_dispatch", "run-name:",
+               "timeout-minutes: 355", "bash .github/keeper.sh", "TRIGGER: keeper", "--keeper-alive",
+               "--ensure-keeper", "gh workflow run robinhood-pages --ref main", "upload-artifact@v4",
+               "if: ${{ always() && inputs.mode == 'keeper' }}", "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}"):
     check(f"screener.yml contains {needle!r}", needle in yml)
 check("screener.yml wires the three secret names", all(s in yml for s in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "NTFY_TOPIC")))
 check("screener.yml carries the private-repo guard (scheduled runs inert until public: minutes)",
       "repository.private" in yml and "github.event_name != 'schedule'" in yml)
+check("screener.yml has NO schedule: trigger (a cron fire must never queue a one-shot beside a keeper; the watchdog carries the cron), "
+      "no Pages deploy of its own, and `*/5` lives only in keeper-watchdog.yml",
+      not re.search(r"^\s*(schedule|cron):", yml, re.M) and "deploy-pages" not in yml and "upload-pages-artifact" not in yml
+      and re.search(r'^\s*- cron: "\*/5 \* \* \* \*"', _read(os.path.join(ROOT, ".github", "workflows", "keeper-watchdog.yml")), re.M) is not None)
+_inputs = yml[yml.index("inputs:"):yml.index("permissions:")]
+check("screener.yml: input `mode` defaults to keeper (a bare `gh workflow run robinhood-screener` starts the chain; the Mac's "
+      "`-f mode=run` stays a one-shot) and `slot` defaults to a",
+      _inputs.index("mode:") < _inputs.index('default: "keeper"') < _inputs.index("slot:") < _inputs.index('default: "a"'))
+check("screener.yml permissions are contents: write + actions: write (pages/id-token moved to pages.yml; actions: write dispatches the successor)",
+      "contents: write" in yml and "actions: write" in yml and "pages: write" not in yml and "id-token: write" not in yml)
+check("screener.yml: the Keeper step runs only in keeper mode and the one-shot Run step guards on --keeper-alive (a keeper alive ⇒ the "
+      "one-shot exits 0 without scanning: the cutover cannot double-scan)",
+      re.search(r"name: Keeper.*\n\s+if: \$\{\{ inputs\.mode == 'keeper' \}\}", yml) is not None
+      and 'bash .github/keeper.sh --keeper-alive; then' in yml and "one-shot skipped" in yml)
 vyml = _read(os.path.join(ROOT, ".github", "workflows", "verify.yml"))
 check("verify.yml runs verify.py with fetch-depth 0 on human pushes only (never inside the 5-min job)",
       "fetch-depth: 0" in vyml and "python verify.py" in vyml and "screener state" in vyml
@@ -2191,6 +2231,41 @@ with tempfile.TemporaryDirectory() as d:
     strict = json.loads(raw, parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
     check("_atomic_json refuses NaN/inf (writes null) and leaves no tmp", strict == {"a": None, "b": [None, 1.0]}
           and not [f for f in os.listdir(d) if f.endswith(".tmp")])
+    # the git-friendly writer for the three big state files (seen / recheck / watchlist are rewritten
+    # every run; recheck.json alone was 67 % of the measured 72 KB/commit packed growth): one entry
+    # per line in sorted key order, so an unchanged entry is an unchanged line and git packs a delta
+    big = {f"0x{i:040x}": {"n_checks": i, "next_check": 1.5e9 + i, "disc": {"kind": "pons_create", "pair": None}}
+           for i in range(50)}
+    big["0x" + "f" * 40] = {"nan": float("nan"), "z": [1, {"y": 2}]}
+    pl = os.path.join(d, "lines.json")
+    RUN._atomic_json_lines(pl, big)
+    raw1 = _read(pl)
+    back = json.loads(raw1, parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
+    check("_atomic_json_lines round-trips through json.load (NaN → null, allow_nan=False semantics) and leaves no tmp",
+          back == RUN._clean(big) and not [f for f in os.listdir(d) if f.endswith(".tmp")])
+    lines1 = raw1.splitlines()
+    keys_in_file = [ln.split('"')[1] for ln in lines1[1:-1]]
+    check("_atomic_json_lines writes `{`, ONE `\"key\": <compact json>` per line in SORTED key order, `}`",
+          lines1[0] == "{" and lines1[-1] == "}" and len(lines1) == len(big) + 2 and keys_in_file == sorted(big)
+          and all(ln.endswith(",") for ln in lines1[1:-2]) and not lines1[-2].endswith(","))
+    big2 = dict(big)
+    big2["0x" + f"{7:040x}"] = {"n_checks": 8, "next_check": 1.5e9 + 7, "disc": {"kind": "pons_create", "pair": None}}
+    RUN._atomic_json_lines(pl, big2)
+    lines2 = _read(pl).splitlines()
+    changed = [i for i, (a_, b_) in enumerate(zip(lines1, lines2)) if a_ != b_]
+    check("writing the same dict with ONE entry changed changes exactly ONE line (unchanged entries are byte-identical lines)",
+          len(lines1) == len(lines2) and len(changed) == 1 and '"n_checks":8' in lines2[changed[0]], str(changed))
+    RUN._atomic_json_lines(os.path.join(d, "empty.json"), {})
+    check("an empty dict is still valid JSON", json.loads(_read(os.path.join(d, "empty.json"))) == {})
+    pw = os.path.join(d, "watch.json")
+    LAB.save_watchlist(big, pw)
+    check("save_watchlist (the watchlist's own writer, in entry_lab/runtime) produces byte-identical output to _atomic_json_lines "
+          "(one format for the three files)", _read(pw) == raw1)
+    _rs_src = _read(os.path.join(ROOT, "run.py"))
+    check("run.py writes SEEN_PATH and RECHECK_PATH through _atomic_json_lines; latest_scan.json keeps _atomic_json (its shape is "
+          "read by the dashboard and the lab)",
+          "_atomic_json_lines(config.SEEN_PATH, seen)" in _rs_src and "_atomic_json_lines(config.RECHECK_PATH, recheck)" in _rs_src
+          and "_atomic_json(config.SCAN_PATH, scan)" in _rs_src)
 
 
 def _snapshot_tree(base):
@@ -2584,9 +2659,23 @@ check("early alerts: run.py sends the champion-band alert for pass-1-selected to
       < _rs.index('to_send = [r for r in fresh_alerts if r["token"] not in early_alerted]')
       < _rs.index("ledger.update_forward(") and '"stage_seconds": stage_s' in _rs)
 _wf = _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
-check("screener.yml: the scan job and the Pages job hold SEPARATE concurrency groups (a deploy never delays the next scan) "
-      "and pip is cached", "group: screener-scan" in _wf and "group: screener-pages" in _wf and "cache: pip" in _wf
-      and _wf.count("concurrency:") == 2)
+_wf_pages = _read(os.path.join(ROOT, ".github", "workflows", "pages.yml"))
+_wf_dog = _read(os.path.join(ROOT, ".github", "workflows", "keeper-watchdog.yml"))
+check("screener.yml holds exactly ONE concurrency block whose group expression names both screener-keeper-<slot> (two keeper "
+      "slots may overlap by design: the handoff) and screener-scan (one-shots); pip is cached",
+      _wf.count("concurrency:") == 1 and "screener-keeper-" in _wf and "screener-scan" in _wf and "cache: pip" in _wf
+      and "format('screener-keeper-{0}', inputs.slot || 'a')" in _wf and "cancel-in-progress: false" in _wf)
+check("pages.yml owns the Pages deploy in its own group (a deploy never delays the next scan), cancel-in-progress true, dispatch-only",
+      "group: screener-pages" in _wf_pages and "cancel-in-progress: true" in _wf_pages and "deploy-pages" in _wf_pages
+      and "upload-pages-artifact" in _wf_pages and "workflow_dispatch" in _wf_pages and "name: robinhood-pages" in _wf_pages
+      and "schedule:" not in _wf_pages)
+_groups = {}
+for _name, _txt in (("screener.yml", _wf), ("pages.yml", _wf_pages), ("keeper-watchdog.yml", _wf_dog)):
+    for _g in re.findall(r"screener-(?:keeper-|scan|pages|watchdog)", _txt):
+        _groups.setdefault(_g, set()).add(_name)
+check("across the three workflow files every concurrency group name appears in exactly one file",
+      set(_groups) == {"screener-keeper-", "screener-scan", "screener-pages", "screener-watchdog"}
+      and all(len(v) == 1 for v in _groups.values()), str(_groups))
 check("REFERENCE_TOKENS name the two winners and the registry lists the launchpad band as a candidate, never the champion",
       set(config.REFERENCE_TOKENS) == {"CATGPT", "ANTHROPIG"} and CHAMP == "band_a_strict"
       and any(e_["name"] == "band_launchpad_lenient" and e_["status"] == "candidate" for e_ in json.load(open(config.REGISTRY_PATH))["candidates"]))
@@ -2878,8 +2967,8 @@ finally:
         http_client._HOST_HZ[GM_HOST] = _saved_gm2[2]
     http_client.reset_health()
 _wf_txt = _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
-check("screener.yml passes GMGN_API_KEY to BOTH the preflight step and the scan step (preflight exists to probe from the runner's IP)",
-      _wf_txt.count("GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}") == 2)
+check("screener.yml passes GMGN_API_KEY to the preflight step, the one-shot scan step AND the Keeper step (preflight exists to "
+      "probe from the runner's IP)", _wf_txt.count("GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}") == 3)
 
 # plumbing: the cloud secret, the workflow env, the preflight probe, the docs page
 check("GMGN_API_KEY is piped by cloud_secrets.py, passed by screener.yml, and preflight probes openapi.gmgn.ai",
@@ -2890,5 +2979,80 @@ _gdoc = os.path.join(ROOT, "docs", "GMGN_TRENCHES.md")
 check("docs/GMGN_TRENCHES.md exists, names the three columns and the filter translation, and carries no home path",
       os.path.exists(_gdoc) and all(w in _read(_gdoc) for w in ("Migrated", "Almost bonded", "min_liquidity", "robinhood"))
       and "/Users/" not in _read(_gdoc))
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+section("O. the keeper — a self-chaining scan job on Actions, the handoff, the */5 watchdog, the stale alert")
+# ═══════════════════════════════════════════════════════════════════════════════════
+import watchdog as WD                                   # noqa: E402
+check("config carries the keeper constants at the brief's values (cadence 240 s, 340 min per run under timeout 355, 600 s lead/wait, "
+      "30 min stale, Pages every 2nd push)",
+      (config.KEEPER_CADENCE_S, config.KEEPER_MAX_S, config.KEEPER_HANDOFF_LEAD_S, config.KEEPER_HANDOFF_WAIT_S,
+       config.KEEPER_STALE_S, config.PAGES_EVERY_N_ITERATIONS) == (240, 20400, 600, 600, 1800, 2)
+      and config.KEEPER_MAX_S + config.KEEPER_HANDOFF_WAIT_S < 355 * 60 and not hasattr(config, "DISPATCH_INTERVAL_S"))
+check("dashboard.STALE_MINUTES is config.KEEPER_STALE_S // 60 (one tripwire for the page and the watchdog)",
+      DASHM.STALE_MINUTES == config.KEEPER_STALE_S // 60 == 30)
+check(".gitignore carries data/.keeper.lock (the flock file never rides `git add data/`)",
+      "data/.keeper.lock" in _read(os.path.join(ROOT, ".gitignore")).splitlines())
+for needle in ('cron: "*/5 * * * *"', "group: screener-watchdog", "cancel-in-progress: true", "actions: write", "contents: read",
+               "repository.private", "github.event_name != 'schedule'", "watchdog.py --send", "WATCHDOG_ACTION",
+               "name: robinhood-keeper-watchdog", "timeout-minutes: 5", "--keeper-alive", "--ensure-keeper watchdog",
+               "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "NTFY_TOPIC", "workflow_dispatch", "circuit-open"):
+    check(f"keeper-watchdog.yml contains {needle!r}", needle in _wf_dog)
+check("keeper-watchdog.yml never pushes, never writes contents, never sees GMGN_API_KEY (a restart-only job)",
+      "git push" not in _wf_dog and "contents: write" not in _wf_dog and "GMGN_API_KEY" not in _wf_dog)
+_wd_tree = _tree(os.path.join(ROOT, "watchdog.py"))
+check("watchdog.py captures time.time() EXACTLY once and imports no subprocess/http_client/urllib/sources/run/requests",
+      _time_time_calls(ast.walk(_wd_tree)) == 1
+      and not (_top_imports(_wd_tree) & {"subprocess", "http_client", "urllib", "sources", "run", "requests", "socket"}),
+      str(_top_imports(_wd_tree)))
+_now = 1_800_000_000.0
+check("assess: a fresh scan is no finding", WD.assess({"scan_ts": _now - 120, "trigger": "keeper"}, _now, "none") == [])
+_stale = WD.assess({"scan_ts": _now - 45 * 60, "trigger": "keeper"}, _now, "restarted")
+check("assess: a 45-min-old scan is ONE line naming the age, the trigger and the restart",
+      len(_stale) == 1 and "45 min" in _stale[0] and "keeper" in _stale[0] and "restarted: yes" in _stale[0], str(_stale))
+check("assess: the action words — none ⇒ 'restarted: no', circuit-open ⇒ 'circuit open'",
+      "restarted: no" in WD.assess({"scan_ts": _now - 3600}, _now, "none")[0]
+      and "circuit open" in WD.assess({"scan_ts": _now - 3600}, _now, "circuit-open")[0])
+check("assess: no file ⇒ one line; unknown or missing keys ⇒ NEVER a finding (a malformed scan is not a stale scan)",
+      WD.assess(None, _now, "none") == ["no latest_scan.json"] and WD.assess({"foo": 1}, _now, "none") == []
+      and WD.assess({"scan_ts": "garbage"}, _now, "none") == [] and WD.assess([1, 2], _now, "none") == []
+      and WD.assess({"scan_ts": None}, _now, "restarted") == [])
+check("alerts.format_event('SCAN STALE', ...) renders the kind (it is in EVENT_KINDS, never 'EVENT SCAN STALE')",
+      "SCAN STALE" in alerts.EVENT_KINDS and alerts.format_event("SCAN STALE", ["x"])[0] == "robinhood_screener SCAN STALE")
+_saved_scan_path, _saved_env = config.SCAN_PATH, {k: os.environ.pop(k, None) for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "NTFY_TOPIC", "WATCHDOG_ACTION")}
+try:
+    with tempfile.TemporaryDirectory() as _d:
+        config.SCAN_PATH = os.path.join(_d, "latest_scan.json")
+        with open(config.SCAN_PATH, "w") as fh:
+            json.dump({"scan_ts": 1.0, "trigger": "keeper"}, fh)
+        _rc, _out = _capture(WD.main, [])
+        check("watchdog.main([]) on a stale scan is a DRY RUN (prints the card, sends nothing, returns 0)",
+              _rc == 0 and "DRY RUN" in _out and "SCAN STALE" in _out and "min ago" in _out, _out[-200:])
+        try:
+            _rc2, _out2 = _capture(WD.main, ["--send"])
+        except SystemExit as e_:
+            _rc2 = e_.code
+        check("watchdog.main(['--send']) without the three alert env vars exits 2 (send_all would be a silent no-op)", _rc2 == 2)
+        with open(config.SCAN_PATH, "w") as fh:
+            json.dump({"scan_ts": time.time(), "trigger": "keeper"}, fh)   # test-only wall clock, not a compute path
+        _rc3, _out3 = _capture(WD.main, [])
+        check("watchdog.main([]) on a fresh scan prints 'fresh' and never renders an alert", _rc3 == 0 and "ALERT" not in _out3 and "fresh" in _out3)
+        os.remove(config.SCAN_PATH)
+        _rc4, _out4 = _capture(WD.main, [])
+        check("watchdog.main([]) with no latest_scan.json reports it (dry)", _rc4 == 0 and "no latest_scan.json" in _out4)
+finally:
+    config.SCAN_PATH = _saved_scan_path
+    for k_, v_ in _saved_env.items():
+        if v_ is not None:
+            os.environ[k_] = v_
+_readme = _read(os.path.join(ROOT, "README.md"))
+check("README's deployment paragraph names the keeper, the */5 watchdog and the retired Mac dispatch, keeping the measured 13.7×/day",
+      "keeper" in _readme and "watchdog" in _readme and "13.7×/day" in _readme)
+_claude_md = _read(os.path.join(ROOT, "CLAUDE.md"))
+check("CLAUDE.md's Commands block carries the chain's start / see / off switch and says keeper.sh never runs on the Mac",
+      "gh workflow run robinhood-screener -f mode=keeper -f trigger=manual" in _claude_md
+      and "gh run list -w robinhood-screener -L 5" in _claude_md
+      and "robinhood-screener robinhood-keeper-watchdog; do gh workflow disable" in _claude_md   # one name per call
+      and "gh run cancel" in _claude_md and "keeper.sh" in _claude_md)
 
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")

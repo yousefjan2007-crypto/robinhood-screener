@@ -43,7 +43,8 @@ from selfimprove import champion
 _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 TELEGRAM_MAX_BODY = 4000          # Telegram's hard message cap is 4096 chars incl. markup
 _TRUNC = "…(truncated)"
-EVENT_KINDS = ("PROMOTED", "DEMOTED", "NOMINATED", "APPARATUS FAULT", "PUBLISH FAILED", "PAUSED")
+EVENT_KINDS = ("PROMOTED", "DEMOTED", "NOMINATED", "APPARATUS FAULT", "PUBLISH FAILED", "PAUSED",
+               "SCAN STALE")           # SCAN STALE: the keeper watchdog (watchdog.py) past KEEPER_STALE_S
 
 
 # ── delivery primitives ───────────────────────────────────────────────────────────

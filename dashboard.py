@@ -37,7 +37,7 @@ import config
 import ledger
 
 # ── module-level fallbacks (in config if/when the other agents add them) ──────────
-STALE_MINUTES = 30            # the plan's tripwire: red past 30 min (the dispatch is every 5)
+STALE_MINUTES = config.KEEPER_STALE_S // 60   # the tripwire: red past 30 min (the keeper scans every 240 s)
 META_REFRESH_S = 300          # the plan: meta refresh 300 s
 RUNS_WINDOW_S = 86400         # "runs in the last 24 h", anchored on the last scan_ts
 MAX_CARDS_PER_TIER = 40       # a page, not a log

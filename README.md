@@ -252,12 +252,15 @@ survive quoted slippage, an execution layer would automate losses faster.
 ## Deployment
 
 The cloud (GitHub Actions) is the system of record: it runs the scan, commits `data/` and deploys
-`docs/` to Pages from the workflow (exempt from the 10-builds/hour limit). The trigger is **not**
-GitHub's cron: measured on this account, the `*/5` schedule fired **13.7×/day against a nominal
-288** (2026-09-12), so a Mac launchd job dispatches the workflow every 5 minutes with `gh workflow
-run`, and the cron stays as the fallback. Discovery, horizons, the watchlist and rechecks are written
-to be correct at any cadence; the dashboard and the weekly summary report the **measured** runs in
-the last 24 h, never the nominal number. The Mac also runs the 60 s live book (it reads
+`docs/` to Pages from a workflow (`pages.yml`, exempt from the 10-builds/hour limit). The trigger
+is **not** GitHub's cron: measured on this account, the `*/5` schedule fired **13.7×/day against a
+nominal 288** (2026-09-12). The scan is therefore a self-chaining **keeper** job (`.github/keeper.sh`):
+one run scans every 240 s for up to 340 min, dispatches its successor into the other concurrency
+slot and hands off through `data/keeper_handoff.json`; a `*/5` watchdog workflow restarts a dead
+keeper and alerts SCAN STALE past 30 min; the Mac dispatch job is retired (a one-shot `mode=run`
+exits without scanning while a keeper is alive). Discovery, horizons, the watchlist and rechecks are
+written to be correct at any cadence; the dashboard and the weekly summary report the **measured**
+runs in the last 24 h, never the nominal number. The Mac still runs the 60 s live book (it reads
 `origin/main` with `git fetch` + `git show`, never `git pull`), the Sunday improve chain (11:00) and
 the research session (12:00).
 

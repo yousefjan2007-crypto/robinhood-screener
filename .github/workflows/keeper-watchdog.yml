@@ -1,0 +1,54 @@
+# robinhood_screener — the keeper watchdog. GitHub's cron is the one clock that needs no Mac and
+# no running job; it fires ~14×/day here against a nominal 288 (measured 2026-09-12), which is
+# enough to restart a dead keeper within the hour and to say SCAN STALE. It never scans, never
+# pushes, never sees the GMGN key: restart + alert only. Three failed keeper runs in two hours
+# open the circuit (no restart; the alert says so) so a broken keeper cannot loop forever.
+name: robinhood-keeper-watchdog
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  actions: write             # dispatch a keeper (keeper.sh --ensure-keeper)
+  contents: read
+
+concurrency:
+  group: screener-watchdog
+  cancel-in-progress: true
+
+jobs:
+  watchdog:
+    # inert while the repo is private (minutes) — the same guard screener.yml carries
+    if: ${{ github.event_name != 'schedule' || github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Restart a dead keeper
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          since="$(date -u -d '-2 hours' +%FT%TZ)"
+          failures="$(gh run list -w robinhood-screener --status failure --created ">=$since" -L 50 --json displayTitle \
+                      --jq '[.[] | select(.displayTitle | startswith("keeper"))] | length' 2>/dev/null || echo 0)"
+          if bash .github/keeper.sh --keeper-alive; then action=none
+          elif [ "${failures:-0}" -ge 3 ]; then action=circuit-open
+          elif bash .github/keeper.sh --ensure-keeper watchdog; then action=restarted
+          else action=dispatch-failed
+          fi
+          echo "keeper alive: $([ "$action" = none ] && echo yes || echo no); keeper failures in 2 h: ${failures:-0}; action: $action"
+          echo "WATCHDOG_ACTION=$action" >> "$GITHUB_ENV"
+      - name: Alert when stale
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python watchdog.py --send

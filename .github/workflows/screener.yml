@@ -1,8 +1,14 @@
-# robinhood_screener — the cloud scan. The Mac dispatches this every 5 min
-# (launchd/com.yousefjan.robinhood-dispatch.plist → `gh workflow run`); GitHub's own cron is the
-# FALLBACK only: measured on this account it fires ~14×/day against a nominal 288 (2026-09-12).
-# The scan is written to be correct at any cadence (block-cursor discovery catches up exactly).
+# robinhood_screener — the cloud scan. The scan loop is a self-chaining KEEPER job on Actions
+# (.github/keeper.sh): one run scans every 240 s for up to 340 min, dispatches its successor
+# into the OTHER concurrency slot ten minutes before its own end and hands off through
+# data/keeper_handoff.json (ready → done), so two keepers may overlap by design and no Mac is in
+# the loop. keeper-watchdog.yml carries the `*/5` cron (measured 13.7 fires/day on this account
+# against a nominal 288, 2026-09-12) and restarts a dead keeper; pages.yml deploys docs/ in its
+# own group. A one-shot `mode=run` (the retiring Mac dispatch, or a human) is HARMLESS while a
+# keeper is alive: it exits before scanning. The scan itself is written to be correct at any
+# cadence (block-cursor discovery catches up exactly).
 name: robinhood-screener
+run-name: ${{ inputs.mode || 'run' }} · ${{ inputs.trigger || 'manual' }} · slot=${{ inputs.slot || '-' }}
 
 on:
   workflow_dispatch:
@@ -12,86 +18,101 @@ on:
         default: "manual"
         type: string
       mode:
-        description: "run | preflight (probe the sources from the runner, commit nothing) | dry"
-        default: "run"
+        description: "keeper | run | preflight | dry"
+        default: "keeper"
         type: string
-  schedule:
-    - cron: "*/5 * * * *"
+      slot:
+        description: "keeper concurrency slot a|b; the predecessor dispatches its successor into the other slot"
+        default: "a"
+        type: string
 
 permissions:
   contents: write            # commit the ledger + state + dashboard back
-  pages: write               # publish docs/ via the Pages deploy action (exempt from the 10 builds/h limit)
-  id-token: write
+  actions: write             # dispatch the successor keeper and the Pages deploy (pages.yml)
 
 jobs:
   scan:
+    # two keeper slots may run concurrently BY DESIGN (the overlap handshake); one-shots share
+    # screener-scan and skip themselves while a keeper is alive
     concurrency:
-      group: screener-scan
+      group: ${{ inputs.mode == 'keeper' && format('screener-keeper-{0}', inputs.slot || 'a') || 'screener-scan' }}
       cancel-in-progress: false  # never interrupt a run mid-write; at most one queued run per group
     # Private-repo minutes would run out in ~2 days at this cadence: the scheduled path is
     # inert until the repo is public. Dispatch/manual runs are allowed either way.
     if: ${{ github.event_name != 'schedule' || github.event.repository.private == false }}
     runs-on: ubuntu-latest
+    timeout-minutes: 355     # KEEPER_MAX_S is 340 min: the keeper leaves on its own first
     outputs:
       published: ${{ steps.commit.outputs.published }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt
       - name: Preflight (sources as seen from the runner IP; commits nothing)
-        if: ${{ github.event.inputs.mode == 'preflight' }}
+        if: ${{ inputs.mode == 'preflight' }}
         env:
           GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}
         run: python preflight.py
-      - name: Run screener
-        if: ${{ github.event.inputs.mode != 'preflight' }}
+      - name: Keeper (the scan loop; exit 3 = persistent push failure, data/ uploaded below)
+        if: ${{ inputs.mode == 'keeper' }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}
-          TRIGGER: ${{ github.event_name == 'schedule' && 'schedule' || github.event.inputs.trigger }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIGGER: keeper
+          KEEPER_SLOT: ${{ inputs.slot || 'a' }}
+        run: bash .github/keeper.sh
+      - name: Run screener (one-shot; skipped while a keeper is alive)
+        id: scan
+        if: ${{ inputs.mode == 'run' || inputs.mode == 'dry' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          GMGN_API_KEY: ${{ secrets.GMGN_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIGGER: ${{ inputs.trigger }}
+          MODE: ${{ inputs.mode }}
         run: |
-          if [ "${{ github.event.inputs.mode }}" = "dry" ]; then python run.py; else python run.py --send; fi
+          if [ "$MODE" = run ] && bash .github/keeper.sh --keeper-alive; then echo "keeper alive; one-shot skipped"; echo "skipped=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "skipped=false" >> "$GITHUB_OUTPUT"
+          if [ "$MODE" = dry ]; then python run.py; else python run.py --send; fi
       - name: Render dashboard
-        if: ${{ github.event.inputs.mode != 'preflight' }}
+        if: ${{ (inputs.mode == 'run' || inputs.mode == 'dry') && steps.scan.outputs.skipped != 'true' }}
         run: python dashboard.py --write
       - name: Persist ledger + state + dashboard
         id: commit
-        if: ${{ github.event.inputs.mode != 'preflight' && github.event.inputs.mode != 'dry' }}
+        if: ${{ inputs.mode == 'run' && steps.scan.outputs.skipped != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "robinhood-screener[bot]"
           git config user.email "bot@users.noreply.github.com"
-          git add data/ docs/
-          if git commit -m "screener state $(date -u +%FT%TZ)"; then
-            # the Mac pushes selfimprove/* on Sundays; rebase over it rather than lose this run
-            git pull --rebase origin main || true
-            git push || true
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "no state change"; echo "published=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Upload dashboard artifact
-        if: ${{ github.event.inputs.mode != 'preflight' }}
-        uses: actions/upload-pages-artifact@v3
+          # keeper.sh's ONE commit+push routine under the same flock: git add data/ docs/, commit,
+          # up to 5x pull --rebase --autostash + push, a failed rebase aborted (never forced)
+          set +e; bash .github/keeper.sh --commit-push; rc=$?; set -e
+          case "$rc" in
+            0)  echo "published=true" >> "$GITHUB_OUTPUT"
+                gh workflow run robinhood-pages --ref main || echo "pages dispatch failed (non-fatal)" ;;
+            10) echo "no state change"; echo "published=false" >> "$GITHUB_OUTPUT" ;;
+            *)  echo "push failed after retries (rc=$rc)"; echo "published=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Ensure a keeper is alive (one-shot only; starts the chain when none is queued or running)
+        if: ${{ inputs.mode == 'run' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/keeper.sh --ensure-keeper
+      - name: Upload data/ (keeper runs; forensics after an exit 3 — the successor starts from a clean checkout)
+        if: ${{ always() && inputs.mode == 'keeper' }}
+        uses: actions/upload-artifact@v4
         with:
-          path: docs
-
-  pages:
-    needs: scan
-    if: ${{ needs.scan.result == 'success' && github.event.inputs.mode != 'preflight' }}
-    # its own group: a deploy in flight must not delay the NEXT scan (measured 2026-09-12: the
-    # whole run took 400-610 s against a 300 s cadence, so alerts queued behind deploys)
-    concurrency:
-      group: screener-pages
-      cancel-in-progress: true
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - id: deploy
-        uses: actions/deploy-pages@v4
+          name: keeper-data-${{ github.run_id }}
+          path: data
+          retention-days: 7

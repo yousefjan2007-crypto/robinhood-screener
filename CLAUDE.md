@@ -40,6 +40,12 @@ python3 cloud_secrets.py [--check]                  # THE HUMAN runs this; value
 bash selfimprove/run_improve.sh                     # the Sunday 11:00 chain (ff-sync, gates, publish)
 RESEARCH_DRYRUN=1 bash selfimprove/research/run_research.sh   # plumbing only: no claude, never pushes
                                                               # (RESEARCH_ORIGIN=<bare repo> tests the push path)
+# the scan keeper (GitHub Actions; .github/keeper.sh runs ONLY on the runner — flock is util-linux, never on the Mac)
+gh workflow run robinhood-screener -f mode=keeper -f trigger=manual   # start the chain (a bare `gh workflow run` also defaults to keeper)
+gh run list -w robinhood-screener -L 5                                # see it: keeper runs are titled "keeper · <trigger> · slot=a|b"
+for w in robinhood-screener robinhood-keeper-watchdog; do gh workflow disable "$w"; done   # the off switch, step 1 (one name per call)
+gh run cancel <id>                                                    # step 2: the live keeper(s) from `gh run list`
+python3 watchdog.py                                                   # offline fixtures + a DRY assessment of latest_scan.json
 ```
 
 Mac launchd jobs (`launchd/`, labels `com.yousefjan.robinhood-*`, all exit 0): `dispatch`

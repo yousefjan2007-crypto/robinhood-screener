@@ -62,6 +62,19 @@ for _d in (DATA_DIR, CACHE_DIR, PROPOSALS_DIR):
 IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"   # the Actions runner has its own IP
 SEED = 42  # any randomness → np.random.default_rng(SEED); never global np.random.*
 
+# ── the scan keeper (.github/keeper.sh on GitHub Actions; never on the Mac) ──────
+# The scan loop is a self-chaining Actions job: one keeper run scans every KEEPER_CADENCE_S,
+# dispatches its successor into the other concurrency slot KEEPER_HANDOFF_LEAD_S before its
+# own KEEPER_MAX_S, and hands off through data/keeper_handoff.json (ready → done). The */5
+# watchdog restarts a dead keeper and alerts SCAN STALE past KEEPER_STALE_S. keeper.sh reads
+# these with one `python3 -c "import config; ..."` — never a literal in the script.
+KEEPER_CADENCE_S = 240             # one scan per 240 s (the retired Mac dispatch's interval)
+KEEPER_MAX_S = 20400               # 340 min per keeper run: margin under the job's timeout-minutes 355
+KEEPER_HANDOFF_LEAD_S = 600        # dispatch the successor this long before KEEPER_MAX_S
+KEEPER_HANDOFF_WAIT_S = 600        # a successor waits this long for the predecessor's `done`, then starts anyway
+KEEPER_STALE_S = 1800              # the tripwire (dashboard red, watchdog SCAN STALE): a scan older than 30 min
+PAGES_EVERY_N_ITERATIONS = 2       # dispatch the Pages deploy on every 2nd successful push (its own workflow/group)
+
 # ── statistical guards (selfimprove/) ────────────────────────────────────────────
 # Read by ~/entry_bot/stats.py (imported by sys.path APPEND so THIS config wins).
 FDR_Q = 0.10                 # Benjamini-YEKUTIELI (valid under arbitrary dependence), not BH:
@@ -455,7 +468,7 @@ SCANHOOD_QUOTE_URL = "https://scanhood.xyz/api/quote"
 # ── live multi-policy paper book (selfimprove/livebook.py; Mac, gitignored state) ──
 LIVEBOOK_FEED_TIERS = ("A", "B")   # B = passed hard gates, failed the champion band: the control
 LIVEBOOK_MAX_OPEN = 40             # A/promotion rows always admitted; B refused when full
-MAX_ENTRY_LAG_S = 15 * 60          # dispatch 5 min + run ≤3 min + tick ≤1 min ⇒ 3-8 min expected
+MAX_ENTRY_LAG_S = 15 * 60          # keeper cadence 240 s + run ≤3 min + tick ≤1 min ⇒ 3-8 min expected
 LIVEBOOK_TICK_INTERVAL_S = 60.0
 LIVEBOOK_TICK_INTERVAL_LATE_S = 900.0
 LIVEBOOK_DECISION_HORIZON_S = 6 * 3600
