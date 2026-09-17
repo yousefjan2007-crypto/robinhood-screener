@@ -14,10 +14,12 @@ Two calls, both keyed (X-APIKEY header + timestamp/client_id query, GMGN's "exis
                            feed_tokens) and as pass-2 features (safety._apply_gmgn).
   token_info(token)        GET /v1/token/info — stat + wallet_tags_stat → the bundler RATIO
                            (bundler wallets / holders: organic 0.00-0.01, the $Cubrate wallet
-                           farm 1.42), the same hold rates, holders, smart-money count, and
-                           progress (the info payload's key is `launchpad_progress`, NOT
-                           `progress`). The wash-trading flag is NOT in this payload at all —
-                           it comes ONLY from the Trenches row (features_from_row).
+                           farm 1.42), the sniper/fresh-wallet/rat-trader hold rates, holders,
+                           smart-money count, and progress (the info payload's key is
+                           `launchpad_progress`, NOT `progress`). The wash-trading flag AND the
+                           insider hold rate are NOT in this payload at all (`stat` carries no
+                           `suspected_insider_hold_rate` key, verified against 16 cached
+                           payloads) — both come ONLY from the Trenches row (features_from_row).
 
 THE BODY SHAPE IS LOAD-BEARING. GMGN's own client (OpenApiClient.ts buildTrenchesBody) sends
 {"version": "v2", "<column>": {"filters": [...], "launchpad_platform_v2": true, "limit": 80,
@@ -243,7 +245,6 @@ def token_info(token: str, cache_s=None):
         "gmgn_bundler_ratio": (None if bundlers is None or holders is None
                                else round(bundlers / max(holders, 1), 6)),
         "gmgn_sniper_hold_pct": _pct(stat.get("top70_sniper_hold_rate")),
-        "gmgn_insider_hold_pct": _pct(stat.get("suspected_insider_hold_rate")),
         "gmgn_fresh_wallet_pct": _pct(stat.get("fresh_wallet_rate")),
         "gmgn_rat_vol_pct": _pct(stat.get("top_rat_trader_percentage")),
         "gmgn_smart_degen_count": _i(tags.get("smart_wallets")),
