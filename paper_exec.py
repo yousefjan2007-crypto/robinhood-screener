@@ -227,12 +227,17 @@ def _q_usd(q: dict):
 
 
 def _frozen_plan(plan) -> dict:
-    """The plan dict as stored on a position: {name, ladder:[[m,f]], stop, trail, max_hold_s}.
-    Garbage becomes the default champion plan (never a crash in the alert path)."""
+    """The plan dict as stored on a position: {name, ladder:[[m,f]], stop, trail, trail_arm,
+    flow, max_hold_s}. Garbage becomes the default champion plan (never a crash in the alert
+    path). `trail_arm` and `flow` are carried for the AUDIT TRAIL — what the alert promised — not
+    because this book executes them: the arm is applied upstream in ledger.update_forward, which
+    decides whether a trail event is emitted at all, and `flow_exit` is not an EXIT_KIND here (no
+    5-minute feed runs beside the scan, so the paper book alone scores that leg)."""
     if not isinstance(plan, dict) or not plan.get("name"):
         return {"name": config.IMPROVE_DEFAULT_EXIT_CHAMPION,
                 "ladder": [[float(m), float(f)] for m, f in config.TP_LADDER],
-                "stop": float(config.HARD_STOP_PCT), "trail": None, "max_hold_s": None}
+                "stop": float(config.HARD_STOP_PCT), "trail": None, "trail_arm": None,
+                "flow": None, "max_hold_s": None}
     ladder = []
     for rung in (plan.get("ladder") or []):
         try:
@@ -240,8 +245,11 @@ def _frozen_plan(plan) -> dict:
             ladder.append([float(m), float(f)])
         except (TypeError, ValueError):
             continue
+    flow = plan.get("flow")
     return {"name": str(plan.get("name")), "ladder": ladder, "stop": plan.get("stop"),
-            "trail": plan.get("trail"), "max_hold_s": plan.get("max_hold_s")}
+            "trail": plan.get("trail"), "trail_arm": plan.get("trail_arm"),
+            "flow": dict(flow) if isinstance(flow, dict) else None,
+            "max_hold_s": plan.get("max_hold_s")}
 
 
 # ── the accounting primitives (shared by the alert path and the retry path) ──────

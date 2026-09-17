@@ -118,9 +118,10 @@ def write_state(exit: dict | None = None, entry_band: dict | None = None,
 
 # ── what the exit champion controls at runtime ───────────────────────────────────
 def exit_plan(name: str | None = None) -> dict:
-    """{name, ladder:[[m,f],..], stop, trail, max_hold_s} for a policy name. A control name,
-    a deleted candidate or garbage falls back to the default plan with a printed warning —
-    never a crash in the alert path."""
+    """{name, ladder:[[m,f],..], stop, trail, trail_arm, flow, max_hold_s} for a policy name. A
+    control name, a deleted candidate or garbage falls back to the default plan with a printed
+    warning — never a crash in the alert path. `flow` is carried for the audit trail and for the
+    paper book; the cloud legs (ledger.update_forward, paper_exec) execute the price legs only."""
     name = name or exit_champion()
     pol = POL.POLICIES.get(name)
     if pol is None or name in POL.CONTROLS or "random_exit" in (pol or {}):
@@ -132,6 +133,8 @@ def exit_plan(name: str | None = None) -> dict:
     return {"name": name,
             "ladder": [[float(m), float(f)] for m, f in (pol.get("ladder") or [])],
             "stop": pol.get("stop"), "trail": pol.get("trail"),
+            "trail_arm": pol.get("trail_arm"),
+            "flow": dict(pol["flow"]) if isinstance(pol.get("flow"), dict) else None,
             "max_hold_s": pol.get("max_hold_s")}
 
 
@@ -164,13 +167,20 @@ def describe_plan(plan: dict, entry_price: float, size_usd: float | None = None,
     else:
         parts.append("no hard stop")
     if plan.get("trail"):
-        parts.append(f"trail -{plan['trail'] * 100:.0f}% off the high-water mark")
+        arm = plan.get("trail_arm")
+        parts.append(f"trail -{plan['trail'] * 100:.0f}% off the high-water mark"
+                     + (f", armed at {float(arm):g}x" if arm else ""))
     if plan.get("ladder"):
         parts.append("TP " + ", ".join(f"{m:g}x→sell {f * 100:.0f}%" for m, f in plan["ladder"]))
     else:
         parts.append("no TP ladder")
     if plan.get("max_hold_s") is not None:
         parts.append(f"exit ALL at {_fmt_hold(int(plan['max_hold_s']))}")
+    if plan.get("flow"):
+        # Said out loud on the card, because it is the one leg the alerted plan does NOT execute:
+        # the cloud ledger and paper_exec have no 5-minute feed and run the price legs only.
+        parts.append("flow take-profit (cloud book: price legs only; the keeper's paper book "
+                     "scores the flow leg)")
     return f"PLAN [{tag}]: " + " · ".join(parts)
 
 
@@ -205,6 +215,9 @@ def _cli(argv: list) -> int:
                       history_line={"ts": now, "arm": arm, "action": "manual_set", "from": prev,
                                     "to": name, "reason": reason})
     print(f"{arm}: {prev} → {name}  (manual; reason recorded)")
+    if arm == "exit" and isinstance((POL.POLICIES.get(name) or {}).get("flow"), dict):
+        print("  note: flow take-profit — cloud book: price legs only; the keeper's paper book "
+              "scores the flow leg")
     if "--publish" in argv:
         from selfimprove import publish
         ok = publish.publish_files([config.CHAMPION_PATH], f"champion: manual {arm} → {name}")

@@ -184,15 +184,16 @@ def index(led: pd.DataFrame) -> dict:
 
 
 def plan_dict(plan_name: str) -> dict:
-    """The exit plan a row was recorded with, as {ladder, stop, trail, max_hold_s}. A missing,
-    control or unknown name falls back to the default champion (never a crash in the exit path)."""
+    """The exit plan a row was recorded with, as {ladder, stop, trail, trail_arm, flow,
+    max_hold_s}. A missing, control or unknown name falls back to the default champion (never a
+    crash in the exit path)."""
     try:
         from selfimprove import champion as _ch
         return _ch.exit_plan(plan_name)
     except Exception:
         return {"name": config.IMPROVE_DEFAULT_EXIT_CHAMPION,
                 "ladder": [list(x) for x in config.TP_LADDER], "stop": config.HARD_STOP_PCT,
-                "trail": None, "max_hold_s": None}
+                "trail": None, "trail_arm": None, "flow": None, "max_hold_s": None}
 
 
 def record_rows(events: list, alert_ts: float, plan_name: str | None = None,
@@ -360,7 +361,15 @@ def update_forward(now_s: float, snapshot_many_fn, path: str | None = None) -> t
             trail = plan.get("trail")
             if trail and not _is_true(led.at[i, "trail_alerted"]):
                 peak_px = entry * (1.0 + max(mx, 0.0))       # high-water mark, run cadence
-                if cur_price <= peak_px * (1.0 - trail):
+                # An ARMED trail is not live until the high-water mark reaches entry x trail_arm.
+                # Without that test a 30% trail sits at 0.70 x entry from the first snapshot,
+                # ABOVE the -50% stop, so the stop could never fire — the opposite of the "stop
+                # always" the plan promises. `flow` is ignored here by design: the cloud leg has
+                # no 5-minute feed, so a flow policy runs its PRICE legs here and its flow leg is
+                # scored only by the paper book.
+                arm = plan.get("trail_arm")
+                armed = arm is None or 1.0 + max(mx, 0.0) >= float(arm)
+                if armed and cur_price <= peak_px * (1.0 - trail):
                     led.at[i, "trail_alerted"] = True; touched = True
                     events.append(dict(base, kind="trail"))
             ladder = plan.get("ladder") or []
