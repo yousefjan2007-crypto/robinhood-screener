@@ -432,7 +432,8 @@ def summary(path: str | None = None) -> None:
                   f"MIN_BOOTSTRAP_CLUSTERS={config.MIN_BOOTSTRAP_CLUSTERS}, this is not a bound")
     print(f"  forward-cell sampling lag (write-once, stamped with the cell; a cell filled later than "
           f"LEDGER_MAX_CELL_LAG_S={config.LEDGER_MAX_CELL_LAG_S:.0f}s is a spot sample of a different "
-          f"instant and every scorecard excludes it):")
+          f"instant — the entry-band scorecard (scorecard.outcome_series) and the paper gate exclude "
+          f"these cells; summary() and the dashboard print raw cells):")
     for h in HORIZ:
         lg = pd.to_numeric(led[f"lag_{h}"], errors="coerce").dropna()
         n_late = int((lg > config.LEDGER_MAX_CELL_LAG_S).sum())
@@ -445,7 +446,8 @@ def summary(path: str | None = None) -> None:
     imp |= pd.to_numeric(led["max_ret_seen"], errors="coerce").fillna(-9.0) > config.LEDGER_MAX_PLAUSIBLE_MULT - 1.0
     print(f"  implausible-mult suspects: {int(imp.sum())} row(s) carrying a recorded multiple above "
           f"LEDGER_MAX_PLAUSIBLE_MULT={config.LEDGER_MAX_PLAUSIBLE_MULT:.0f}x (the EDDICE 11e6x row) — new "
-          f"ticks above it are refused into the suspect path and the scorecards exclude these cells")
+          f"ticks above it are refused into the suspect path; the entry-band scorecard and the paper "
+          f"gate exclude these cells, summary() and the dashboard print raw cells")
     n_sus = led["status"].astype(str).eq("suspect").sum()
     if n_sus:
         print(f"  quote-integrity: {n_sus} row(s) terminally SUSPECT (implied supply moved "

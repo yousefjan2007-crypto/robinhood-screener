@@ -529,13 +529,12 @@ band_almost_bonded = _register(BandSpec(
 
 ctl_random_band = _register(BandSpec(
     "ctl_random_band",
-    "NEGATIVE CONTROL. Selects a sha256-chosen BAND_CTL_RANDOM_RATE share of tokens and fires at "
-    "a per-token deterministic delay U(0, BAND_WATCH_WINDOW_S), so its firing instants are spread "
-    "over the window like a maturation band's. Must fail every gate; if it does not, the "
-    "apparatus is measuring itself.",
-    ("token", "sighting_age_s"), (), "control", _ctl_random_band,
-    lambda f: "not selected" if not random_control_params(f["token"])[0]
-    else f"selected; fires at +{random_control_params(f['token'])[1] / 3600:.1f} h"))
+    "NEGATIVE CONTROL. A sha256-chosen BAND_CTL_RANDOM_RATE share of tokens is selected AT "
+    "EVALUATION (random_control_params's selected flag) — no per-token timing, no staggered "
+    "instants; see _ctl_random_band's own docstring for why. Its only job is to fail every gate; "
+    "if it does not, the apparatus is measuring itself.",
+    ("token",), (), "control", _ctl_random_band,
+    lambda f: "selected (sha256 10%)" if random_control_params(f["token"])[0] else "not selected"))
 
 ctl_inverse_band = _register(BandSpec(
     "ctl_inverse_band",

@@ -179,10 +179,9 @@
    "registered_ts": 0.0,
    "registered_at_event_seq": 0,
    "nominated_at_event_seq": null,
-   "rationale": "NEGATIVE CONTROL. Selects a sha256-chosen BAND_CTL_RANDOM_RATE share of tokens and fires at a per-token deterministic delay U(0, BAND_WATCH_WINDOW_S), so its firing instants are spread over the window like a maturation band's. Must fail every gate; if it does not, the apparatus is measuring itself.",
+   "rationale": "NEGATIVE CONTROL. A sha256-chosen BAND_CTL_RANDOM_RATE share of tokens is selected AT EVALUATION (random_control_params's selected flag) \u2014 no per-token timing, no staggered instants; see entry_lab.bands._ctl_random_band's own docstring for why. Its only job is to fail every gate; if it does not, the apparatus is measuring itself.",
    "requires": [
-    "token",
-    "sighting_age_s"
+    "token"
    ],
    "proposal": null
   },

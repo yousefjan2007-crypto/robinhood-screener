@@ -994,6 +994,11 @@ with tempfile.TemporaryDirectory() as d:
           "'implausible-mult suspects' line",
           out_i.count("late cells (lag > LEDGER_MAX_CELL_LAG_S)") == len(LED.HORIZ)
           and "implausible-mult suspects:" in out_i, out_i[-600:])
+    check("summary() names precisely who excludes gap-sampled cells (the entry-band scorecard and the "
+          "paper gate) and says plainly that this printout does not — 'print raw cells', twice, never "
+          "the old blanket 'every scorecard excludes it'",
+          out_i.count("print raw cells") == 2 and "entry-band scorecard" in out_i and "paper gate" in out_i
+          and "every scorecard excludes it" not in out_i, out_i[-800:])
 
 with tempfile.TemporaryDirectory() as d:
     LP = os.path.join(d, "ledger.csv")
@@ -1969,6 +1974,19 @@ check(f"ctl_random_band through evaluate_bands at sighting_age_s = 0 (what run.p
       f"a True rate of {config.BAND_CTL_RANDOM_RATE} ± 0.02 over 2,000 tokens — never the inert 0/672",
       n_na_ctl == 0 and abs(rate_ctl - config.BAND_CTL_RANDOM_RATE) <= 0.02 and n_true_ctl > 0,
       f"rate {rate_ctl} na {n_na_ctl}")
+# REQUIRES = ("token",) now — sighting_age_s = 0.0 above would not have caught a REQUIRES hole
+# (0.0 is not None); prove a None sighting_age_s (unrecorded / absent) still yields True/False.
+n_na_none_sa = sum(LAB.evaluate_bands(dict(good, token="0x" + hashlib.sha256(f"ctl-nosa-{i}".encode()).hexdigest()[:40],
+                                            sighting_age_s=None), REG, CHAMP)["ctl_random_band"] is None
+                    for i in range(500))
+check("ctl_random_band's REQUIRES no longer forces NA on a None sighting_age_s (REQUIRES == ('token',), not "
+      "('token', 'sighting_age_s') — the verdict no longer reads that field)",
+      n_na_none_sa == 0 and B.ctl_random_band.REQUIRES == ("token",), f"na={n_na_none_sa} requires={B.ctl_random_band.REQUIRES}")
+_ctl_text = (B.ctl_random_band.RATIONALE + " " + B.ctl_random_band.explain(good)
+             + " " + B.ctl_random_band.explain(dict(good, token="0x" + "00" * 20))).lower()
+check("ctl_random_band's registered RATIONALE and explain() text never claim the removed per-token delay "
+      "('delay' / 'fires at') — the Sunday research session reads bands.py as the family's contract",
+      "delay" not in _ctl_text and "fires at" not in _ctl_text, _ctl_text)
 vd = LAB.evaluate_bands(good, REG, CHAMP)
 vna = LAB.evaluate_bands(dict(good, score=None), REG, CHAMP)
 check("ctl_inverse_band is computed on the fly in evaluate_bands (== not champion; None when the champion is None) "
