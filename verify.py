@@ -2957,6 +2957,68 @@ check("band_no_age is NOT inert vs band_a_strict (an 80-min token with 1400 hold
 check("tier_for(False, {champ: True}) == 'B' and tier_for(True, {champ: None}) == 'B' (a laxer band is impossible)",
       B.tier_for(False, {CHAMP: True}, CHAMP) == "B" and B.tier_for(True, {CHAMP: None}, CHAMP) == "B"
       and B.tier_for(True, {CHAMP: True}, CHAMP) == "A")
+
+# ── the band-under-test modules: written and VALIDATED here, registered by the operator ───────
+# Registration is a counted trial (trials.json only grows and deflates every later DSR), so the
+# modules ship validated and unregistered: verify runs register.py's own validator functions
+# WITHOUT calling scan(), and proves the registry and the trial list are untouched.
+from selfimprove.candidates import register as REGM   # noqa: E402
+import selfimprove.trials as TRIALS_MOD                # noqa: E402
+
+HYPE_E = os.path.join(config.SELFIMPROVE_DIR, "candidates", "band_hype_early.py")
+HYPE_A = os.path.join(config.SELFIMPROVE_DIR, "candidates", "band_hype_attention.py")
+_raw_reg = REGM.load_registry_raw(config.REGISTRY_PATH)
+_fx = REGM.fixtures()
+for _hp in (HYPE_E, HYPE_A):
+    _nm = os.path.splitext(os.path.basename(_hp))[0]
+    bi_, ba_, bc_ = _hygiene(_hp)
+    check(f"candidate {_rel(_hp)} is clock/network/RNG/open-free and passes bands.static_ok (the import allowlist and the "
+          "forbidden attribute chains)", not bi_ and not ba_ and not bc_ and B.static_ok(_hp)[0],
+          f"{bi_} {ba_} {bc_} {B.static_ok(_hp)[1]}")
+    _ok_v, _why_v, _info_v = REGM.validate_module(_hp, _raw_reg, REG, CHAMP, _fx)
+    check(f"{_nm} passes register.py's FULL validator without being registered: NAME == the file name, RATIONALE and CONSUMED_DATA "
+          f"declared, REQUIRES a non-empty subset of FEATURE_FIELDS, deterministic across two PYTHONHASHSEEDs on {len(_fx)} fixtures, "
+          "NA whenever a REQUIRES field is None, no undeclared dependency, not all-NA and not inert vs the champion",
+          _ok_v and _info_v.get("kind") == "band" and _info_v.get("name") == _nm, _why_v)
+    check(f"{_nm} is NOT registered: absent from registry.json and from trials.json's bands_ever_scored — registering it is a "
+          "counted trial and the operator's step, not a side effect of shipping the file",
+          _nm not in {c_.get("name") for c_ in _raw_reg.get("candidates", [])}
+          and _nm not in set(TRIALS_MOD.load().get("bands_ever_scored") or [])
+          and _nm not in REG.names() and _nm not in B.BUILTINS)
+
+_HE = B.spec_from_module(B.load_candidate_module(HYPE_E, "band_hype_early"))
+_HA = B.spec_from_module(B.load_candidate_module(HYPE_A, "band_hype_attention"))
+# FOMOPAD's own numbers at its 4.07-minute sighting (the one winner the screener ever saw)
+_fomo = dict(good, pair_age_min=4.07, vol_h1=323_290.0, liq_usd=53_263.0, mcap=346_387.0, buys_h1=1273, sells_h1=1137,
+             top10_pct=14.93, holders_source="blockscout", honeypot=False, is_scam=False, roundtrip_loss_pct=-7.3,
+             gmgn_is_honeypot=False, gmgn_top10_holder_pct=None, gmgn_visiting_count=None)
+check("band_hype_early fires on FOMOPAD's at-sighting numbers (age 4.07 min, hour-1 volume $323k, liq $53k, mcap $346k, buys 1273 vs "
+      "sells 1137, top-10 14.9 % exact from Blockscout, no positive rug finding) where the champion band_volume_early does NOT: its "
+      "buys >= 2x sells clause is exactly what rejected the one winner the screener sighted",
+      _HE.verdict(_fomo) is True and B.BUILTINS["band_volume_early"].verdict(_fomo) is False,
+      str((_HE.verdict(_fomo), _HE.explain(_fomo), B.BUILTINS["band_volume_early"].verdict(_fomo))))
+_clone = dict(_fomo, vol_h1=12_000.0, liq_usd=30_000.0, buys_h1=1400, sells_h1=1000)
+check("band_hype_early refuses the clone swarms (~$30k liq, $25-38k LIFETIME volume, buys/sells 1.4-1.5x): they clear every hard gate "
+      "but never reach $50k of volume in hour one at an age <= 15 min, and that volume floor is the whole separation",
+      _HE.verdict(_clone) is False and "volume" in _HE.explain(_clone), _HE.explain(_clone))
+check("band_hype_early is NA (never False) when the top-10 share is unknown — no exact Blockscout snapshot and no GMGN value — and "
+      "reads the GMGN value when there is one, naming the source it used in explain()",
+      _HE.verdict(dict(_fomo, top10_pct=None, holders_source="gt", gmgn_top10_holder_pct=None)) is None
+      and _HE.verdict(dict(_fomo, top10_pct=None, holders_source="gt", gmgn_top10_holder_pct=6.0)) is True
+      and _HE.verdict(dict(_fomo, top10_pct=None, holders_source="gt", gmgn_top10_holder_pct=44.0)) is False
+      and "gmgn" in _HE.explain(dict(_fomo, top10_pct=None, holders_source="gt", gmgn_top10_holder_pct=44.0)).lower()
+      and "blockscout" in _HE.explain(dict(_fomo, top10_pct=88.0)).lower(),
+      _HE.explain(dict(_fomo, top10_pct=None, holders_source="gt", gmgn_top10_holder_pct=44.0)))
+check("band_hype_early refuses a POSITIVE rug finding whatever the flow says (honeypot True, is_scam True, GMGN's own honeypot 'yes', "
+      "a round trip above the cap), and an UNKNOWN round trip is not a finding",
+      all(_HE.verdict(dict(_fomo, **kv)) is False for kv in ({"honeypot": True}, {"is_scam": True},
+                                                             {"gmgn_is_honeypot": True}, {"roundtrip_loss_pct": 9.0}))
+      and _HE.verdict(dict(_fomo, roundtrip_loss_pct=None)) is True)
+check("band_hype_attention is band_hype_early AND at least 3 GMGN viewers, and REQUIRES the viewer count — so it is NA wherever GMGN "
+      "did not see the token at all, which is why its coverage (latest_scan.json gmgn_coverage) must be measured before it is registered",
+      _HA.verdict(dict(_fomo, gmgn_visiting_count=8)) is True and _HA.verdict(dict(_fomo, gmgn_visiting_count=2)) is False
+      and _HA.verdict(_fomo) is None and "gmgn_visiting_count" in _HA.REQUIRES
+      and _HA.verdict(dict(_clone, gmgn_visiting_count=8)) is False)
 n_sel = 0
 for i in range(10_000):
     tok = "0x" + hashlib.sha256(f"synthetic-{i}".encode()).hexdigest()[:40]
