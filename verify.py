@@ -2589,6 +2589,24 @@ with tempfile.TemporaryDirectory() as d:
           "line, PAUSED and the research line", "earliest possible promotion (from trailing-28d observed rates" in body_f
           and "entry band: >=" in body_f and "K5 kill" in body_f and "PAUSED (PAUSE file)" in body_f
           and "research: research merged" in body_f and len(lines_f) <= WS.MAX_LINES)
+    check("the ledger LINE RENDERS — both arms' medians and promoted-B, never 'unavailable' (ledger_section named a "
+          "module whose only import was local to _ledger_frame: a NameError swallowed by compose's per-section try)",
+          "A (alerted) median" in body_f and "B (silent control) median" in body_f
+          and "promoted-B" in body_f and "unavailable" not in body_f,
+          "\n".join(x for x in lines_f if "ledger" in x or "unavailable" in x))
+    lb_raw = json.load(open(PF["livebook"]))
+    check("the weekly fixture writes the NESTED shape improve.summary_json produces (book counts under 'book'), and "
+          "livebook_section reads them there — they printed 0 / '?' while it read the top level",
+          isinstance(lb_raw.get("book"), dict) and lb_raw["book"]["n_done"] == 80 and "n_done" not in lb_raw
+          and "livebook: 120 positions, 80 done, 3 suspect, 2 unpriced, 5 gapped, 4 no-route" in body_f
+          and "entry lag median 310 s" in body_f and "refused 1" in body_f,
+          "\n".join(x for x in lines_f if "livebook" in x))
+    check("the per-policy 'top by mean' line keeps reading the TOP-LEVEL per_policy (the improve gate's table, not "
+          "the book's)", "top by mean" in body_f and "sell_3h -0.050" in body_f
+          and "ctl_exit_immediately -0.034" in body_f)
+    _ws_tree = _tree(os.path.join(ROOT, "selfimprove", "weekly_summary.py"))
+    check("weekly_summary imports ledger at MODULE level (a function-local import binds a local name and every other "
+          "function that spells it raises NameError)", "ledger" in _top_imports(_ws_tree))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

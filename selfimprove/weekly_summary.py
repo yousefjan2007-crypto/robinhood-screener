@@ -15,7 +15,10 @@ WHAT IT READS (all committed or derived; nothing live, nothing from the network)
                                    promoted-B, suspect
   data/band_verdicts.csv        -> per-band verdict coverage; the champion's selected rows
   data/livebook_summary.json    -> positions / done / suspect / unpriced / gapped, entry lag,
-                                   per-policy top 3 by mean and the two controls
+                                   per-policy top 3 by mean and the two controls. improve.summary_json
+                                   NESTS the book counts under "book" and keeps the gate's own
+                                   per_policy / controls tables at the top level — read each from
+                                   where it lives (_book()), or the counts print 0 and '?'
   selfimprove/champion.json     -> champions, nominees, last promoted/demoted history lines
   selfimprove/trials.json       -> trial counts (the DSR denominators)
   data/entry_lab_history.jsonl, selfimprove/improve_history.jsonl -> last verdicts
@@ -48,6 +51,9 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config                                  # noqa: E402
+import ledger                                  # noqa: E402  (module level: ledger_section spells it too,
+                                               # and a function-local import binds a LOCAL name — the
+                                               # NameError compose swallowed as "ledger: unavailable")
 
 sys.path.append(os.path.join(config.HOME, "entry_bot"))   # stats.py only; APPEND so our config wins
 
@@ -125,7 +131,6 @@ def runs_section(now_s: float, P: dict) -> list:
 
 def _ledger_frame(P: dict):
     import pandas as pd
-    import ledger
     led = ledger.load(P["ledger"])
     if len(led) == 0:
         return led
@@ -186,15 +191,26 @@ def verdict_section(wide) -> list:
             f"{cov[low]:.0%}; below {config.BAND_MIN_COVERAGE:.0%} floor: {shown or 'none'}"]
 
 
+def _book(d: dict) -> dict:
+    """The BOOK counts inside a livebook digest. improve.summary_json nests livebook.live_stats_dict
+    under "book" and keeps only the gate's own tables at the top level, so reading n_done/n_suspect/
+    n_gapped/n_no_route/entry_lag_median_s/n_missed from the top level printed 0 or '?'. A flat
+    digest (an older file, or live_stats_dict written directly) still reads correctly."""
+    b = d.get("book") if isinstance(d, dict) else None
+    return b if isinstance(b, dict) else (d if isinstance(d, dict) else {})
+
+
 def livebook_section(P: dict) -> list:
     d = _read_json(P["livebook"])
-    if not isinstance(d, dict) or not d.get("n_positions"):
+    book = _book(d)
+    n_pos = book.get("n_positions", (d or {}).get("n_positions") if isinstance(d, dict) else None)
+    if not isinstance(d, dict) or not n_pos:
         return ["livebook: insufficient (n=0) — no weekly summary JSON yet"]
-    lag = _num(d.get("entry_lag_median_s"))
-    lines = [f"livebook: {d.get('n_positions', 0)} positions, {d.get('n_done', 0)} done, "
-             f"{d.get('n_suspect', 0)} suspect, {d.get('n_unpriced', 0)} unpriced, "
-             f"{d.get('n_gapped', 0)} gapped, {d.get('n_no_route', 0)} no-route; entry lag median "
-             f"{('%.0f s' % lag) if lag is not None else '?'}; refused {d.get('n_missed', 0)}"]
+    lag = _num(book.get("entry_lag_median_s"))
+    lines = [f"livebook: {n_pos} positions, {book.get('n_done', 0)} done, "
+             f"{book.get('n_suspect', 0)} suspect, {book.get('n_unpriced', 0)} unpriced, "
+             f"{book.get('n_gapped', 0)} gapped, {book.get('n_no_route', 0)} no-route; entry lag median "
+             f"{('%.0f s' % lag) if lag is not None else '?'}; refused {book.get('n_missed', 0)}"]
     per = {k: v for k, v in (d.get("per_policy") or {}).items()
            if isinstance(v, dict) and _num(v.get("n"), 0) > 0}
     if per:
@@ -395,7 +411,7 @@ def promotion_eta_section(led, wide, champion_band: str, now_s: float, P: dict) 
     entry_days = in_sample + forward
     # exit gate: the livebook admits every event row (A always, B up to the cap)
     lb = _read_json(P["livebook"]) if os.path.exists(P["livebook"]) else None
-    have_pos = int(_num((lb or {}).get("n_done"), 0) or 0) if isinstance(lb, dict) else 0
+    have_pos = int(_num(_book(lb).get("n_done"), 0) or 0) if isinstance(lb, dict) else 0
     day_frac = len(per_day) / window_days
     ex_in = max((config.IMPROVE_MIN_POSITIONS - have_pos) / ev_rate,
                 (config.IMPROVE_PROMOTE_MIN_CLUSTERS - min(have_days, config.IMPROVE_PROMOTE_MIN_CLUSTERS)) / day_frac, 0.0)
@@ -533,9 +549,14 @@ def _fixture(d: str, now_s: float) -> dict:
             f.write(json.dumps({"scan_ts": now_s - i * 3000, "run_seconds": 90 + i % 7,
                                 "dark": ["blockscout"] if i % 5 == 0 else []}) + "\n")
     with open(P["livebook"], "w") as f:
-        json.dump({"ts": now_s, "n_positions": 120, "n_done": 80, "n_open": 40, "n_suspect": 3,
-                   "n_unpriced": 2, "n_gapped": 5, "n_no_route": 4, "entry_lag_median_s": 310.0,
-                   "n_missed": 1,
+        # the shape improve.summary_json actually writes: the gate's own tables at the top level,
+        # livebook.live_stats_dict nested under "book"
+        json.dump({"ts": now_s, "champion": "sell_3h", "n_positions": 120, "n_days": 40,
+                   "n_trials": 3,
+                   "book": {"ts": now_s, "n_positions": 120, "n_done": 80, "n_open": 40, "n_suspect": 3,
+                            "n_unpriced": 2, "n_gapped": 5, "n_no_route": 4,
+                            "entry_lag_median_s": 310.0, "n_missed": 1,
+                            "by_tier": {"A": 40, "B": 80}},
                    "per_policy": {"hold_to_end": {"n": 70, "mean": -0.61}, "sell_3h": {"n": 70, "mean": -0.05},
                                   "sell_1h": {"n": 70, "mean": -0.12}, "trail_30": {"n": 70, "mean": -0.2}},
                    "controls": {"ctl_exit_immediately": {"n": 70, "mean": -0.034},
