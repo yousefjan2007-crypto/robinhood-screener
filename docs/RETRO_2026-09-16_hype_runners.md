@@ -5,7 +5,10 @@ them — here or anywhere downstream.
 
 Every number below is pinned to `origin/main` at **bcb7fa9** (`data/ledger.csv`: 775 event rows,
 759 distinct tokens) and to GeckoTerminal OHLCV fetched on 2026-09-17 through
-`selfimprove/paths.py`. Two data-quality columns travel with every price statement: **`res`**, the
+`selfimprove/paths.py` — except §3's sparse-era cohort (the 33-of-41 rows and the 24 %-vs-49 %
+rates), §4's top-10 holder shares, and §5's clone counts, which carry forward from an earlier
+2026-09-17 exploration (GeckoTerminal and Dexscreener reads taken that day) and were **not**
+re-measured by this backfill. Two data-quality columns travel with every price statement: **`res`**, the
 bar resolution the series came back at, and **`pages`**, how many backward OHLCV pages it took to
 reach the alert. An hour-long bar cannot resolve a token that peaks four minutes in, and a row
 that needed page 2 was invisible to this lab until 2026-09-17.
@@ -84,8 +87,10 @@ optimistic side alone.
 | `ctl_random_exit` | −0.614 / −0.614 | −0.824 / −0.824 | −0.910 / −0.910 |
 
 Read the last two rows first. `ctl_exit_immediately` — sell at the close of the entry bar, the
-control that is supposed to be worthless — beats eleven of the sixteen policies at +0 min and
-every one of them at +15 min. On one path, on one day, a negative control wins. That is the whole
+control that is supposed to be worthless — beats seven of the sixteen policies at +0 min, twelve
+at +5 min, and thirteen at +15 min, losing at +15 only to the three `trail_30`-family rules
+(`trail_30`, `tp2_half_trail30`, `cfg_ladder_trail30_6h`, all +0.143). On one path, on one day, a
+negative control beats most of a pre-declared policy family more often than not. That is the whole
 argument of §1 in one line.
 
 What ordering buys, and only ordering: on this path the **1.5× take-profit was touched at the

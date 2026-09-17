@@ -3366,6 +3366,26 @@ check("each page gets its OWN cache file keyed by before_timestamp (a shared key
       and any("_b600" in c["cache"] for c in _pa_calls) and any("_b360" in c["cache"] for c in _pa_calls),
       str(_pa_calls))
 
+# ── 2b. a FULL page that pool_ohlcv's own dedup shrinks below LIMIT still pages on ──
+# pool_ohlcv collapses a repeated timestamp WITHIN a page (GT has repeated a bar — its own
+# docstring), so a raw LIMIT-row page can arrive here as LIMIT-1 bars. The old fullness test
+# (`n_raw < LIMIT`) read that short count as "GT has nothing older" and stopped one page short —
+# the FOMOPAD failure mode. Page 0 below is exactly such a page (4 of 5 slots after the page's
+# own dedup); page 1 holds bars back past the alert and must still be fetched.
+_pa_calls.clear()
+_DUP_PAGE0 = _bars(7, 10, 1.0)                        # 4 bars (ts 420..600) — a "short" raw count
+_DUP = {None: _DUP_PAGE0, 420: _bars(2, 6, 1.0)}      # page 1 reaches back to and past the alert
+try:
+    PA.LIMIT, GTM.pool_ohlcv = 5, _pages_fake(_DUP)
+    _dd_st, _dd_bars, _dd_pages = PA._ohlcv(_POOLP, "minute", 1, 200.0)
+finally:
+    GTM.pool_ohlcv, PA.LIMIT = _pa_orig_ohlcv, _pa_orig_limit
+check("a full page whose bars a same-page duplicate shrank to LIMIT-1 (4 of 5) still triggers a "
+      "second page — paging is judged by whether the oldest bar MOVED, never by a raw count a "
+      "duplicate can shrink below LIMIT — and the merged series covers the alert",
+      _dd_pages == 2 and _dd_st == "ok" and min(b["ts"] for b in _dd_bars) <= 200.0,
+      f"{_dd_st} {_dd_pages} {[b['ts'] for b in _dd_bars]}")
+
 # ── 3. a deferred page poisons the resolution, never "no price" ─────────────────────
 _pa_calls.clear()
 _DEFER = {None: _bars(10, 14, 1.0), 600: None, 360: _bars(2, 5, 1.0)}

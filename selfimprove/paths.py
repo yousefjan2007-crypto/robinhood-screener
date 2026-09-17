@@ -133,11 +133,24 @@ def _ohlcv(pool: str, timeframe: str, aggregate: int, alert_ts: float) -> tuple[
     PAGING BACKWARD. One page is LIMIT bars and GT emits a bar per traded minute, so on a busy
     pool the newest minute/1 page begins only ~16 h ago: FOMOPAD's unpaged page started at
     18:34Z for a 14:51:50Z alert and the row read `no_cover` while the token was in fact up
-    4.6x inside it. So while the oldest bar we hold is still NEWER than the alert, the page came
-    back full (a short page means GT has nothing older), and we are under config.PATHS_MAX_PAGES,
-    ask again for the window ENDING at that oldest bar. Pages are merged on ts, keeping the
-    larger reported volume exactly as pool_ohlcv does within a page — the window boundary repeats
-    a bar, and one bar counted twice would double its volume in the evaluator's sanitizer.
+    4.6x inside it. So while the oldest bar we hold is still NEWER than the alert and we are
+    under config.PATHS_MAX_PAGES, ask again for the window ENDING at that oldest bar. Pages are
+    merged on ts, keeping the larger reported volume exactly as pool_ohlcv does within a page —
+    the window boundary repeats a bar, and one bar counted twice would double its volume in the
+    evaluator's sanitizer.
+
+    PROGRESS, NOT FULLNESS, DECIDES WHETHER TO PAGE AGAIN. `pool_ohlcv` already collapses a
+    repeated timestamp WITHIN the page it returns (its own docstring: GT has repeated a bar), so
+    a full LIMIT-row page containing one such repeat arrives here as LIMIT-1 bars. A test of
+    "did this page come back full" (`len(bars) < LIMIT`) reads that as "GT has nothing older" and
+    stops one page short — a real 999-of-1000-bar page silently became a wall. The bar this
+    module actually needs is whether paging again would teach us anything: did the page we just
+    got move the oldest bar held STRICTLY before the boundary we asked for? If yes, there may be
+    more; if the oldest bar did not move (an empty page, or a page whose only content repeats the
+    boundary), further paging would just re-ask the same question forever. So keep paging while
+    the new page's oldest bar is older than the previous one (page 0 has no previous boundary, so
+    any bar it returns counts as progress) AND still newer than the alert AND the page cap has
+    not been reached.
 
     A PAGE WE COULD NOT FETCH POISONS THE WHOLE RESOLUTION. Returning the pages we did get would
     quietly hand the caller a series that starts after the alert, which `fetch_path` would read
@@ -146,7 +159,8 @@ def _ohlcv(pool: str, timeframe: str, aggregate: int, alert_ts: float) -> tuple[
     having fabricated 472 of 1,400 rows as dead tokens. Deferred here, retried next pass.
     """
     by_ts: dict = {}
-    before = None
+    before = None            # the before_timestamp SENT on this iteration (None = newest page)
+    cutoff = float("inf")    # the oldest ts already held; a page must beat this to be progress
     pages = 0
     max_pages = max(1, int(config.PATHS_MAX_PAGES))
     while True:
@@ -160,7 +174,6 @@ def _ohlcv(pool: str, timeframe: str, aggregate: int, alert_ts: float) -> tuple[
         pages += 1
         if is_absent(bars) or not isinstance(bars, list):
             break                              # GT knows no bars in this window: a real answer
-        n_raw = len(bars)
         oldest = None
         for b in bars:
             try:
@@ -173,8 +186,10 @@ def _ohlcv(pool: str, timeframe: str, aggregate: int, alert_ts: float) -> tuple[
             if prev is None or (rec["v"] or 0.0) > (prev["v"] or 0.0):
                 by_ts[rec["ts"]] = rec
             oldest = rec["ts"] if oldest is None else min(oldest, rec["ts"])
-        if oldest is None or oldest <= alert_ts or n_raw < LIMIT or pages >= max_pages:
+        made_progress = oldest is not None and oldest < cutoff
+        if not made_progress or oldest <= alert_ts or pages >= max_pages:
             break
+        cutoff = oldest
         before = int(oldest)
     out = [by_ts[k] for k in sorted(by_ts)]
     return ("ok" if out else ABSENT), out, pages
