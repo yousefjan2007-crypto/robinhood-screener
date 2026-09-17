@@ -69,6 +69,8 @@ SAFETY_FEATURE_KEYS = (
     "gmgn_launchpad_platform", "gmgn_progress", "gmgn_bundler_ratio", "gmgn_sniper_hold_pct",
     "gmgn_insider_hold_pct", "gmgn_fresh_wallet_pct", "gmgn_rat_vol_pct", "gmgn_smart_degen_count",
     "gmgn_is_wash_trading", "gmgn_holders",
+    "gmgn_visiting_count", "gmgn_top10_holder_pct", "gmgn_market_cap", "gmgn_volume_24h",
+    "gmgn_buys_24h", "gmgn_sells_24h", "gmgn_is_honeypot", "gmgn_created_ts",
 )
 # … plus the solana-only keys carried as None and never gated (persisted dicts stay
 # comparable across the two screeners) …
@@ -622,6 +624,17 @@ def _apply_gmgn(s: dict, token: str, row: dict | None = None, info: bool = True)
         got = True
     if got:
         _mark(s, "gmgn", dark=False)
+
+
+def apply_gmgn_row(s: dict, row: dict | None) -> None:
+    """Attach a Trenches row that is ALREADY IN HAND — no call, no budget, no rate-limit weight.
+    run.py does this at PASS 1 for every enriched token, because the row is free once the feed has
+    been pulled and pass 2 reaches only GT_INFO_BUDGET_PER_RUN + WATCH_REFRESH_PER_RUN tokens a run
+    while the watchlist is ~98 % of the survivors: applied inside pass 2 only, the row-only fields
+    (the wash flag, the insider hold rate — /v1/token/info carries neither) reached 11 of 157
+    survivors against 107 for the info-sourced ones. Features only, exactly like _apply_gmgn."""
+    if isinstance(row, dict) and row:
+        _apply_gmgn(s, "", row=row, info=False)
 
 
 def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = None,

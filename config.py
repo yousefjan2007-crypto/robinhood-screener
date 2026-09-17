@@ -443,10 +443,14 @@ FEATURE_FIELDS = (
     "gt_verified", "launchpad_graduation_pct", "launchpad_completed",
     "launchpad_completed_age_s", "holders_updated_age_s", "scanhood_verdict",
     "scanhood_sellable", "sources_dark",
-    # safety (sources/gmgn.py via safety._apply_gmgn): features only, never a hard gate
+    # safety (sources/gmgn.py via safety._apply_gmgn): features only, never a hard gate. The second
+    # line is what the operator reads on the Trenches board — viewers, top-10 share, market cap,
+    # 24 h volume and flow, GMGN's own honeypot verdict (three-valued) and the creation timestamp.
     "gmgn_launchpad_platform", "gmgn_progress", "gmgn_bundler_ratio", "gmgn_sniper_hold_pct",
     "gmgn_insider_hold_pct", "gmgn_fresh_wallet_pct", "gmgn_rat_vol_pct", "gmgn_smart_degen_count",
     "gmgn_is_wash_trading", "gmgn_holders",
+    "gmgn_visiting_count", "gmgn_top10_holder_pct", "gmgn_market_cap", "gmgn_volume_24h",
+    "gmgn_buys_24h", "gmgn_sells_24h", "gmgn_is_honeypot", "gmgn_created_ts",
     # runtime
     "token", "score", "first_sighting", "sighting_age_s",
 )

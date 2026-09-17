@@ -742,7 +742,9 @@ def clean_fixture() -> dict:
         "gmgn_launchpad_platform": "flap", "gmgn_progress": 1.0, "gmgn_bundler_ratio": 0.01,
         "gmgn_sniper_hold_pct": 0.5, "gmgn_insider_hold_pct": 0.0, "gmgn_fresh_wallet_pct": 5.0,
         "gmgn_rat_vol_pct": 0.0, "gmgn_smart_degen_count": 2, "gmgn_is_wash_trading": False,
-        "gmgn_holders": 1400,
+        "gmgn_holders": 1400, "gmgn_visiting_count": 8, "gmgn_top10_holder_pct": 17.5,
+        "gmgn_market_cap": 250_000.0, "gmgn_volume_24h": 750_000.0, "gmgn_buys_24h": 3000,
+        "gmgn_sells_24h": 2500, "gmgn_is_honeypot": False, "gmgn_created_ts": 1789261939,
         "token": "0x" + "ab" * 20, "first_sighting": True, "sighting_age_s": 0.0,
     })
     f["score"] = screen.soft_score(f, f)[0]

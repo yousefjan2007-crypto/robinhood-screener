@@ -15,11 +15,14 @@ Two calls, both keyed (X-APIKEY header + timestamp/client_id query, GMGN's "exis
   token_info(token)        GET /v1/token/info — stat + wallet_tags_stat → the bundler RATIO
                            (bundler wallets / holders: organic 0.00-0.01, the $Cubrate wallet
                            farm 1.42), the sniper/fresh-wallet/rat-trader hold rates, holders,
-                           smart-money count, and progress (the info payload's key is
-                           `launchpad_progress`, NOT `progress`). The wash-trading flag AND the
-                           insider hold rate are NOT in this payload at all (`stat` carries no
-                           `suspected_insider_hold_rate` key, verified against 16 cached
-                           payloads) — both come ONLY from the Trenches row (features_from_row).
+                           smart-money count, progress (the info payload's key is
+                           `launchpad_progress`, NOT `progress`), and — verified across 16 cached
+                           payloads — the viewer count (`data.visiting_count`), the top-10 share
+                           (`stat.top_10_holder_rate`, a string rate) and the creation timestamp.
+                           NOT in this payload at all: the wash-trading flag, the insider hold
+                           rate (`stat` carries no `suspected_insider_hold_rate`), the market cap,
+                           the 24 h volume, the buy/sell counts and the honeypot verdict — all of
+                           those come ONLY from the Trenches row (features_from_row).
 
 THE BODY SHAPE IS LOAD-BEARING. GMGN's own client (OpenApiClient.ts buildTrenchesBody) sends
 {"version": "v2", "<column>": {"filters": [...], "launchpad_platform_v2": true, "limit": 80,
@@ -70,6 +73,10 @@ GMGN_FEATURE_KEYS = (
     "gmgn_launchpad_platform", "gmgn_progress", "gmgn_bundler_ratio", "gmgn_sniper_hold_pct",
     "gmgn_insider_hold_pct", "gmgn_fresh_wallet_pct", "gmgn_rat_vol_pct", "gmgn_smart_degen_count",
     "gmgn_is_wash_trading", "gmgn_holders",
+    # the signals the operator reads on the Trenches board itself (features only, never a gate):
+    # who is looking, how concentrated it is, what it trades, and GMGN's own honeypot verdict
+    "gmgn_visiting_count", "gmgn_top10_holder_pct", "gmgn_market_cap", "gmgn_volume_24h",
+    "gmgn_buys_24h", "gmgn_sells_24h", "gmgn_is_honeypot", "gmgn_created_ts",
 )
 _COLUMN_ALIASES = {"pump": "near_completion"}     # GMGN returns Almost-bonded under `pump`
 
@@ -133,6 +140,13 @@ def _pct(x):
 
 def _str(x):
     return x if isinstance(x, str) and x else None
+
+
+def _yesno(x):
+    """GMGN's three-valued STRING flags ('yes' / 'no' / 'unknown') -> True / False / None. Anything
+    else — a bool, a number, a missing key — is None: unknown is never a finding."""
+    v = x.strip().lower() if isinstance(x, str) else None
+    return True if v == "yes" else False if v == "no" else None
 
 
 def _query() -> str:
@@ -199,7 +213,8 @@ def trenches(columns=None, filters: dict | None = None, cache_s=None):
 
 def features_from_row(row: dict) -> dict:
     """A Trenches row → EXACTLY the gmgn_* feature keys (None when the row lacks a field).
-    The bundler RATIO needs /v1/token/info's wallet tags, so it stays None here."""
+    The bundler RATIO needs /v1/token/info's wallet tags, so it stays None here; everything else
+    the board shows is here, because the row costs nothing once the feed has been pulled."""
     r = row if isinstance(row, dict) else {}
     return {
         "gmgn_launchpad_platform": _str(r.get("launchpad_platform")),
@@ -212,6 +227,14 @@ def features_from_row(row: dict) -> dict:
         "gmgn_smart_degen_count": _i(r.get("smart_degen_count")),
         "gmgn_is_wash_trading": _b(r.get("is_wash_trading")),
         "gmgn_holders": _i(r.get("holder_count")),
+        "gmgn_visiting_count": _i(r.get("visiting_count")),
+        "gmgn_top10_holder_pct": _pct(r.get("top_10_holder_rate")),
+        "gmgn_market_cap": _f(r.get("market_cap")),
+        "gmgn_volume_24h": _f(r.get("volume_24h")),
+        "gmgn_buys_24h": _i(r.get("buys_24h")),
+        "gmgn_sells_24h": _i(r.get("sells_24h")),
+        "gmgn_is_honeypot": _yesno(r.get("is_honeypot")),
+        "gmgn_created_ts": _i(r.get("created_timestamp")),
     }
 
 
@@ -249,6 +272,11 @@ def token_info(token: str, cache_s=None):
         "gmgn_rat_vol_pct": _pct(stat.get("top_rat_trader_percentage")),
         "gmgn_smart_degen_count": _i(tags.get("smart_wallets")),
         "gmgn_holders": holders,
+        # present in 16/16 cached payloads; the market cap, the 24 h volume, the buy/sell counts and
+        # the honeypot verdict are NOT in this payload at all, so only a Trenches row can set them
+        "gmgn_visiting_count": _i(data.get("visiting_count")),
+        "gmgn_top10_holder_pct": _pct(stat.get("top_10_holder_rate")),
+        "gmgn_created_ts": _i(data.get("creation_timestamp")),
     })
     return out
 

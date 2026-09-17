@@ -3509,7 +3509,14 @@ _saved_pe = config.PAPER_EXEC
 _saved_rt = {"bn": rpc.block_number, "gl": rpc.get_logs, "np_": GT.new_pools, "tr": GMR.trenches,
              "en": RUN.dex.enrich_many, "fw": RUN.dex.forward_snapshot_many, "p1": SAFE.pass1_many,
              "p2": SAFE.pass2, "st": scanhood.stock_tokens, "sa": RUN.send_all}
-T_FEED, T_PULL, T_DONE = "0x" + "11" * 20, "0x" + "22" * 20, "0x" + "33" * 20
+T_FEED, T_PULL, T_DONE, T_SURV = "0x" + "11" * 20, "0x" + "22" * 20, "0x" + "33" * 20, "0x" + "55" * 20
+_SURV_MKT = {"symbol": "SURV", "name": "survivor", "price_usd": 0.001, "liq_usd": 53_263.0, "mcap": 346_387.0,
+             "fdv": 346_387.0, "vol_h1": 323_290.0, "vol_h6": 400_000.0, "vol_h24": 500_000.0, "buys_h1": 1273,
+             "sells_h1": 1137, "buys_h24": 2000, "sells_h24": 1800, "price_chg_h1": 40.0, "pair_age_min": 4.07,
+             "dex": "uniswap", "url": "https://dexscreener.com/robinhood/0xpair", "pair": "0x" + "66" * 20}
+_SURV_ROW = {"address": T_SURV, "symbol": "SURV", "launchpad_platform": "bankr", "is_wash_trading": False,
+             "suspected_insider_hold_rate": 0.02, "visiting_count": 8, "top_10_holder_rate": 0.0566,
+             "created_timestamp": 1789261939, "is_honeypot": "no"}
 try:
     with tempfile.TemporaryDirectory() as _dd:
         for _k in _RPATHS:
@@ -3526,11 +3533,13 @@ try:
         GT.new_pools = lambda page=1, network=None: ([{"token": T_FEED, "symbol": "FEED", "pool": "0x" + "44" * 20,
                                                        "created_ts": 1.7e9}] if page == 1 else [])
         GMR.trenches = lambda **k: {"new_creation": [], "near_completion": [],
-                                    "completed": [{"address": T_PULL, "launchpad_platform": "pons"}]}
-        RUN.dex.enrich_many = lambda addrs, now_s, max_age_sec=None: {"ok": {}, "absent": set(addrs), "deferred": set()}
+                                    "completed": [{"address": T_PULL, "launchpad_platform": "pons"}, _SURV_ROW]}
+        RUN.dex.enrich_many = lambda addrs, now_s, max_age_sec=None: {
+            "ok": {T_SURV: dict(_SURV_MKT)} if T_SURV in addrs else {},
+            "absent": {a_ for a_ in addrs if a_ != T_SURV}, "deferred": set()}
         RUN.dex.forward_snapshot_many = lambda toks, now_s: {}
-        SAFE.pass1_many = lambda *a, **k: {}
-        SAFE.pass2 = lambda *a, **k: None
+        SAFE.pass1_many = lambda toks, markets_, disc_, now_s, chain_cache=None: {t_: SAFE.empty_safety() for t_ in toks}
+        SAFE.pass2 = lambda token, market, s1_, now_s, **k: dict(s1_, **{"pass": 2})   # adds NOTHING of its own
         scanhood.stock_tokens = lambda: set()
         RUN.send_all = lambda title, body, dry_run=True: None
         _t_run = time.time()
@@ -3549,6 +3558,19 @@ try:
         check("a token PULLED FORWARD by a feed row is looked at WITHOUT consuming its scheduled slot: its recheck record is identical "
               "afterwards (same next_check, same n_checks) — the pull-forward adds a look rather than spending one",
               _rec_after.get(T_PULL) == _pull_rec, str(_rec_after.get(T_PULL)))
+        _srv = {r_["token"]: r_ for r_ in (_scan_after.get("survivors") or [])}
+        check("the free Trenches row reaches EVERY token's feature dict, not only the handful that get a pass 2: the row is attached "
+              "to the pass-1 safety dict, so the row-only fields (the wash flag and the insider hold rate, which /v1/token/info does "
+              "not carry at all) are present on a survivor whose pass 2 added nothing. Measured before this: 11/157 survivors carried "
+              "them against 107/157 for the info-sourced fields, because the row was applied inside pass2 and pass 2 runs for at most "
+              "GT_INFO_BUDGET_PER_RUN + WATCH_REFRESH_PER_RUN tokens while the watchlist is ~98 % of the survivors",
+              T_SURV in _srv and _srv[T_SURV]["gmgn_is_wash_trading"] is False
+              and abs(float(_srv[T_SURV]["gmgn_insider_hold_pct"]) - 2.0) < 1e-9
+              and _srv[T_SURV]["gmgn_visiting_count"] == 8 and _srv[T_SURV]["gmgn_launchpad_platform"] == "bankr",
+              str({k_: v_ for k_, v_ in (_srv.get(T_SURV) or {}).items() if k_.startswith("gmgn_")}))
+        check("latest_scan.json carries gmgn_coverage — the share of survivors with a known gmgn_visiting_count — so the coverage of a "
+              "GMGN-dependent band is measured before that band is ever registered",
+              abs(float(_scan_after.get("gmgn_coverage")) - 1.0) < 1e-9, str(_scan_after.get("gmgn_coverage")))
         check("latest_scan.json records how discovery ran this time — catchup, cursor_lag_blocks, feed_hits — so a run that is behind, or "
               "is being led by the feeds, says so in the point-in-time store",
               _scan_after.get("catchup") is False and _scan_after.get("cursor_lag_blocks") == 0
@@ -3703,13 +3725,14 @@ scan_syn = {"scan_ts": LT0, "trigger": "dispatch", "band": CHAMP, "champion": {"
             "survivors": [dict(good, symbol="MIZU", score=84.0, tier="A", url="u", event_kind="promotion", event_seq=7, hc_misses=[],
                                champion_reason="", plan_line="PLAN [champion x]", bands={CHAMP: 1})],
             "health": {"api.dexscreener.com": {"ok": 1, "fail": 0, "absent": 0, "bot_challenge": False, "last_status": None}},
-            "run_seconds": 12.0}
+            "run_seconds": 12.0, "gmgn_coverage": 0.37}
 run_log_syn = [{"scan_ts": LT0 - 600, "trigger": "schedule", "run_seconds": 40, "n_a": 0},
                {"scan_ts": LT0, "trigger": "dispatch", "run_seconds": 12.0, "n_a": 1}]
 with tempfile.TemporaryDirectory() as d:
     page = DASH.render(scan_syn, LED.load(os.path.join(d, "l.csv")), None, None, run_log_syn)
-    check("dashboard.render on a synthetic scan contains 'A-TIER', the band, 'runs in the last 24 h' and config.FOOTER",
-          all(n in page for n in ("A-TIER", CHAMP, "runs in the last 24 h", config.FOOTER)) and "<b>2</b>" in page)
+    check("dashboard.render on a synthetic scan contains 'A-TIER', the band, 'runs in the last 24 h', the GMGN coverage of the run "
+          "(the eligibility number for any band that reads a gmgn_* field) and config.FOOTER",
+          all(n in page for n in ("A-TIER", CHAMP, "runs in the last 24 h", "GMGN coverage 37%", config.FOOTER)) and "<b>2</b>" in page)
     junk = DASH.render({"survivors": [None, 3]}, None, {"fills": [None]}, {"per_policy": 5}, [{}])
     check("dashboard.render never raises on garbage inputs", config.FOOTER in junk and "runs in the last 24 h" in junk)
 
@@ -4093,9 +4116,14 @@ check("build_trenches_body is GMGN's own client shape — version v2, one sectio
                                                "limit": config.GMGN_TRENCHES_LIMIT, "quote_address_type": [11, 20, 24, 12, 0],
                                                "min_liquidity": 25000}}
       and set(GM.build_trenches_body()) == {"version", *config.GMGN_TRENCHES_COLUMNS}, str(_body))
+# shaped like the cached Trenches payload (cache/gmgn_trenches_*.json): rates are 0-1, is_honeypot is
+# a STRING, created_timestamp is unix seconds, market cap / volume are numbers, counts are ints
 _row = {"address": "0xAbC0000000000000000000000000000000000001", "symbol": "X", "launchpad_platform": "longxyz", "progress": 0.83,
         "holder_count": 40, "top70_sniper_hold_rate": 0.0001, "suspected_insider_hold_rate": 0.02, "fresh_wallet_rate": 0.31,
-        "rat_trader_amount_rate": 0.005, "smart_degen_count": 2, "is_wash_trading": False}
+        "rat_trader_amount_rate": 0.005, "smart_degen_count": 2, "is_wash_trading": False,
+        "visiting_count": 8, "top_10_holder_rate": 0.0566, "market_cap": 23756.72, "volume_24h": 82085.88,
+        "buys_24h": 663, "sells_24h": 1071, "is_honeypot": "no", "created_timestamp": 1789261939,
+        "owner_renounced": "yes", "burn_status": "yes"}
 _fr = GM.features_from_row(_row)
 check("features_from_row maps a Trenches row onto EXACTLY the gmgn_* feature keys (rates x100, counts int, '' platform -> None, "
       "missing -> None, bundler ratio only from /v1/token/info) and every key is a FEATURE_FIELD",
@@ -4105,6 +4133,18 @@ check("features_from_row maps a Trenches row onto EXACTLY the gmgn_* feature key
       and _fr["gmgn_smart_degen_count"] == 2 and _fr["gmgn_is_wash_trading"] is False and _fr["gmgn_bundler_ratio"] is None
       and GM.features_from_row({"launchpad_platform": ""})["gmgn_launchpad_platform"] is None
       and set(_fr) == set(GM.GMGN_FEATURE_KEYS) and set(GM.GMGN_FEATURE_KEYS) <= set(config.FEATURE_FIELDS), str(_fr))
+check("the operator's Trenches signals are FEATURES carrying the payload's own shapes: is_honeypot is a STRING ('yes' / 'no' / "
+      "'unknown') read THREE-VALUED (anything else, a bool included, is None — unknown is never a finding), top_10_holder_rate is a "
+      "0-1 rate scaled x100 like every other rate here, created_timestamp is unix seconds as an int, and the viewer count, market "
+      "cap, 24 h volume and buy/sell counts come through as numbers",
+      _fr["gmgn_visiting_count"] == 8 and abs(_fr["gmgn_top10_holder_pct"] - 5.66) < 1e-9
+      and _fr["gmgn_is_honeypot"] is False and GM.features_from_row(dict(_row, is_honeypot="YES"))["gmgn_is_honeypot"] is True
+      and GM.features_from_row(dict(_row, is_honeypot="unknown"))["gmgn_is_honeypot"] is None
+      and GM.features_from_row(dict(_row, is_honeypot=True))["gmgn_is_honeypot"] is None
+      and GM.features_from_row({})["gmgn_is_honeypot"] is None and GM.features_from_row({})["gmgn_created_ts"] is None
+      and _fr["gmgn_created_ts"] == 1789261939 and isinstance(_fr["gmgn_created_ts"], int)
+      and _fr["gmgn_market_cap"] == 23756.72 and _fr["gmgn_volume_24h"] == 82085.88
+      and _fr["gmgn_buys_24h"] == 663 and _fr["gmgn_sells_24h"] == 1071, str(_fr))
 _gm_reqs: list = []
 
 
@@ -4152,9 +4192,13 @@ try:
           got is None and len(_gm_reqs) == n0 + 1 and http_client.is_blocked(GM_HOST), str(len(_gm_reqs) - n0))
     check("while blocked, a second call makes no request", GM.trenches(cache_s=0) is None and len(_gm_reqs) == n0 + 1)
     http_client.reset_health()
-    _info_body = {"code": 0, "data": {"launchpad_progress": 0.28,
+    # shaped like the cached /v1/token/info payloads: rates arrive as STRINGS, and the payload carries
+    # visiting_count / creation_timestamp but NO market cap, volume, buy/sell counts or honeypot verdict
+    _info_body = {"code": 0, "data": {"launchpad_progress": 0.28, "visiting_count": 12,
+                                      "creation_timestamp": 1789221503,
                                       "stat": {"holder_count": 1000, "top70_sniper_hold_rate": 0.01,
-                                               "fresh_wallet_rate": 0.1, "top_rat_trader_percentage": 0.004},
+                                               "fresh_wallet_rate": 0.1, "top_rat_trader_percentage": 0.004,
+                                               "top_10_holder_rate": "0.0611"},
                                       "wallet_tags_stat": {"bundler_wallets": 10, "sniper_wallets": 3, "smart_wallets": 2}}}
     http_client._urlopen = _gm_fake(lambda u, d: json.dumps(_info_body).encode())
     _TI = "0x" + "c1" * 20
@@ -4169,6 +4213,14 @@ try:
           and f"address={_TI}" in _gm_reqs[-1][0] and "chain=robinhood" in _gm_reqs[-1][0]
           and abs(ti["gmgn_progress"] - 0.28) < 1e-9 and ti["gmgn_is_wash_trading"] is None
           and ti["gmgn_insider_hold_pct"] is None, str(ti))
+    check("token_info fills ONLY the operator signals the info payload really carries — data.visiting_count, stat.top_10_holder_rate "
+          "(a rate GMGN ships as a STRING, x100) and data.creation_timestamp, all present in 16/16 cached payloads. The market cap, "
+          "the 24 h volume, the buy/sell counts and the honeypot verdict are NOT in it (0/16, `data.price` holds a different shape) "
+          "and stay None, so the Trenches row is their only source",
+          abs(ti["gmgn_top10_holder_pct"] - 6.11) < 1e-9 and ti["gmgn_visiting_count"] == 12
+          and ti["gmgn_created_ts"] == 1789221503
+          and all(ti[k] is None for k in ("gmgn_market_cap", "gmgn_volume_24h", "gmgn_buys_24h", "gmgn_sells_24h",
+                                          "gmgn_is_honeypot")), str(ti))
     _legacy_body = {"code": 0, "data": {"progress": 0.9, "stat": {"holder_count": 5}, "wallet_tags_stat": {}}}
     http_client._urlopen = _gm_fake(lambda u, d: json.dumps(_legacy_body).encode())
     ti_legacy = GM.token_info(_TI, cache_s=0)
@@ -4191,9 +4243,11 @@ check("sources/gmgn.py: the ONLY wall-clock is the auth timestamp inside _query(
       len(_gm_auth) == 1 and _time_time_calls(_compute_nodes(_gm_tree)) == 1 and _time_time_calls(ast.walk(_gm_auth[0])) == 1)
 
 # the adapter: gmgn_* fields are features, never a hard gate; a dark GMGN is named, not scored
-check("SAFETY_FEATURE_KEYS is exactly the safety subset of FEATURE_FIELDS and includes every gmgn_* key",
+check("SAFETY_FEATURE_KEYS is exactly the safety subset of FEATURE_FIELDS and includes every gmgn_* key; the gmgn_ PREFIX in "
+      "FEATURE_FIELDS is exactly GMGN_FEATURE_KEYS, which is what alerts.py's 'unavailable' guard iterates",
       set(SAFE.SAFETY_FEATURE_KEYS) == set(config.FEATURE_FIELDS) - set(RUN.dex.MARKET_KEYS) - {"token", "score", "first_sighting", "sighting_age_s"}
-      and set(GM.GMGN_FEATURE_KEYS) <= set(SAFE.SAFETY_FEATURE_KEYS))
+      and set(GM.GMGN_FEATURE_KEYS) <= set(SAFE.SAFETY_FEATURE_KEYS)
+      and set(alerts._GMGN_FIELDS) == set(GM.GMGN_FEATURE_KEYS))
 _s_row = SAFE.empty_safety()
 SAFE._apply_gmgn(_s_row, _row["address"], row=_row, info=False)
 _s_ok = dict(safety)
@@ -4255,13 +4309,22 @@ _bs_url = config.BLOCKSCOUT_TOKEN_URL.format(token=_TOK)
 _card_dark = dict(surv_a, token=_TOK, sources_dark=["gmgn"], **{k: None for k in GM.GMGN_FEATURE_KEYS})
 _, _b_dark = alerts.format_alert([_card_dark], band=CHAMP)
 _card_ok = dict(surv_a, token=_TOK, gmgn_bundler_ratio=0.01, gmgn_sniper_hold_pct=0.5, gmgn_insider_hold_pct=0.0,
-                gmgn_smart_degen_count=2, gmgn_is_wash_trading=False, gmgn_launchpad_platform="longxyz", gmgn_progress=1.0)
+                gmgn_smart_degen_count=2, gmgn_is_wash_trading=False, gmgn_launchpad_platform="longxyz", gmgn_progress=1.0,
+                gmgn_visiting_count=8, gmgn_top10_holder_pct=5.66)
 _, _b_ok = alerts.format_alert([_card_ok], band=CHAMP)
 check("every A card carries the GMGN token deep link and the explorer token link; the GMGN line prints the wallet-tag numbers "
       "when present and 'unavailable (passed through)' when the source is dark",
       _gm_url in _b_dark and _bs_url in _b_dark and "GMGN: unavailable" in _b_dark
       and _gm_url in _b_ok and "GMGN:" in _b_ok and "bundler" in _b_ok and "0.01" in _b_ok and "longxyz" in _b_ok
       and config.FOOTER in _b_ok, _b_ok[-600:])
+_card_vis = dict(surv_a, token=_TOK, sources_dark=[], **{k: None for k in GM.GMGN_FEATURE_KEYS})
+_card_vis["gmgn_visiting_count"] = 8                      # the one field a Trenches row alone can give
+_, _b_vis = alerts.format_alert([_card_vis], band=CHAMP)
+check("the GMGN line prints the operator's two headline signals — viewers (the Trenches visiting_count) and the top-10 share — when "
+      "they are known, and says 'unavailable (passed through)' only when EVERY gmgn_* field is None: the guard used to test four "
+      "fields, so a card carrying only the row's signals claimed the source was unavailable",
+      "viewers 8" in _b_vis and "GMGN: unavailable" not in _b_vis and "viewers 8" in _b_ok and "top10 5.7%" in _b_ok
+      and "GMGN: unavailable" in _b_dark, _b_vis[-400:])
 _card_html = DASHM._card(dict(_card_ok, url="https://dexscreener.com/robinhood/0xpair"), CHAMP)
 check("the dashboard card links to Dexscreener, GMGN and the explorer as SEPARATE anchors (no nested <a>)",
       f'href="{_gm_url}"' in _card_html and 'href="https://dexscreener.com/robinhood/0xpair"' in _card_html

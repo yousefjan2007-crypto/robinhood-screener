@@ -414,6 +414,8 @@ def run(dry_run: bool = True, send: bool = False) -> list:
                 or feed_disc.get(t) or {})
             for t in p1_tokens}
     s1 = SAFE.pass1_many(p1_tokens, markets, dmap, now_s, chain_cache=chain_cache) if p1_tokens else {}
+    for t, s_ in s1.items():          # the Trenches row is already in hand and costs nothing, so it
+        SAFE.apply_gmgn_row(s_, gmgn_rows.get(t))   # goes on EVERY token, not the pass-2 handful
     stage_s["pass1"] = round(budget.elapsed(), 1)
     survivors1: list = []
     for t in p1_tokens:
@@ -567,6 +569,10 @@ def run(dry_run: bool = True, send: bool = False) -> list:
             r["tier"] = e["tier"]
     n_na = sum(1 for r in survivors if r["verdicts"].get(champion) is None)
     champion_na_frac = (n_na / len(survivors)) if survivors else 0.0
+    # how far the Trenches feed actually reaches: the share of survivors GMGN has seen at all. A band
+    # that reads a gmgn_* field is NA everywhere else, so its coverage is measured before it is registered.
+    n_gm = sum(1 for r in survivors if r.get("gmgn_visiting_count") is not None)
+    gmgn_coverage = (n_gm / len(survivors)) if survivors else 0.0
     a_tier = [r for r in survivors if r["tier"] == "A" and r["event_kind"] == "promotion"
               or (r["tier"] == "A" and r["event_kind"] == "first_sighting")]
     print(f"screen: {len(markets)} enriched · {len(survivors1)} passed pass 1 · {len(survivors)} survivors · "
@@ -680,7 +686,8 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     # ── the point-in-time feature store + run log ─────────────────────────────────
     scan = {"scan_ts": now_s, "trigger": trigger, "band": champion, "bands_hash": STORE.bands_code_hash(),
             "champion": {"exit": exit_plan["name"], "entry_band": champion},
-            "champion_na_frac": _round(champion_na_frac), "head": head, "cursor": new_cursor, "gap_blocks": gap,
+            "champion_na_frac": _round(champion_na_frac), "gmgn_coverage": _round(gmgn_coverage),
+            "head": head, "cursor": new_cursor, "gap_blocks": gap,
             "catchup": bool(disc_meta["catchup"]), "cursor_lag_blocks": int(disc_meta["lag_blocks"]),
             "feed_hits": len(feed_hits),
             "discovered": len(order), "by_source": by_source, "quota_cuts": quota_cuts,

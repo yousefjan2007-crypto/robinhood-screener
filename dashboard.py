@@ -602,6 +602,9 @@ def render(scan: dict, led: pd.DataFrame, paper: dict | None, live: dict | None,
         tail_bits.append(f"trigger {_esc(trigger, 12)}")
     if run_s is not None:
         tail_bits.append(f"run {_fmt_secs(run_s)}")
+    gm_cov = _num(scan.get("gmgn_coverage"))
+    if gm_cov is not None:                 # how far the Trenches feed reaches into this run's survivors
+        tail_bits.append(f"GMGN coverage {gm_cov:.0%}")
     tail_bits.append(f"auto-reloads every {META_REFRESH_S // 60}&nbsp;min")
 
     a_html = _safe(lambda: _cards(survivors, "A", band))

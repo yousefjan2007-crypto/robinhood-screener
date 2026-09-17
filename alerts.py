@@ -184,11 +184,16 @@ def _plan(entry_price) -> str:
         return f"PLAN [unavailable: {e}]"
 
 
+_GMGN_FIELDS = tuple(k for k in config.FEATURE_FIELDS if k.startswith("gmgn_"))   # == gmgn.GMGN_FEATURE_KEYS
+
+
 def _gmgn_line(s: dict) -> str:
-    """GMGN's wallet-tag second opinion, or its absence stated: a dark or unconsulted GMGN passes
-    through (no gate reads it) and the card says so, exactly like solana's alert did."""
-    if all(s.get(k) is None for k in ("gmgn_bundler_ratio", "gmgn_smart_degen_count", "gmgn_progress",
-                                      "gmgn_sniper_hold_pct")):
+    """GMGN's second opinion — the wallet tags from /v1/token/info and the board signals from the
+    Trenches row — or its absence stated: a dark or unconsulted GMGN passes through (no gate reads
+    it) and the card says so, exactly like solana's alert did. The guard tests EVERY gmgn_* field:
+    it used to test four, so a card carrying only the row's own signals (viewers, top-10, flow —
+    which /v1/token/info does not carry) printed 'unavailable' while GMGN had in fact answered."""
+    if all(s.get(k) is None for k in _GMGN_FIELDS):
         return "   GMGN: unavailable (passed through)"
     prog = s.get("gmgn_progress")
     try:
@@ -196,7 +201,8 @@ def _gmgn_line(s: dict) -> str:
     except (TypeError, ValueError):
         prog_txt = "?"
     wash = s.get("gmgn_is_wash_trading")
-    return (f"   GMGN: bundler ratio {_f(s.get('gmgn_bundler_ratio'), '.2f')} · snipers hold "
+    return (f"   GMGN: viewers {_f(s.get('gmgn_visiting_count'))} · top10 {_pct(s.get('gmgn_top10_holder_pct'), '.1f')} "
+            f"· bundler ratio {_f(s.get('gmgn_bundler_ratio'), '.2f')} · snipers hold "
             f"{_pct(s.get('gmgn_sniper_hold_pct'), '.1f')} · insiders {_pct(s.get('gmgn_insider_hold_pct'), '.1f')} "
             f"· smart-money {_f(s.get('gmgn_smart_degen_count'))} · wash {'?' if wash is None else wash} "
             f"· launchpad {s.get('gmgn_launchpad_platform') or '?'} · curve {prog_txt}")
