@@ -4,7 +4,7 @@
 # data/keeper_handoff.json (ready → done), so two keepers may overlap by design and no Mac is in
 # the loop. keeper-watchdog.yml carries the `*/5` cron (measured 13.7 fires/day on this account
 # against a nominal 288, 2026-09-12) and restarts a dead keeper; pages.yml deploys docs/ in its
-# own group. A one-shot `mode=run` (the retiring Mac dispatch, or a human) is HARMLESS while a
+# own group. A one-shot `mode=run` (the retired Mac dispatch, or a human) is HARMLESS while a
 # keeper is alive: it exits before scanning — and also when `gh` cannot say (alive | none |
 # unknown: only a definite none scans or dispatches). The scan itself is written to be correct
 # at any cadence (block-cursor discovery catches up exactly).

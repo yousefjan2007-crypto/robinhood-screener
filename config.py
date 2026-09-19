@@ -542,7 +542,9 @@ LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN = 20
 # stamped [] (fail closed). A row whose lines exist but carry no 1, and an unreadable sidecar,
 # are [] at once — a dark sidecar must never starve the book.
 LIVEBOOK_SIDECAR_WAIT_TICKS = 1
-MAX_ENTRY_LAG_S = 15 * 60          # keeper cadence 240 s + run ≤3 min + tick ≤1 min ⇒ 3-8 min expected
+MAX_ENTRY_LAG_S = 15 * 60          # inside the keeper the lag is the scan's wall time after alert_ts
+                                   # plus at most one tick (cadence 240 s + run ≤3 min + tick ≤1 min), so
+                                   # 15 min is generous headroom; the retired Mac mode measured 3-8 min
 LIVEBOOK_TICK_INTERVAL_S = 60.0
 LIVEBOOK_TICK_INTERVAL_LATE_S = 900.0
 LIVEBOOK_DECISION_HORIZON_S = 6 * 3600

@@ -89,8 +89,9 @@ WHAT THIS PORT CHANGES, AND THE INCIDENTS BEHIND EACH CHANGE.
     partial one (the lock is not what guarantees that — the scan does not run under it); the
     band-verdict sidecar is APPENDED after that replace, so a read landing in the gap sees the
     row and no sidecar line yet (see THE BAND UNDER TEST). The lag is the scan's wall time
-    after alert_ts plus at most one tick. `origin` — the Mac's, retired: origin/main via
-    git fetch + show, never pull (dispatch + run + commit + fetch: 3–8 min). Either way a row
+    after alert_ts plus at most one tick. `origin` — origin/main via git fetch + show,
+    never pull: the retired Mac mode, whose lag measured 3–8 min (dispatch + run +
+    commit + fetch) before those jobs were retired. Either way a row
     older than MAX_ENTRY_LAG_S is refused and logged with its lag, so the book judges "exit
     policy given a late entry" and says so (entry_lag_s on every position).
   * HANDOFFS: a successor keeper's first tick follows the predecessor's last by about one

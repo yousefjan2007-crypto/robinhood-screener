@@ -344,6 +344,40 @@ for base in (os.path.join(ROOT, "docs"), os.path.join(ROOT, "selfimprove", "rese
 check("no file under docs/, selfimprove/research/ or .github/ contains '/Users/' or 'vrp_backtest' (public-repo scrub)",
       not leaks, str(leaks))
 
+# ── cadence drift (Phase 9): the Mac dispatch job is gone and the keeper's cadence is a config
+# constant, so no source or doc may still quote the retired job's interval or a nominal "one run
+# per five minutes". The needles are ASSEMBLED, never written out, so this file does not trip its
+# own walk; the same trick keeps the entry-lag needle out of the text below.
+_STALE_CADENCE = ("StartInterval " + "300", "every " + "5 min")
+_LAG_NEEDLES = ("3" + "–" + "8 min", "3" + "-" + "8 min")
+_TEXT_EXT = (".md", ".py", ".yml", ".yaml", ".sh", ".plist")
+_SKIP_DIRS = {".git", "cache", "data", "__pycache__", "context", "logs", "node_modules"}
+_cadence_bad, _lag_bad = [], []
+for dp, dns, fns in os.walk(ROOT):
+    dns[:] = [d for d in dns if d not in _SKIP_DIRS and not d.startswith(".super")]
+    for fn in fns:
+        if not fn.endswith(_TEXT_EXT):
+            continue
+        p = os.path.join(dp, fn)
+        try:
+            txt = _read(p)
+        except Exception:
+            continue
+        for needle in _STALE_CADENCE:
+            if needle in txt:
+                _cadence_bad.append(f"{_rel(p)}:{needle!r}")
+        for i, ln in enumerate(txt.splitlines(), 1):
+            if any(nd in ln for nd in _LAG_NEEDLES) and "retired" not in ln.lower():
+                _lag_bad.append(f"{_rel(p)}:{i}")
+check("no file in the tree still carries the retired Mac dispatch job's cadence — neither its launchd "
+      "interval key with the old value nor a nominal per-five-minute phrasing; the scan's cadence is "
+      f"config.KEEPER_CADENCE_S = {config.KEEPER_CADENCE_S} s and the docs print MEASURED runs",
+      not _cadence_bad, str(_cadence_bad))
+check("every line that quotes the old 3-to-8-minute entry lag says 'retired' on that same line — inside "
+      "the keeper the lag is the scan's wall time after alert_ts plus at most one tick, and the Mac "
+      "measurement must never be read as the live number",
+      not _lag_bad, str(_lag_bad))
+
 rate_names = {n: getattr(config, n) for n in dir(config) if n.endswith("_RATE_HZ") and n != "HOST_RATE_HZ"}
 unmapped = [h for h, hz in http_client._HOST_HZ.items() if hz not in rate_names.values()]
 check("every http_client._HOST_HZ value is a config.*_RATE_HZ constant (no literals in http_client)",

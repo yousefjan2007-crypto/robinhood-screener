@@ -93,7 +93,7 @@ Claude session proposes new candidates that merge only if `verify.py` is green.
 | `selfimprove/entry_lab/` | The entry loop: `bands.py` (bands as pure functions + controls + the registry loader), `runtime.py` (feature normalizer, band evaluation, event decisions, watchlist), `store.py` (the verdict sidecar), `scorecard.py`, `improve_bands.py` (the 9-check entry gate). |
 | `selfimprove/candidates/` | The research pool: `registry.json`, `register.py --scan`, `_template.py`, and every candidate module the weekly session has proposed. |
 | `selfimprove/research/` | `run_research.sh` (the Sunday headless Claude session), `research_prompt.md`, `allowlist.py`, `proposals/`. |
-| `launchd/` | The Mac jobs: `dispatch` (5 min), `livebook` (60 s — retired at the cloud-book cutover; the keeper ticks the book), `improve` (Sun 11:00), `research` (Sun 12:00). |
+| `launchd/` | The one Mac job left: `research` (Sun 12:00, optional). `dispatch` and `livebook` were booted out and deleted on **2026-09-19** — the keeper is the scan loop and ticks the book itself; `improve` went when the Sunday gates moved into `weekly.yml`; `screener` and `dashboard` went at the rebuild. All five retired labels are in `verify.py`'s retired set and must stay absent. |
 | `.github/workflows/` | `screener.yml` (the cloud scan), `pages.yml` (the Pages deploy), `keeper-watchdog.yml` (the `*/5` restart cron), `weekly.yml` (`robinhood-weekly`: the Sunday 10:00 UTC gates, the publish and the ONE weekly message — it replaced the Mac's Sunday launchd chain, so a sleeping laptop no longer skips a week) and `verify.yml` (the invariant suite on human pushes). |
 | `docs/DESIGN.md` | The reconciled design: resolved decisions and module contracts. |
 | `docs/RETRO_2026-09-16_hype_runners.md` | What three 2026-09-16 runners did minute by minute on ordered 1-minute paths — descriptive, n = 3, chosen on the outcome; no rule is derived from it. |
@@ -149,7 +149,7 @@ without consuming its scheduled slot (at most 40 per run); the new-pools feed re
 of 2, because 2 pages spanned about 2.5 minutes of pool creation against a 240-second scan cadence;
 and the recheck queue drains 150 tokens a run instead of 40, which at a Pons inflow of 750–1,250
 launches an hour is the difference between draining the queue and evicting it. None of this reaches
-the 8-minute class: an architecture with a 240-second cadence and a 3–8 minute entry lag cannot
+the 8-minute class: an architecture with a 240-second cadence and an entry lag of minutes cannot
 enter a token that peaks eight minutes in, and no tuning of it will.
 
 **Pons and hook-less V4.** Pons (`pons-v2-dex`) is the chain's largest launchpad by count —
@@ -210,7 +210,7 @@ share beside the book's no-route count so the two rules stay auditable against e
 
 Every alert carries the champion exit plan (`cfg_ladder_stop` by default: the take-profit ladder plus
 the hard stop), and the ledger row and paper position freeze that plan at record time. The plan is
-one of 16 policies + 2 negative controls that the Mac's live book runs simultaneously off **one shared
+one of 16 policies + 2 negative controls that the live book runs simultaneously, inside the keeper, off **one shared
 fill per alert**, behind a quote-integrity gate, so any difference between two policies is caused by
 the exit alone.
 
@@ -224,8 +224,12 @@ a one-shot **demotion** test judges the new champion's own forward prefix once; 
 the best control reverts it to the default with no positive proof required. Promotion, demotion and
 nomination write `selfimprove/champion.json` through its sole writer and are applied **only under
 `--apply` on Sundays**. Human overrides: create `selfimprove/PAUSE` (both gates evaluate and report but
-write nothing), or `python3 selfimprove/champion.py --set exit=<name> --reason "..."`. The off switch
-is `gh workflow disable robinhood-screener` plus `launchctl bootout` of the dispatch job.
+write nothing), or `python3 selfimprove/champion.py --set exit=<name> --reason "..."`. The cloud
+pause switch is `champion.json.locked` (committed, honoured by both gates; `selfimprove/PAUSE` is
+Mac-local and the runner never sees it). The off switch is `gh workflow disable robinhood-screener`
+and `gh workflow disable robinhood-keeper-watchdog` (one name per call), then `gh run cancel <id>`
+on the live keeper(s) — disabling a workflow does not stop a run already looping — plus
+`gh workflow disable robinhood-weekly` for the Sunday pass.
 
 ## The entry lab and the weekly research session
 
@@ -272,14 +276,23 @@ is **not** GitHub's cron: measured on this account, the `*/5` schedule fired **1
 nominal 288** (2026-09-12). The scan is therefore a self-chaining **keeper** job (`.github/keeper.sh`):
 one run scans every 240 s for up to 340 min, dispatches its successor into the other concurrency
 slot and hands off through `data/keeper_handoff.json`; a `*/5` watchdog workflow restarts a dead
-keeper and alerts SCAN STALE past 30 min; the Mac dispatch job is retired (a one-shot `mode=run`
-exits without scanning while a keeper is alive). Discovery, horizons, the watchlist and rechecks are
-written to be correct at any cadence; the dashboard and the weekly summary report the **measured**
-runs in the last 24 h, never the nominal number. The 60 s live book runs inside the keeper too (one
-tick per minute; its state reads and its write phase take the scan's lock, its quotes do not; its four
-state files are committed with the scan; the Mac's launchd tick is retired at the cutover and a tick
-refuses to run on tracked state); the Mac runs the Sunday improve chain (11:00) and the research
-session (12:00) on the pulled snapshot.
+keeper and alerts SCAN STALE past 30 min. Measured since the keeper went live on 2026-09-17:
+**596 scans in the first 40 h at a median gap of 240.03 s**, and 8 handoffs whose ready→done took
+13–16 s. The Mac dispatch job was booted out and deleted on 2026-09-19 (a one-shot `mode=run` exits
+without scanning while a keeper is alive, so it was harmless as well as redundant). Discovery,
+horizons, the watchlist and rechecks are written to be correct at any cadence; the dashboard and the
+weekly summary report the **measured** runs in the last 24 h, never the nominal number. The 60 s live
+book runs inside the keeper too (one tick per minute; its state reads and its write phase take the
+scan's lock, its quotes do not; its four state files are committed with the scan; the Mac's launchd
+tick is retired and a tick refuses to run on tracked state). The Sunday gates run in the cloud as
+well (`weekly.yml`, 10:00 UTC); the only job left on the Mac is the optional 12:00 research session,
+which reads the pulled snapshot.
+
+If the cloud has to be rolled back to the Mac: revert the keeper, the cloud-book cutover and the
+Sunday-workflow commits, then reinstall the plists from git history — they were last carried by the
+parent of the retire commit (`git log --diff-filter=D -- launchd/` finds it) — with
+`launchctl bootstrap gui/$(id -u) <plist>`. Nothing in this repo does that for you, and nothing
+should: the keeper has been the system of record since 2026-09-17.
 
 ## Running it
 
@@ -291,8 +304,7 @@ python3 run.py --send                               # write AND alert (what the 
 python3 preflight.py                                # probe every source from here; commits nothing
 python3 ledger.py                                   # the A-vs-B scorecard
 python3 paper_exec.py                               # the paper A book (add --live to mark it)
-python3 selfimprove/livebook.py --tick              # one live-book cycle (the keeper runs this; never on the Mac after the cutover)
-python3 selfimprove/livebook.py --scorecard         # per-policy live P&L
+python3 selfimprove/livebook.py --scorecard         # the book, read-only (the keeper owns --tick; never run it on the Mac)
 python3 selfimprove/improve.py                      # exit gate, dry (the Sunday workflow adds --apply --send)
 python3 selfimprove/improve.py --band-scorecard     # the paper gate alone, read-only: PASS / FAIL / VOID, or "none registered"
 python3 selfimprove/entry_lab/improve_bands.py      # entry-band gate, dry
@@ -334,14 +346,19 @@ file is mode 0600 and the loader warns otherwise. Nothing is hardcoded.
 - Blockscout from the Actions runner's IP is unverified; `preflight.py` measures it. If challenged,
   pass 2 runs on GeckoTerminal + ScanHood, holders/template checks are NA (tier B, never a false A),
   and the DEGRADED alert, dashboard line and weekly dark share quantify it.
-- Cadence depends on the Mac dispatching. Without it GitHub's cron gives ~14 runs/day; the cursor
+- Cadence depends on the keeper staying alive — a scan every 240 s while it loops, restarted by
+  the `*/5` watchdog when it dies. If both fail, GitHub's own cron gives ~14 runs/day; the cursor
   catches up exactly (up to 8.4 h per run), but horizon cells carry more drift and watchlist
-  promotions are rarer.
+  promotions are rarer. No Mac is in this path.
 - Aggregator outages leave tokens with no V2 pair `unpriced` (reported, split by pool type).
 - V3/V4-pool tokens rarely reach A-tier — LP status unknown by construction.
-- Entry lag is 3–8 min (dispatch + run + commit + fetch), recorded as `entry_lag_s` on every live
-  position; anything past 15 min is refused and logged. The book judges "this exit policy given a
-  late entry", not a t=0 entry.
+- Entry lag inside the keeper is the scan's wall time after `alert_ts` plus at most one tick — a
+  design bound of about five minutes, not yet a measured number on the cloud book;
+  the retired Mac mode measured 3–8 min (dispatch + run + commit + fetch).
+  It is recorded as `entry_lag_s` on every
+  live position; anything past 15 min is refused and logged to `data/livebook_missed.jsonl`. Read
+  `entry_lag_s` before trusting a live number. The book judges "this exit policy given a late
+  entry", not a t=0 entry.
 - The public RPC and GeckoTerminal budgets bound throughput; the global time budget defers visibly
   (`deferred_by_stage`) and never marks a deferred token as seen.
 - History is never rewritten after go-live; the repo grows by one commit per run, bounded by the
