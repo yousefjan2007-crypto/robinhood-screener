@@ -15,14 +15,18 @@ Run everything from the repo root of a tree that is up to date with `origin/main
 
 ```bash
 gh run list -w robinhood-screener -s in_progress
-python3 -c "import json,statistics as st; t=sorted(json.loads(l)['scan_ts'] for l in open('data/run_log.jsonl'))[-720:]; g=[b-a for a,b in zip(t,t[1:])]; print('scans',len(t),'median',round(st.median(g),1),'s  max',round(max(g),1),'s  over',round((t[-1]-t[0])/3600,1),'h')"
+python3 -c "import json,statistics as st; t=sorted(json.loads(l)['scan_ts'] for l in open('data/run_log.jsonl'))[-720:]; g=sorted(b-a for a,b in zip(t,t[1:])); n=len(g); p95=g[min(n-1,round(0.95*(n-1)))]; print('scans',len(t),'median',round(st.median(g),1),'s  p95',round(p95,1),'s  max',round(g[-1],1),'s  over',round((t[-1]-t[0])/3600,1),'h')"
 ```
 
 **Pass:** exactly one in-progress run (titled `keeper · <trigger> · slot=a|b`; two only during a
-handoff), and over the last ~720 scans the **median gap is ≤ 300 s** with **no gap above
-`KEEPER_STALE_S` = 1800 s**. Do not require every gap at 240 s: the gap is the cadence plus the
-run, and a slow scan stretches it — measured 240.03 s median over the first 596 scans, with 16
-gaps above 260 s (max 591 s) all attributable to slow runs, none to a handoff.
+handoff), and over the last ~720 scans **all three** hold: the **median gap is ≤ 300 s**, the
+**p95 gap is ≤ 300 s**, and **no gap exceeds 2 × `KEEPER_CADENCE_S` + 300 s** — that is
+2 × 240 + 300 = **780 s** with `KEEPER_CADENCE_S` = 240. A flat "≤ 300 s for every scan" is
+unreachable: the gap is the cadence plus the run, and a slow scan — never a dropped one —
+stretches it past 300 s from time to time, which is why the tail is bounded separately by the
+2×-cadence ceiling instead of being folded into the median/p95 legs. Measured on the last 720
+scans (48.5 h) as of 2026-09-19: median 240.0 s, p95 244.2 s, max **594 s** — from a slow scan,
+not a handoff — comfortably inside the 780 s ceiling.
 
 ### 2. The watchdog is green
 
