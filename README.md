@@ -96,6 +96,7 @@ Claude session proposes new candidates that merge only if `verify.py` is green.
 | `launchd/` | The one Mac job left: `research` (Sun 12:00, optional). `dispatch` and `livebook` were booted out and deleted on **2026-09-19** — the keeper is the scan loop and ticks the book itself; `improve` went when the Sunday gates moved into `weekly.yml`; `screener` and `dashboard` went at the rebuild. All five retired labels are in `verify.py`'s retired set and must stay absent. |
 | `.github/workflows/` | `screener.yml` (the cloud scan), `pages.yml` (the Pages deploy), `keeper-watchdog.yml` (the `*/5` restart cron), `weekly.yml` (`robinhood-weekly`: the Sunday 10:00 UTC gates, the publish and the ONE weekly message — it replaced the Mac's Sunday launchd chain, so a sleeping laptop no longer skips a week) and `verify.yml` (the invariant suite on human pushes). |
 | `docs/DESIGN.md` | The reconciled design: resolved decisions and module contracts. |
+| `docs/GO_LIVE_CHECKLIST.md` | The eleven things that must be true before a paper scorecard may be read as evidence — one command and one binary pass condition each, then the sizing paragraph. |
 | `docs/RETRO_2026-09-16_hype_runners.md` | What three 2026-09-16 runners did minute by minute on ordered 1-minute paths — descriptive, n = 3, chosen on the outcome; no rule is derived from it. |
 
 ## Tiers, the control group and the event model
@@ -267,6 +268,9 @@ fills at **$0**, exactly like real life.
 **Real automated trading is justified ONLY if the PAPER scorecard is repeatedly positive** — never
 the frictionless ledger's. The gap between the two is the execution cost; if the edge does not
 survive quoted slippage, an execution layer would automate losses faster.
+[`docs/GO_LIVE_CHECKLIST.md`](docs/GO_LIVE_CHECKLIST.md) is the eleven-item version of that
+sentence: one command and one binary pass condition each, ending in the position-sizing numbers
+this book's own stop fills actually realized.
 
 ## Deployment
 

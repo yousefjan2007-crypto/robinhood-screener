@@ -4867,6 +4867,28 @@ check("DESIGN.md carries the champion-decision row — both branches of `champio
       "modules by name, tier_for's composition, the demotion target, the registry-status rule and the unset branch ending in "
       "'NO CHANGE for months'",
       not _champ_row, str(_champ_row))
+# The go-live checklist is the document a human reads with a terminal open, so every command in it
+# has to resolve TODAY: a workflow name that no longer exists, or a script that moved, turns an
+# item into a shrug. Eleven items exactly — the count is part of the contract (adding a twelfth is
+# a decision, not an edit) — and the public-repo scrub applies to it like every other doc.
+_glc = _read(os.path.join(ROOT, "docs", "GO_LIVE_CHECKLIST.md"))
+_glc_items = re.findall(r"(?m)^### (\d+)\. ", _glc)
+_wf_names = set()
+for _wp in sorted(glob.glob(os.path.join(ROOT, ".github", "workflows", "*.yml"))):
+    _m = re.search(r"(?m)^name:\s*(\S+)", _read(_wp))
+    if _m:
+        _wf_names.add(_m.group(1))
+_glc_bad_wf = sorted({w for w in re.findall(r"gh [^\n`]*?-w\s+([A-Za-z0-9._-]+)", _glc)} - _wf_names)
+_glc_bad_py = sorted({p_ for p_ in re.findall(r"python3 (?!-c\b|-I\b)([A-Za-z0-9_./-]+\.py)", _glc)
+                      if not os.path.exists(os.path.join(ROOT, p_))})
+check("docs/GO_LIVE_CHECKLIST.md has EXACTLY the eleven numbered items, every workflow it names exists by its "
+      "`name:` and every script it runs exists by path, and it carries no home path, no sibling-project name and "
+      "never the shared secrets file",
+      _glc_items == [str(i) for i in range(1, 12)] and not _glc_bad_wf and not _glc_bad_py
+      and "/Users/" not in _glc and "monitor_config" not in _glc and "vrp_backtest" not in _glc,
+      str([_glc_items, _glc_bad_wf, _glc_bad_py]))
+check("README links the go-live checklist beside the pre-committed 'repeatedly positive' condition",
+      "docs/GO_LIVE_CHECKLIST.md" in _readme and "repeatedly positive" in _readme)
 check("CLAUDE.md's live-book paragraph is the keeper's (KEEPER_BOOK, LIVEBOOK_FEED_SOURCE, the four committed files, the ticks log as "
       "artifact, the band under test) and the gotchas say never to tick on the Mac after the cutover",
       all(w in _claude_md for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "livebook_ticks.jsonl", "LIVEBOOK_BAND_UNDER_TEST"))
