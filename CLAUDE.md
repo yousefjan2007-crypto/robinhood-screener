@@ -310,7 +310,7 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   sets it — halving the book's rate lengthens its ticks in proportion, so it is not a recommended
   setting there (verify pins the unscaled rates).
 - **Alerts go out EARLY in a run**: tokens the champion band selects on pass-1 facts get pass 2
-  first and are alerted before the rest of pass 2, the watchlist refresh and the forward update;
+  first and are alerted before the rest of pass 2, the watchlist refresh and the forward update; the non-candidate survivors past `GT_INFO_BUDGET_PER_RUN` are rescheduled on their recheck ladder (never looped, never dropped), so their pass-2 facts lag by a ladder rung;
   `latest_scan.json.stage_seconds.alert_sent` is the measured latency inside the run.
 - **Entry lag inside the keeper is the scan's wall time after `alert_ts` plus at most one tick**
   (the retired Mac mode's 3–8 min came from dispatch + run + commit + fetch); refusals past
