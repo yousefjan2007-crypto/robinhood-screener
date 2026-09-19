@@ -5147,9 +5147,11 @@ try:
     def _tr_lines(prefix):
         return [x for x in TR.load()["nominations_ever"] if x.startswith(prefix)]
 
-    def _pg(book, now_s):
+    def _pg(book, now_s, record=True):
+        # record=True is the RUNNER's Sunday --apply evaluation, the only caller allowed to mint
+        # the one-shot trials.json lines; record=False is every read-only caller.
         LB._save_atomic(book, LB.BOOK_PATH)         # live_stats_dict (the flow-dark share) reads the file
-        return _capture(IM.paper_gate, now_s, book=book)
+        return _capture(IM.paper_gate, now_s, book=book, record=record)
 
     # none registered: no band, or no window start — and the CLI returns before the Sunday gate
     config.LIVEBOOK_BAND_UNDER_TEST, config.PAPER_GATE_WINDOW_START, config.PAPER_GATE_POLICY = None, None, None
@@ -5350,6 +5352,43 @@ try:
     check("a verdict promotes nothing: champion.json was never written by the paper gate (only trials.json grew)",
           not os.path.exists(config.CHAMPION_PATH))
 
+    # ── the one-shot lines are minted ONLY on the apply path. selfimprove/trials.json is TRACKED and
+    # published by weekly.yml's Publish step alone; a read-only caller that wrote it would diverge the
+    # Mac tree (run_research.sh's step-0 ff-merge then refuses) and split the one-shot record in two —
+    # a Mac --band-scorecard on an older snapshot recording `=fail` while the runner records `=pass`.
+    C1P, C1S = "stop_30", "2026-01-05T00:00:00Z"          # long closed on any real clock: the CLI judges it
+    config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = C1P, C1S
+    _q_c1 = IM._parse_window_start(C1S)
+    book_c1 = IM._synthetic_book(W, 5, _q_c1, seed=41, adv={C1P: 0.60}, stamp=[BQ])
+    LB._save_atomic(book_c1, LB.BOOK_PATH)
+    _tr_bytes = _read(config.TRIALS_PATH)
+    pg_c1, _ = _capture(IM.paper_gate, _q_c1 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0, book=book_c1)
+    rc_c1, out_c1 = _capture(IM.main, ["--band-scorecard"])     # the documented Mac command
+    _capture(IM.main, [])                                       # a dry improve.py
+    _capture(IM.main, ["--summary-json"])                       # the runner's third Gates command
+    check("the paper gate's one-shot bookkeeping is minted ONLY on the apply path: --band-scorecard, a dry improve.py and "
+          "--summary-json leave the TRACKED selfimprove/trials.json BYTE-IDENTICAL, and `record=False` is the default",
+          _read(config.TRIALS_PATH) == _tr_bytes and rc_c1 == 0 and not _tr_lines(f"paper:{BQ}/{C1P}@"),
+          out_c1[-300:])
+    check("a read-only evaluation still COMPUTES the same verdict and prints the would-be lines: `recorded_now` empty, "
+          "`would_record` carries the paper: and paper_verdict: lines verbatim, and the line says '(not recorded: dry)'",
+          pg_c1["status"] in ("PASS", "FAIL", "VOID") and pg_c1["recorded_now"] == []
+          and pg_c1["would_record"] == [f"paper:{BQ}/{C1P}@{C1S}", f"paper_verdict:{BQ}/{C1P}@{C1S}={pg_c1['status'].lower()}"]
+          and pg_c1["line"].endswith(" (not recorded: dry)") and "(not recorded: dry)" in out_c1
+          and f"would record: paper:{BQ}/{C1P}@{C1S}" in out_c1, f"{pg_c1['line']} | {pg_c1['would_record']}")
+    LB._save_atomic({}, LB.BOOK_PATH)          # n=0: main's early return never reaches apply() / champion.json
+    _capture(IM.main, ["--apply"])
+    _c1_after = (_tr_lines(f"paper:{BQ}/{C1P}@"), _tr_lines(f"paper_verdict:{BQ}/{C1P}@"))
+    _c1_bytes = _read(config.TRIALS_PATH)
+    _capture(IM.main, ["--apply"])
+    pg_c1b, _ = _capture(IM.paper_gate, _q_c1 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0, book={})
+    check("the apply path mints each line exactly ONCE: `improve.py --apply` bumps the paper: and paper_verdict: lines, a second "
+          "--apply adds nothing (byte-identical) and every later read prints them '(recorded)' from nominations_ever",
+          _c1_after == ([f"paper:{BQ}/{C1P}@{C1S}"], [f"paper_verdict:{BQ}/{C1P}@{C1S}=fail"])
+          and _read(config.TRIALS_PATH) == _c1_bytes and pg_c1b["recorded"] == f"paper_verdict:{BQ}/{C1P}@{C1S}=fail"
+          and pg_c1b["would_record"] == [] and pg_c1b["line"].endswith(" (recorded)"), f"{_c1_after} | {pg_c1b['line']}")
+    config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = CHQ, START
+
     # the history line's `applied` stamp (weekly.yml's idempotency reads it): a dry run never stamps the day
     if os.path.exists(config.IMPROVE_HISTORY_PATH):
         os.remove(config.IMPROVE_HISTORY_PATH)
@@ -5378,6 +5417,7 @@ check("DESIGN.md's paper-gate row carries the pre-registered numbers, the VOID l
       all(w in _design_q for w in ("Paper gate for a band-under-test", "PAPER_GATE_WINDOW_START", "PAPER_GATE_MIN_FILLS = 20",
                                    "PAPER_GATE_MAX_REFUSED_SHARE = 0.05", "sidecar_true", "flow_dark_share", "0.50",
                                    "a number, not a bound (floor 12)", "paper_verdict:", "not a promotion",
+                                   "apply path only", "(not recorded: dry)",
                                    "double-conservative on purpose", "gas is not in the quote")),
       str([w for w in ("Paper gate for a band-under-test", "a number, not a bound (floor 12)", "not a promotion",
                        "double-conservative on purpose") if w not in _design_q]))
@@ -5387,10 +5427,11 @@ check("DESIGN.md's weekly-jobs row is weekly.yml's (10:00 UTC, the idempotency r
                                    "sunday_insurance", "RESEARCH_SEND_SUMMARY=1", "gh workflow disable robinhood-weekly"))
       and "Sunday 11:00 `selfimprove/run_improve.sh`" not in _design_q)
 _claude_q, _readme_q = _read(os.path.join(ROOT, "CLAUDE.md")), _read(os.path.join(ROOT, "README.md"))
-check("CLAUDE.md lists --band-scorecard and the weekly workflow (including the `-f dry=true` rehearsal), and no longer tells anyone to "
-      "run the deleted run_improve.sh",
+check("CLAUDE.md lists --band-scorecard and the weekly workflow (including the `-f dry=true` rehearsal), says the paper gate's "
+      "one-shot lines are written on the apply path only, and no longer tells anyone to run the deleted run_improve.sh",
       "--band-scorecard" in _claude_q and "gh workflow run robinhood-weekly -f dry=true" in _claude_q
-      and "robinhood-weekly" in _claude_q and "bash selfimprove/run_improve.sh" not in _claude_q)
+      and "robinhood-weekly" in _claude_q and "bash selfimprove/run_improve.sh" not in _claude_q
+      and "apply path only" in _claude_q and "not recorded: dry" in _claude_q)
 check("README's file table names selfimprove/dsr.py and weekly.yml, and its dependency line says numpy on BOTH sides (scipy is gone "
       "from every path but verify's mac_only cross-checks) while keeping the measured 13.7×/day",
       "`dsr.py`" in _readme_q and "weekly.yml" in _readme_q and "13.7×/day" in _readme_q

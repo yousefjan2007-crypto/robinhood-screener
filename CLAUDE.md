@@ -31,7 +31,7 @@ python3 paper_exec.py                               # paper A book (--live marks
 python3 dashboard.py --write                        # render docs/index.html (no flag = smoke test only)
 python3 selfimprove/livebook.py --scorecard         # per-policy live P&L from the pulled snapshot (--tick runs inside the keeper ONLY)
 python3 selfimprove/improve.py [--apply --send]     # exit gate; --selftest = offline only
-python3 selfimprove/improve.py --band-scorecard     # the PAPER GATE alone (the ONE judge; returns before the Sunday gate)
+python3 selfimprove/improve.py --band-scorecard     # the PAPER GATE alone (the ONE judge; read-only: writes nothing)
 python3 selfimprove/entry_lab/improve_bands.py [--apply --send]   # entry gate; --selftest
 python3 selfimprove/entry_lab/scorecard.py --markdown
 python3 selfimprove/weekly_summary.py --dry|--send  # the ONE weekly message
@@ -245,7 +245,11 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
 - **The paper gate (`improve.py --band-scorecard`) judges the paper test ONCE and promotes
   nothing.** `PAPER_GATE_WINDOW_START` is the operator's "start the window" commit; changing the
   band, the policy or the start is a NEW counted window (a visible `paper:` trial), and a third on
-  one pair inside `BAND_RENOMINATE_COOLDOWN_DAYS` is refused. A 7-day verdict on fewer than
+  one pair inside `BAND_RENOMINATE_COOLDOWN_DAYS` is refused. Its `paper:` / `paper_verdict:` lines
+  are written by the **apply path only** (weekly.yml's Gates step, whose `trials.json` the Publish
+  step stages); `--band-scorecard` on the Mac, a dry `improve.py` and `--summary-json` print the
+  would-be line "(not recorded: dry)" and write nothing — `trials.json` is tracked, and a write left
+  on the Mac diverges the tree and splits a permanent one-shot record in two. A 7-day verdict on fewer than
   `MIN_BOOTSTRAP_CLUSTERS` alert-days says "a number, not a bound (floor 12)" in those words.
 - **MIZUKARA remains only as the V2-mechanics smoke fixture** (a renounced owner, a burned V2
   pair, router legs) in the sources' `__main__` blocks; it is not a reference for what to find.

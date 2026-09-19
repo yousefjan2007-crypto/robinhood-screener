@@ -294,7 +294,7 @@ python3 paper_exec.py                               # the paper A book (add --li
 python3 selfimprove/livebook.py --tick              # one live-book cycle (the keeper runs this; never on the Mac after the cutover)
 python3 selfimprove/livebook.py --scorecard         # per-policy live P&L
 python3 selfimprove/improve.py                      # exit gate, dry (the Sunday workflow adds --apply --send)
-python3 selfimprove/improve.py --band-scorecard     # the paper gate alone: PASS / FAIL / VOID, or "none registered"
+python3 selfimprove/improve.py --band-scorecard     # the paper gate alone, read-only: PASS / FAIL / VOID, or "none registered"
 python3 selfimprove/entry_lab/improve_bands.py      # entry-band gate, dry
 python3 selfimprove/weekly_summary.py --dry         # the one weekly message, printed
 python3 selfimprove/candidates/register.py --scan   # validate + register new candidate modules

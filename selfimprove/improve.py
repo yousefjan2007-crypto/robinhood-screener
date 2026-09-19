@@ -65,13 +65,14 @@ its own machinery: the per-policy table is suppressed and no number from the run
     python3 selfimprove/improve.py                 # dry: evaluate, decide, proposal + history
     python3 selfimprove/improve.py --apply --send  # the Sunday job: write champion.json, alert
     python3 selfimprove/improve.py --summary-json  # data/livebook_summary.json only (no gate)
-    python3 selfimprove/improve.py --band-scorecard  # the PAPER GATE alone (see paper_gate); no gate
+    python3 selfimprove/improve.py --band-scorecard  # the PAPER GATE alone (see paper_gate); writes nothing
     python3 selfimprove/improve.py --quiet         # same as dry, no stdout
 
 THE PAPER GATE (paper_gate, 2026-09-17) is the ONE judge of the paper test — a pre-registered
 window of config.PAPER_GATE_WINDOW_DAYS over one named (band, policy) pair, judged once as
 PASS / FAIL / VOID with the statistics above and nothing new. It is not a promotion: it writes
-only the `paper:` / `paper_verdict:` lines of trials.json.
+only the `paper:` / `paper_verdict:` lines of trials.json, and only on the --apply path — every
+read-only caller computes the same verdict and prints it "(not recorded: dry)".
 
 No wall-clock in any compute path: main() reads time.time() ONCE and threads now_s through.
 Not financial advice.
@@ -387,9 +388,10 @@ def _exit_arm() -> dict:
 
 
 def evaluate_all(now_s: float, book: dict | None = None,
-                 stratum: str | None = None) -> dict:
+                 stratum: str | None = None, record_paper: bool = False) -> dict:
     """Score the family on the live book. Pure except for the trial bump (scoring IS a trial —
-    the count only grows and is idempotent for the same names)."""
+    the count only grows and is idempotent for the same names). `record_paper` is the paper
+    gate's apply-path flag and is False everywhere but `improve.py --apply` (see paper_gate)."""
     stratum = (stratum or config.IMPROVE_SCORE_STRATUM or "pooled")
     if book is None:
         book = LB._load(LB.BOOK_PATH, {})
@@ -428,10 +430,11 @@ def evaluate_all(now_s: float, book: dict | None = None,
         res["book"] = LB.live_stats_dict(now_s)
     except Exception as exc:
         res["book"] = {"error": str(exc)[:120]}
-    # the paper gate rides every evaluation (its one-shot bookkeeping is idempotent; "none
-    # registered" until the operator's window commit) and never touches the verdict below
+    # the paper gate rides every evaluation ("none registered" until the operator's window
+    # commit) and never touches the verdict below. Only the apply path mints its one-shot
+    # trials.json lines — every other evaluation computes and prints them, and writes nothing.
     try:
-        res["paper_gate"] = paper_gate(now_s, book=book, counts=counts)
+        res["paper_gate"] = paper_gate(now_s, book=book, counts=counts, record=record_paper)
     except Exception as exc:
         print(f"  [improve] paper gate failed: {type(exc).__name__}: {exc}")
         res["paper_gate"] = {"status": "error", "line": f"unavailable ({type(exc).__name__}: {str(exc)[:60]})"}
@@ -600,7 +603,8 @@ def _iso(ts: float) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(float(ts)))
 
 
-def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = None) -> dict:
+def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = None,
+               record: bool = False) -> dict:
     """The ONE judge of the paper test. Pre-registered by three config constants — the band
     (LIVEBOOK_BAND_UNDER_TEST), the policy (PAPER_GATE_POLICY, None ⇒ the exit champion's plan)
     and the window start (PAPER_GATE_WINDOW_START) — and computed with the machinery above and
@@ -634,6 +638,19 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
     BAND_RENOMINATE_COOLDOWN_DAYS is refused. A verdict promotes nothing — champion.json,
     registry.json and the Sunday gates never read it.
 
+    `record` is what makes that bookkeeping ONE-SHOT ACROSS CHECKOUTS, and only the APPLY path
+    passes it: weekly.yml's Gates step runs `improve.py --apply --send` on the runner, whose
+    Publish step is the only thing that stages the TRACKED selfimprove/trials.json. Every other
+    caller — `--band-scorecard` on the Mac, a dry improve.py, `--summary-json`, weekly_summary —
+    computes the identical verdict, prints the would-be lines in `would_record` marked
+    "(not recorded: dry)", and writes NOTHING. Two reasons: a tracked file written and left
+    uncommitted on the Mac makes the tree diverge (run_research.sh's step-0 ff-merge then
+    refuses and the Mac stays silently stale), and the verdict is permanent — whoever evaluated
+    first would mint it, so a Mac run on an older pulled snapshot could record `=fail` while the
+    runner records `=pass` from the fresh committed book, with no way to tell which is
+    authoritative. The one-shot and cap logic still READ trials.load()["nominations_ever"]
+    exactly as before, so a recorded line prints "(recorded)" on every later run either way.
+
     `book` defaults to the file at livebook.BOOK_PATH; the flow-dark share is read through
     livebook.live_stats_dict (the one implementation), which reads that file.
     """
@@ -650,7 +667,8 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
            "benchmark": None, "band_controls": {}, "complement": None, "gapped_share": None,
            "refused_share": None, "n_refused": 0, "has_flow": False, "n_armed": None,
            "flow_dark_share": None, "checks": [], "void": [], "reasons": [],
-           "nomination_key": None, "recorded": None, "bound_label": ""}
+           "nomination_key": None, "recorded": None, "bound_label": "",
+           "record": bool(record), "recorded_now": [], "would_record": []}
     if band is None or start is None:
         why = ("no band under test (config.LIVEBOOK_BAND_UNDER_TEST)" if band is None
                else "no window start (config.PAPER_GATE_WINDOW_START)")
@@ -683,7 +701,11 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
         out.update({"status": "refused", "line": f"refused: {why}", "reasons": [why]})
         return out
     if not known:
-        TR.bump("nominations", [key])
+        if record:
+            TR.bump("nominations", [key])
+            out["recorded_now"].append(key)
+        else:
+            out["would_record"].append(key)      # the apply path mints it; this caller writes nothing
     vprefix = f"paper_verdict:{band}/{policy}@{start_str}="
     recorded = next((x for x in tr["nominations_ever"] if x.startswith(vprefix)), None)
     out["recorded"] = recorded
@@ -833,8 +855,14 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
             status, suffix = recorded.rsplit("=", 1)[1].upper(), " (recorded)"
         else:
             status = "VOID" if void else ("PASS" if all(ok for _, ok, _ in checks) else "FAIL")
-            TR.bump("nominations", [f"{vprefix}{status.lower()}"])
-            suffix = ""
+            vline = f"{vprefix}{status.lower()}"
+            if record:
+                TR.bump("nominations", [vline])
+                out["recorded_now"].append(vline)
+                suffix = ""
+            else:
+                out["would_record"].append(vline)
+                suffix = " (not recorded: dry)"
         if status == "VOID":
             # no number from a void window may be quoted: the apparatus facts stay, the table goes
             out.update({"table": None, "policy_row": None, "controls_net_lb": {}, "benchmark": None,
@@ -903,6 +931,10 @@ def _print_paper_gate(pg: dict) -> None:
         print(f"  VOID: {v}")
     if pg["recorded"]:
         print(f"  recorded: {pg['recorded']}")
+    for x in pg.get("recorded_now") or []:
+        print(f"  recorded now: {x}")
+    for x in pg.get("would_record") or []:
+        print(f"  would record: {x}   (not recorded: dry — only the Sunday --apply run writes trials.json)")
     print("  a verdict promotes nothing: champion.json, registry.json and the Sunday gates are untouched by it")
 
 
@@ -1468,7 +1500,8 @@ def main(argv=None) -> int:
     send = "--send" in argv
     if "--band-scorecard" in argv:
         # the paper gate alone, and return BEFORE the Sunday gate: no proposal, no history
-        # line, no champion read-modify-write (its own bookkeeping is the trials.json lines)
+        # line, no champion read-modify-write — and, this being a read-only caller, no
+        # trials.json write either (record=False: it prints the would-be lines instead)
         try:
             pg = paper_gate(now_s)
         except Exception as exc:
@@ -1477,8 +1510,10 @@ def main(argv=None) -> int:
         if not quiet:
             _print_paper_gate(pg)
         return 0
+    # the paper gate's one-shot lines are minted on the APPLY path alone — the runner's Sunday
+    # Gates step, whose trials.json the Publish step stages. --summary-json never applies.
     try:
-        res = evaluate_all(now_s)
+        res = evaluate_all(now_s, record_paper=do_apply and "--summary-json" not in argv)
     except Exception as exc:
         print(f"  [improve] evaluate_all failed: {type(exc).__name__}: {exc}")
         return 0
