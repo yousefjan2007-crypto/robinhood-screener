@@ -4853,6 +4853,20 @@ check("DESIGN.md's discovery/budget constants are REGENERATED from config.py, no
       not _stale_pins and all(k in _design for k in ("gt_new_pools:(300, 900)", "gmgn_new_creation:(600, 1800)",
                                                      "gmgn_near_completion:(300, 900, 1800)", "gmgn_completed:(300, 900)")),
       str(_stale_pins))
+# The champion decision is the one switch that turns a written candidate into an alerted one, so
+# the row that describes it is pinned to the names it cites and to BOTH branches: the four
+# unregistered modules, the composition rule that makes A impossible to loosen, the demotion
+# target, the fact that a manual --set never flips registry status, and what happens when the
+# switch is NOT thrown (verdicts + B rows + the band-under-test rule + "NO CHANGE").
+_champ_row = [w for w in ("What the champion decision changes", "band_hype_early", "band_hype_attention",
+                          "tp15_half_armtrail30_stop50_6h", "tp15_half_flowtrail_stop50_6h",
+                          "`gates_ok and verdict is True`", "DEFAULT_ENTRY_BAND", "registry.json",
+                          "band_fire", "LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN", "APPARATUS FAULT",
+                          '**"NO CHANGE" for months is the expected outcome**') if w not in _design]
+check("DESIGN.md carries the champion-decision row — both branches of `champion.py --set`, the four written-but-unregistered "
+      "modules by name, tier_for's composition, the demotion target, the registry-status rule and the unset branch ending in "
+      "'NO CHANGE for months'",
+      not _champ_row, str(_champ_row))
 check("CLAUDE.md's live-book paragraph is the keeper's (KEEPER_BOOK, LIVEBOOK_FEED_SOURCE, the four committed files, the ticks log as "
       "artifact, the band under test) and the gotchas say never to tick on the Mac after the cutover",
       all(w in _claude_md for w in ("KEEPER_BOOK", "LIVEBOOK_FEED_SOURCE", "livebook_ticks.jsonl", "LIVEBOOK_BAND_UNDER_TEST"))
