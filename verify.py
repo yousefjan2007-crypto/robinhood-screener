@@ -5283,6 +5283,58 @@ try:
           pgr["n_refused"] == 3 and pgr["n_admitted"] == 35 and abs(pgr["refused_share"] - 3 / 38) < 1e-12
           and pgr["status"] == "VOID" and "CAPACITY" in pgr["line"], f"{pgr['n_refused']} {pgr['n_admitted']} {pgr['line']}")
 
+    # ── unknown is NOT zero. The numerator used to swallow every error and return n_refused 0, and
+    # `refused_share is None or refused_share <= MAX` passes on 0 — so a missing or corrupt sidecar
+    # turned the capacity VOID off in the direction that makes PASS easier, on a permanent verdict.
+    # (record=False throughout: these sub-cases re-judge the same pair, so nothing may be minted.)
+    _lb_src = _read(os.path.join(ROOT, "selfimprove", "livebook.py"))
+    check("the paper gate's refusal reasons ARE livebook's own spellings: every string in improve.PAPER_REFUSAL_REASONS appears "
+          "LITERALLY in selfimprove/livebook.py — a rename there now breaks this check instead of silently zeroing the numerator",
+          len(IM.PAPER_REFUSAL_REASONS) == 2 and all(f'"{r_}"' in _lb_src for r_ in IM.PAPER_REFUSAL_REASONS),
+          str([r_ for r_ in IM.PAPER_REFUSAL_REASONS if f'"{r_}"' not in _lb_src]))
+    config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = "sell_30m", "2027-07-20T00:00:00Z"
+    _q_u = IM._parse_window_start(config.PAPER_GATE_WINDOW_START)
+    _u_closed = _q_u + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0
+    book_u = IM._synthetic_book(W, 5, _q_u, seed=42, adv={"sell_30m": 0.60}, stamp=[BQ])
+    _u_miss = [{"ts": _q_u + 3600.0 * i_, "token": "0x%040x" % (9100 + i_), "event_seq": 9100 + i_, "symbol": "R",
+                "tier": "B", "alert_ts": _q_u + 3600.0 * i_ - 200, "entry_lag_s": 200.0,
+                "reason": "band_under_test_full"} for i_ in (1, 2)]
+
+    def _write_missed(rows):
+        with open(LB.MISSED_PATH, "w") as fh:
+            for r_ in rows:
+                fh.write(json.dumps(r_) + "\n")
+
+    pg_u0, _ = _pg(book_u, _u_closed, record=False)          # no missed log at all: a refusal count of 0 is a FACT
+    _write_missed(_u_miss)                                   # two in-window refusals and NO sidecar to attribute them
+    pg_u1, _ = _pg(book_u, _u_closed, record=False)
+    os.mkdir(config.BAND_VERDICTS_PATH)                      # ... and the same with a sidecar that raises on open
+    pg_u2, _ = _pg(book_u, _u_closed, record=False)
+    os.rmdir(config.BAND_VERDICTS_PATH)
+    os.remove(LB.MISSED_PATH); os.mkdir(LB.MISSED_PATH)      # an unreadable missed log: the numerator is uncountable
+    pg_u3, _ = _pg(book_u, _u_closed, record=False)
+    os.rmdir(LB.MISSED_PATH)
+    _write_missed(_u_miss)
+    with open(config.BAND_VERDICTS_PATH, "w", newline="") as fh:
+        w_ = csv.writer(fh); w_.writerow(["event_seq", "token", "alert_ts", "band", "verdict"])
+        for seq_ in (9101, 9102):
+            w_.writerow([seq_, "0x%040x" % seq_, _q_u + 3600, BQ, "0"])      # the band did not select either refusal
+    pg_u4, _ = _pg(book_u, _u_closed, record=False)
+    os.remove(LB.MISSED_PATH); os.remove(config.BAND_VERDICTS_PATH)
+    check("unknown is not zero: in-window refusals the sidecar cannot attribute — because it is missing, or because it raises on "
+          "open — VOID the window as CAPACITY UNKNOWN with refused_share None, instead of passing the gate on a share of 0",
+          pg_u1["status"] == pg_u2["status"] == "VOID" and "CAPACITY UNKNOWN" in pg_u1["line"] and "CAPACITY UNKNOWN" in pg_u2["line"]
+          and pg_u1["refused_share"] is None and pg_u2["refused_share"] is None
+          and len(pg_u1["refusals_unknown"]) == len(pg_u2["refusals_unknown"]) == 1
+          and not any(ok_ for lbl_, ok_, _d in pg_u1["checks"] if "refused share" in lbl_),
+          f"{pg_u1['line']} | {pg_u2['line']}")
+    check("an unreadable data/livebook_missed.jsonl is unknown too (the numerator itself cannot be counted), while a MISSING one is "
+          "the fact that no refusal was ever logged and a sidecar answering verdict 0 for every refusal is a measured zero",
+          pg_u3["status"] == "VOID" and "CAPACITY UNKNOWN" in pg_u3["line"]
+          and pg_u0["status"] in ("PASS", "FAIL") and pg_u0["refusals_unknown"] == [] and pg_u0["n_refused"] == 0
+          and pg_u4["status"] in ("PASS", "FAIL") and pg_u4["refusals_unknown"] == [] and pg_u4["refused_share"] == 0.0,
+          f"{pg_u3['line']} | {pg_u0['line']} | {pg_u4['line']}")
+
     # the adaptive policy: the price-only twin is the paired benchmark; the flow-dark share VOIDs above 0.50
     from selfimprove.candidates import tp15_half_flowtrail_stop50_6h as _FLOWC, tp15_half_armtrail30_stop50_6h as _ARMC
     POL.POLICIES["zz_flow_probe"] = json.loads(json.dumps(_FLOWC.POLICY))
@@ -5417,7 +5469,7 @@ check("DESIGN.md's paper-gate row carries the pre-registered numbers, the VOID l
       all(w in _design_q for w in ("Paper gate for a band-under-test", "PAPER_GATE_WINDOW_START", "PAPER_GATE_MIN_FILLS = 20",
                                    "PAPER_GATE_MAX_REFUSED_SHARE = 0.05", "sidecar_true", "flow_dark_share", "0.50",
                                    "a number, not a bound (floor 12)", "paper_verdict:", "not a promotion",
-                                   "apply path only", "(not recorded: dry)",
+                                   "apply path only", "(not recorded: dry)", "CAPACITY UNKNOWN",
                                    "double-conservative on purpose", "gas is not in the quote")),
       str([w for w in ("Paper gate for a band-under-test", "a number, not a bound (floor 12)", "not a promotion",
                        "double-conservative on purpose") if w not in _design_q]))

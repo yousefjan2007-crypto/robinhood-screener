@@ -555,8 +555,23 @@ def _paper_refusals(start: float, end: float, band: str) -> dict:
     """The refusals the book logged inside the window for rows the band selected: lines of
     data/livebook_missed.jsonl with a PAPER_REFUSAL_REASONS reason (the sub-cap, or the entry
     lag), whose event_seq has a sidecar verdict 1 for `band` (data/band_verdicts.csv, read ONCE)
-    and whose ts is inside [start, end). Unreadable files count 0, printed."""
-    selected: set = set()
+    and whose ts is inside [start, end).
+
+    UNKNOWN IS NOT ZERO. This is the capacity VOID's numerator, and the first version swallowed
+    every error and returned 0 — which `refused_share is None or refused_share <= MAX` passes,
+    so a missing or corrupt sidecar silently turned the check off in the direction that makes
+    PASS easier, on a verdict that is permanent. Every positive finding of unreadability is now
+    reported in `unknown` and VOIDs the window instead:
+      - the missed log EXISTS but cannot be read, or carries unparseable lines — the numerator
+        itself cannot be counted;
+      - the sidecar is missing or raises AND there is at least one in-window refusal line to
+        attribute (a refusal with no ts or no event_seq counts the same way).
+    A MISSING missed log is not unknown: the file is only written when a refusal happens, so
+    "no file" is the fact that none was ever logged, and 0 is then a measured zero — as it is
+    when the sidecar answers verdict 0 for every refusal it was asked about."""
+    unknown: list = []
+    selected: set | None = set()
+    side_why = ""
     n_side = 0
     try:
         with open(config.BAND_VERDICTS_PATH, newline="") as fh:
@@ -569,10 +584,11 @@ def _paper_refusals(start: float, end: float, band: str) -> dict:
                 except (TypeError, ValueError):
                     continue
     except FileNotFoundError:
-        pass
+        selected, side_why = None, f"the band verdict sidecar is missing ({config.BAND_VERDICTS_PATH})"
     except Exception as exc:
-        print(f"  [paper gate] sidecar unreadable ({exc}); refusals counted as 0")
-    n_ref = n_lines = 0
+        selected, side_why = None, f"the band verdict sidecar is unreadable ({exc})"
+        print(f"  [paper gate] sidecar unreadable ({exc}); the refusal share is UNKNOWN, not 0")
+    n_ref = n_lines = n_unattributed = n_bad = 0
     if os.path.exists(LB.MISSED_PATH):
         try:
             with open(LB.MISSED_PATH) as fh:
@@ -583,6 +599,7 @@ def _paper_refusals(start: float, end: float, band: str) -> dict:
                     try:
                         m = json.loads(ln)
                     except Exception:
+                        n_bad += 1                  # its reason cannot be read: it may be a refusal
                         continue
                     reason = str(m.get("reason") or "")
                     if not any(reason.startswith(x) for x in PAPER_REFUSAL_REASONS):
@@ -591,12 +608,25 @@ def _paper_refusals(start: float, end: float, band: str) -> dict:
                     try:
                         seq = int(float(m.get("event_seq")))
                     except (TypeError, ValueError):
+                        seq = None
+                    if ts is None or seq is None:
+                        n_unattributed += 1         # a refusal we cannot place in time or match
+                    elif not start <= ts < end:
                         continue
-                    if ts is not None and start <= ts < end and seq in selected:
+                    elif selected is None:
+                        n_unattributed += 1         # in the window, and no sidecar to attribute it
+                    elif seq in selected:
                         n_ref += 1
         except Exception as exc:
-            print(f"  [paper gate] missed log unreadable ({exc}); refusals counted as 0")
-    return {"n_refused": n_ref, "n_lines": n_lines, "n_sidecar_rows": n_side}
+            unknown.append(f"data/livebook_missed.jsonl is unreadable ({exc})")
+            print(f"  [paper gate] missed log unreadable ({exc}); the refusal share is UNKNOWN, not 0")
+    if n_bad:
+        unknown.append(f"{n_bad} unparseable line(s) in data/livebook_missed.jsonl")
+    if n_unattributed:
+        unknown.append(f"{n_unattributed} in-window refusal(s) cannot be attributed to {band}"
+                       + (f" — {side_why}" if selected is None else ""))
+    return {"n_refused": n_ref, "n_lines": n_lines, "n_sidecar_rows": n_side,
+            "n_unattributed": n_unattributed, "unknown": unknown}
 
 
 def _iso(ts: float) -> str:
@@ -620,7 +650,8 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
            ∧ no inert control ∧ gapped share <= BAND_MAX_GAPPED_SHARE ∧ refused share <=
            PAPER_GATE_MAX_REFUSED_SHARE (∧ flow-dark share <= 0.50 for a policy with a flow leg);
       VOID (no number quoted) when a control's net_lb > 0, a control is inert, either share is
-           exceeded, or the flow leg was dark on more than half of its armed ticks (the tick-level
+           exceeded, the refusal share cannot be MEASURED at all (unknown is not zero — see
+           _paper_refusals), or the flow leg was dark on more than half of its armed ticks (the tick-level
            share over armed positions from livebook.live_stats_dict — a close-level count cannot
            see a rule that never ran when it mattered);
       FAIL otherwise.
@@ -665,7 +696,8 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
            "line": "none registered", "n": 0, "n_days": 0, "n_open_eligible": 0, "n_admitted": 0,
            "days_elapsed": None, "table": None, "policy_row": None, "controls_net_lb": {},
            "benchmark": None, "band_controls": {}, "complement": None, "gapped_share": None,
-           "refused_share": None, "n_refused": 0, "has_flow": False, "n_armed": None,
+           "refused_share": None, "n_refused": 0, "refusals_unknown": [],
+           "has_flow": False, "n_armed": None,
            "flow_dark_share": None, "checks": [], "void": [], "reasons": [],
            "nomination_key": None, "recorded": None, "bound_label": "",
            "record": bool(record), "recorded_now": [], "would_record": []}
@@ -748,7 +780,9 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
     gapped_share = (n_gapped / idx.size) if idx.size else None
     ref = _paper_refusals(start, end, band)
     n_ref = ref["n_refused"]
-    refused_share = (n_ref / (n_ref + n_admitted)) if (n_ref + n_admitted) else None
+    # unknown is not zero: a share that cannot be measured is None (and VOIDs below), never 0
+    refused_share = (None if ref["unknown"]
+                     else (n_ref / (n_ref + n_admitted)) if (n_ref + n_admitted) else None)
     has_flow = isinstance((POL.POLICIES.get(policy) or {}).get("flow"), dict)
     n_armed = flow_dark = None
     if has_flow:
@@ -794,6 +828,7 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
                 "days_elapsed": days_elapsed, "table": tbl, "policy_row": prow,
                 "controls_net_lb": {c: r["net_lb"] for c, r in tbl["controls"].items()},
                 "gapped_share": gapped_share, "refused_share": refused_share, "n_refused": n_ref,
+                "refusals_unknown": list(ref["unknown"]),
                 "has_flow": has_flow, "n_armed": n_armed, "flow_dark_share": flow_dark,
                 "bound_label": label})
     void = []
@@ -807,6 +842,9 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
     if gapped_share is not None and gapped_share > config.BAND_MAX_GAPPED_SHARE:
         void.append(f"SAMPLING GAP: gapped share {gapped_share:.3f} > BAND_MAX_GAPPED_SHARE "
                     f"{config.BAND_MAX_GAPPED_SHARE}")
+    if ref["unknown"]:
+        void.append("CAPACITY UNKNOWN: " + "; ".join(ref["unknown"])
+                    + " — a refusal share that cannot be measured is not a share of zero")
     if refused_share is not None and refused_share > config.PAPER_GATE_MAX_REFUSED_SHARE:
         void.append(f"CAPACITY: refused share {refused_share:.3f} > PAPER_GATE_MAX_REFUSED_SHARE "
                     f"{config.PAPER_GATE_MAX_REFUSED_SHARE} ({n_ref} refused / {n_admitted} admitted)")
@@ -829,8 +867,10 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
         (f"gapped share <= BAND_MAX_GAPPED_SHARE {config.BAND_MAX_GAPPED_SHARE}",
          gapped_share is None or gapped_share <= config.BAND_MAX_GAPPED_SHARE, _fmt(gapped_share, ".3f")),
         (f"refused share <= PAPER_GATE_MAX_REFUSED_SHARE {config.PAPER_GATE_MAX_REFUSED_SHARE}",
-         refused_share is None or refused_share <= config.PAPER_GATE_MAX_REFUSED_SHARE,
-         f"{_fmt(refused_share, '.3f')} ({n_ref} refused / {n_admitted} admitted)"),
+         not ref["unknown"] and (refused_share is None
+                                 or refused_share <= config.PAPER_GATE_MAX_REFUSED_SHARE),
+         f"{_fmt(refused_share, '.3f')} ({n_ref} refused / {n_admitted} admitted)"
+         + ("; UNKNOWN: " + "; ".join(ref["unknown"]) if ref["unknown"] else "")),
     ]
     if has_flow:
         checks.append((f"flow-dark share over armed positions <= {PAPER_FLOW_DARK_MAX:.2f}",
