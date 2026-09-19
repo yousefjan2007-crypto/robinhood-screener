@@ -624,8 +624,8 @@ def _paper_refusals(start: float, end: float, band: str) -> dict:
     if n_bad:
         unknown.append(f"{n_bad} unparseable line(s) in data/livebook_missed.jsonl")
     if n_unattributed:
-        unknown.append(f"{n_unattributed} in-window refusal(s) cannot be attributed to {band}"
-                       + (f" — {side_why}" if selected is None else ""))
+        unknown.append(f"{n_unattributed} refusal line(s) in data/livebook_missed.jsonl could not be "
+                       f"attributed to {band}" + (f" — {side_why}" if selected is None else ""))
     return {"n_refused": n_ref, "n_lines": n_lines, "n_sidecar_rows": n_side,
             "n_unattributed": n_unattributed, "unknown": unknown}
 
