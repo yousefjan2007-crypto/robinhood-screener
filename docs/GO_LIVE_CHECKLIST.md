@@ -106,12 +106,17 @@ promotion**: neither `champion.json` nor `registry.json` nor either Sunday gate 
 python3 -c "import json; print([t for t in json.load(open('selfimprove/trials.json')).get('nominations_ever',[]) if t.startswith('paper')])"
 ```
 
-**Pass:** at least **two consecutive 7-day windows** have closed with a PASS. Each window is a new
-`paper:` trial, deflates every later Sharpe gate in its family, and a third window on one
-(band, policy) pair inside `BAND_RENOMINATE_COOLDOWN_DAYS` = 90 is refused — so this is a small,
-expensive number of attempts, not a search. Two is a recommendation, not a threshold the code
-enforces: one 7-day window carries at most 7 alert-days, and this repo's own floor for calling a
-bound a bound is **12**. Two windows is the cheapest way to clear that floor while keeping each
+**Pass:** at least **two consecutive 7-day windows** have closed with a PASS. Each window mints one
+permanent line — `paper:<band>/<policy>@<start>` — in `trials.json`'s **`nominations_ever`**
+(`improve.paper_gate` → `trials.bump("nominations", …)`, on the `--apply` path only). That line
+deflates **no** Sharpe gate: the exit DSR counts `policies_ever_scored`, the entry DSR counts
+`bands_ever_scored`, and the paper gate's own DSR counts `policies_ever_scored` too. What deflates
+a later gate is **registration** (`register.py --scan`), not opening a window. What a window does
+cost is the one-shot: a **third** window on one (band, policy) pair is refused unless its start is
+at least `PAPER_GATE_WINDOW_DAYS + BAND_RENOMINATE_COOLDOWN_DAYS` = 7 + 90 = **97 days** after the
+latest prior window's start — so this is a small, expensive number of attempts, not a search. Two
+is a recommendation, not a threshold the code enforces: one 7-day window carries at most 7
+alert-days, and this repo's own floor for calling a bound a bound is **12**. Two windows is the cheapest way to clear that floor while keeping each
 verdict one-shot.
 
 ### 9. The honest prior has not changed
@@ -135,10 +140,22 @@ python3 selfimprove/champion.py --set entry_band=<band> --reason "<why, in one s
 **Pass:** `selfimprove/champion.json` on `origin/main` names the band, and the next scan's
 `latest_scan.json.champion.entry_band` agrees. `--set exit=<policy>` is the same move on the other
 arm and refuses anything that is not an executable registered policy. What this does and does not
-change is written out in `docs/DESIGN.md` ("What the champion decision changes"): in particular a
-manual set never flips `candidates/registry.json`, and the following Sunday's one-shot demotion
-test reverts to `DEFAULT_ENTRY_BAND` on a non-positive forward lift, with no positive proof
-required.
+change is written out in `docs/DESIGN.md` ("What the champion decision changes"). Two things it
+does **not** do. It never flips `candidates/registry.json` — that status moves only on a gate
+promotion. And it does not arm the Sunday demotion test: `champion.py` writes
+`promoted_at_event_seq: null` on every manual set, and the entry gate builds its one-shot demotion
+block only when that field is non-null, which only a gate promotion ever writes. **There is no
+automatic revert behind this command.** A hand-set band stands until you revert it by hand with
+the same command (`--set entry_band=band_a_strict`), so treat item 9's honest prior as the only
+thing standing between a manual set and a band that alerts for months on one window's evidence.
+The band the gate would revert *to* is still `DEFAULT_ENTRY_BAND`, on a non-positive forward lift
+and with no positive proof required — but only after a **gate** promotion.
+
+Before this command the band must already be registered —
+`python3 selfimprove/candidates/register.py --scan`, itself a permanent counted trial that
+deflates every later DSR in its family. `--set entry_band=` validates no name at all, so an
+unregistered band leaves `champion.json` naming it while every scan silently falls back to
+`DEFAULT_ENTRY_BAND` — one printed line, no alert. The exit arm is the strict one: rc 2.
 
 ### 11. Real money is a different plan and a different program
 

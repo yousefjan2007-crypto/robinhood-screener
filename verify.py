@@ -5,13 +5,15 @@ THE invariant suite for robinhood_screener — this project's tests. Run after a
     GITHUB_ACTIONS=true python3 verify.py  # the cloud partition (mac_only sections print SKIP)
 
 Every section is OFFLINE: injected fakes, temp dirs, monkeypatched module functions. Nothing
-here sends (every send_all is dry_run=True), commits, pushes or touches the network. Sections
-that need the Mac (statsmodels for the Benjamini-Yekutieli comparison, the cross-pin of the
-vendored Deflated Sharpe against the sibling repo's copy, launchctl, a git identity for publish's
-temp bare origin) are tagged mac_only and print SKIP under config.IS_CI or when the dependency is
-absent. The Deflated Sharpe itself (selfimprove/dsr.py: numpy + statistics.NormalDist) runs on
-BOTH partitions — the Sunday gates run on the Actions runner, which has no sibling repo and no
-scipy.
+here sends (every send_all is dry_run=True), commits, pushes or touches the network. EXACTLY
+three sections need the Mac (statsmodels for the Benjamini-Yekutieli comparison, the cross-pin of
+the vendored Deflated Sharpe against the sibling repo's copy, a git identity for publish's temp
+bare origin): they are tagged mac_only and print SKIP under config.IS_CI or when the dependency
+is absent. The launchd checks are NOT among them — the plist walk, the retired-label set and the
+launchd/ contents check read committed files and call no launchctl, so they run on BOTH
+partitions and a launchd regression fails the cloud run too. The Deflated Sharpe itself
+(selfimprove/dsr.py: numpy + statistics.NormalDist) runs on BOTH partitions — the Sunday gates
+run on the Actions runner, which has no sibling repo and no scipy.
 
 Every check corresponds to a real mistake, cited in the check name where there is one:
   $Cubrate            a wallet farm that looked impossibly good at 20 min (age/rate gates)
@@ -4873,15 +4875,35 @@ check("DESIGN.md's discovery/budget constants are REGENERATED from config.py, no
 # unregistered modules, the composition rule that makes A impossible to loosen, the demotion
 # target, the fact that a manual --set never flips registry status, and what happens when the
 # switch is NOT thrown (verdicts + B rows + the band-under-test rule + "NO CHANGE").
+# Fix round 1 added the two halves the first draft got WRONG, and they are needled here so the
+# old wording cannot come back: it is TWO switches (register.py --scan mints the counted trial
+# first; champion.py:_cli refuses an unregistered policy rc 2 and run.py silently falls back for
+# an unregistered band), and a manual --set does NOT arm the demotion test — champion.py writes
+# promoted_at_event_seq: None and improve_bands only builds the block when it is non-None.
 _champ_row = [w for w in ("What the champion decision changes", "band_hype_early", "band_hype_attention",
                           "tp15_half_armtrail30_stop50_6h", "tp15_half_flowtrail_stop50_6h",
                           "`gates_ok and verdict is True`", "DEFAULT_ENTRY_BAND", "registry.json",
                           "band_fire", "LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN", "APPARATUS FAULT",
+                          "register.py --scan", "policies.load_candidates()",
+                          "it does not arm the Sunday demotion test", "promoted_at_event_seq: None",
+                          "judges **gate promotions only**",
                           '**"NO CHANGE" for months is the expected outcome**') if w not in _design]
 check("DESIGN.md carries the champion-decision row — both branches of `champion.py --set`, the four written-but-unregistered "
-      "modules by name, tier_for's composition, the demotion target, the registry-status rule and the unset branch ending in "
+      "modules by name, the TWO switches (register.py --scan first), tier_for's composition, the registry-status rule, the fact "
+      "that a manual set does NOT arm the demotion test (promoted_at_event_seq stays None) and the unset branch ending in "
       "'NO CHANGE for months'",
       not _champ_row, str(_champ_row))
+# The code behind those two sentences, asserted directly rather than trusted: a manual set writes
+# the seq key as None on BOTH arms, and each gate builds its demotion block only when its own seq
+# key is not None. If either ever changes, the doc sentence has to change with it.
+_ch_src, _ib_src, _im_src = (_read(os.path.join(ROOT, *p)) for p in
+                             (("selfimprove", "champion.py"), ("selfimprove", "entry_lab", "improve_bands.py"),
+                              ("selfimprove", "improve.py")))
+check("champion.py's manual --set writes the arm's promotion seq key as None, and BOTH gates build the one-shot demotion block "
+      "only when that key is not None — so only a gate promotion can arm a demotion (what DESIGN.md and the go-live checklist say)",
+      "seq_key: None" in _ch_src
+      and 'st.get("promoted_at_event_seq") is not None' in _ib_src
+      and 'arm.get("promoted_at_alert_seq") is not None' in _im_src)
 # The go-live checklist is the document a human reads with a terminal open, so every command in it
 # has to resolve TODAY: a workflow name that no longer exists, or a script that moved, turns an
 # item into a shrug. Eleven items exactly — the count is part of the contract (adding a twelfth is
@@ -4910,6 +4932,69 @@ check("CLAUDE.md's live-book paragraph is the keeper's (KEEPER_BOOK, LIVEBOOK_FE
       and "never run `livebook.py --tick` on the mac" in _claude_md.lower())
 check("README says the live book runs inside the keeper and keeps its measured numbers",
       "inside the keeper" in _readme and "13.7×/day" in _readme)
+# ── fix round 1 (2026-09-19): six doc claims that were not true of this tree. Each needle below
+# is the corrected sentence's load-bearing half, so the old wording cannot come back silently.
+# C7: a paper WINDOW is a `paper:` line in nominations_ever and deflates nothing — the exit DSR
+# counts policies_ever_scored, the entry DSR bands_ever_scored, and the paper gate's own DSR reads
+# policies_ever_scored (improve.paper_gate). Registration, not a window, is what deflates. The
+# third-window refusal is start >= last prior start + (PAPER_GATE_WINDOW_DAYS + cooldown), and
+# that arithmetic is REGENERATED from config here rather than remembered.
+_glc_cool = (f"= {int(config.PAPER_GATE_WINDOW_DAYS)} + {int(config.BAND_RENOMINATE_COOLDOWN_DAYS)} = "
+             f"**{int(config.PAPER_GATE_WINDOW_DAYS) + int(config.BAND_RENOMINATE_COOLDOWN_DAYS)} days**")
+check("C7: the checklist says a paper window mints a nominations_ever line that deflates NO Sharpe gate (registration does), and "
+      "its third-window arithmetic is regenerated from config; the code agrees — paper_gate bumps the 'nominations' family and "
+      "reads family_count('policies') for its own DSR",
+      "deflates **no** Sharpe gate" in _glc and _glc_cool in _glc
+      and 'TR.bump("nominations", [key])' in _im_src and 'TR.family_count("policies")' in _im_src
+      and TR.FAMILIES == {"policies": "policies_ever_scored", "bands": "bands_ever_scored",
+                          "nominations": "nominations_ever"}, _glc_cool)
+# C3 again, in the document the operator reads with a terminal open: no automatic revert stands
+# behind item 10's one write command.
+_glc_flat = " ".join(_glc.split())          # the needles are sentences; they may be line-wrapped
+check("C3: the checklist's item 10 says a manual set does NOT arm the demotion test and that there is no automatic revert — the "
+      "operator reverts by hand — and it names register.py --scan as the step before it",
+      "does not arm the Sunday demotion test" in _glc_flat
+      and "There is no automatic revert behind this command" in _glc_flat
+      and "revert it by hand with the same command" in _glc_flat
+      and "selfimprove/candidates/register.py --scan" in _glc_flat)
+# C5: screener.yml has NO schedule:, so the watchdog's */5 IS GitHub's cron. The docs claimed a
+# third layer under it ("the fallback of last resort"), which would have had a dead keeper and a
+# dead watchdog still scanning ~14x/day. Nothing scans in that state.
+_scr_yml = _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
+check("C5: there is no third scan backstop to describe — screener.yml declares no `schedule:` (the watchdog's */5 IS GitHub's "
+      "cron, 13.7 fires/day measured) — and DESIGN.md, README.md and CLAUDE.md all say so, none of them calling GitHub cron a "
+      "fallback under the watchdog",
+      not re.search(r"(?m)^\s*schedule:", _scr_yml)
+      and all("no `schedule:`" in t and "13.7" in t for t in (_design, _readme, _claude_md))
+      and not any("fallback of last resort" in t for t in (_design, _readme, _claude_md)))
+# C6: the bullet that describes screener.yml must quote the permissions the file declares (the
+# same pair section A pins against the file itself), not the Pages pair that moved to pages.yml.
+_scr_bullet = next((ln for ln in _design.splitlines()
+                    if ln.startswith("- `.github/workflows/screener.yml`")), "")
+check("C6: DESIGN.md's screener.yml bullet quotes the file's real permissions (contents: write + actions: write; pages/id-token "
+      "live in pages.yml) and the job guard as written, schedule clause included",
+      "`permissions: contents: write` + `actions: write`" in _scr_bullet
+      and "permissions: contents: write, pages: write, id-token: write" not in _design
+      and "github.event_name != 'schedule'" in _scr_bullet, _scr_bullet[:200])
+# C1: the launchd checks are ungated module-level code. Exactly three sections are mac_only, and
+# the three docs that describe the partition say which.
+_mac_skips = sorted(re.findall(r'skip\("([^"]*mac_only[^"]*)"', _read(os.path.join(ROOT, "verify.py"))))
+check("C1: EXACTLY three sections are mac_only (statsmodels BY, publish.py against a temp bare origin, the vendored-DSR "
+      "cross-pin) and none of them is the launchd walk — the plist checks read committed files, call no launchctl and run on "
+      "both partitions, as verify's own docstring, DESIGN.md's Verify partition row and CLAUDE.md now say",
+      len(_mac_skips) == 3 and not any("launchd" in s for s in _mac_skips)
+      and "launchd checks are NOT among them" in (__doc__ or "")
+      and "launchd checks are NOT among them" in _design
+      and "launchd checks are not among them" in _claude_md.lower(), str(_mac_skips))
+# C2: run_research.sh pushes with git itself; publish.py is not in that path. Every "publish" in
+# the script is a comment, and CLAUDE.md names publish.py's real survivors instead of the gates.
+_res_sh = _read(os.path.join(ROOT, "selfimprove", "research", "run_research.sh"))
+_res_pub = [ln.strip() for ln in _res_sh.splitlines() if "publish" in ln and not ln.strip().startswith("#")]
+check("C2: run_research.sh never calls publish.py (every 'publish' in it is a comment) — it merges its research branch and "
+      "pushes with git — and CLAUDE.md says so, naming publish.py's real survivors (champion.py --set --publish, livebook's "
+      "origin_blob, reconcile()) and the allowlist's two paths",
+      not _res_pub and "does **not** use `publish.py`" in _claude_md and "publish.origin_blob" in _claude_md
+      and "reconcile()" in _claude_md and "PROPOSAL_<date>.md" in _claude_md, str(_res_pub))
 
 # ═══════════════════════════════════════════════════════════════════════════════════
 section("P. price paths — paging, deferred propagation, unmatched rows")

@@ -77,17 +77,27 @@ whether research ran or not.
 for all three loops. The SCAN is a self-chaining keeper (`screener.yml` `mode=keeper` →
 `.github/keeper.sh`): `run.py --send` → `dashboard.py --write` → commit `data/` + `docs/` as
 `robinhood-screener[bot]` every `KEEPER_CADENCE_S`, handing off to a successor in the other
-concurrency slot; `keeper-watchdog.yml`'s `*/5` cron restarts a dead keeper and alerts SCAN
-STALE; GitHub's own cron is the fallback of last resort (measured 13.7 fires/day against a
-nominal 288 on this account) and `latest_scan.json.trigger` records who fired. The BOOK ticks
-inside that same keeper (`KEEPER_BOOK=1`: a 60 s `livebook.py --tick` whose state reads and write
-phase take the scan's lock from Python, four state files committed with the scan). The SUNDAY
-GATES run in `weekly.yml` at 10:00 UTC on the runner's own checkout, and its Publish step stages
-its six state paths plus the last four proposals explicitly, as `robinhood-improve[bot]`. What is left on the Mac is the
-OPTIONAL research session, which ff-syncs the tree, works in a detached temp worktree and
-publishes `selfimprove/candidates/*` + `data/proposals/` through `publish.py` — `publish.py`
-survives as that path and as `reconcile()`, not as the gates' publisher. The Mac's and the
-runner's path sets stay disjoint, so `git pull --rebase` on both sides is conflict-free.
+concurrency slot. **Two backstop layers, not three:** the keeper self-chains, and
+`keeper-watchdog.yml`'s `*/5` cron restarts a dead keeper and alerts SCAN STALE — and that
+watchdog cron **is** GitHub's own cron (measured 13.7 fires/day against a nominal 288 on this
+account). `screener.yml` has no `schedule:` of its own, so there is nothing underneath: if the
+watchdog's cron stops firing, nothing scans until a human dispatches, and SCAN STALE plus the
+dashboard tripwire are the signal. `latest_scan.json.trigger` records who fired the run —
+`keeper` inside the loop, else the dispatcher's own word. The BOOK ticks inside that same keeper
+(`KEEPER_BOOK=1`: a 60 s `livebook.py --tick` whose state reads and write phase take the scan's
+lock from Python, four state files committed with the scan). The SUNDAY GATES run in `weekly.yml`
+at 10:00 UTC on the runner's own checkout, and its Publish step stages its six state paths plus
+the last four proposals explicitly, as `robinhood-improve[bot]`. What is left on the Mac is the
+OPTIONAL research session, and it does **not** use `publish.py`: `run_research.sh` ff-syncs the
+tree, works in a detached temp worktree, then merges its own `research/<date>` branch onto
+`origin/main` and pushes it with git directly (3 retries, else the branch is pushed for a human).
+The only paths it may commit are the research allowlist's — `selfimprove/candidates/<name>.py` and
+`selfimprove/research/proposals/PROPOSAL_<date>.md`; `data/proposals/` is the GATES' directory,
+staged by `weekly.yml`, and the allowlist rejects it. `publish.py` survives as
+`champion.py --set … --publish`, as `livebook`'s retired `origin` feed read
+(`publish.origin_blob`) and as `reconcile()` — the manual recovery `weekly.yml`'s PUBLISH FAILED
+alert names — not as the gates' publisher. The Mac's two allowlisted paths and the runner's path
+sets stay disjoint, so `git pull --rebase` on both sides is conflict-free.
 
 **Discovery.** `data/discovery_cursor.json` is a block cursor over `DISCOVERY_LOG_SOURCES`; log
 tokens are never truncated (`DISCOVERY_MAX_LOG_TOKENS_PER_RUN` caps the window; the cursor advances
@@ -319,12 +329,20 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
 - **A sibling voice assistant reads the alphabetically-first `*ledger*.csv` under this repo.**
   `data/ledger.csv` must stay that file: no `*ledger*.csv` under `.claude/`, `.github/`, `cache/`
   or `data/archive/`; temp worktrees are created with `mkdtemp()` *outside* the repo.
-- **The runner has no `entry_bot` and no scipy**, so the DSR pin, the statsmodels BY comparison,
-  launchd and publish checks are `mac_only` and print SKIP under `GITHUB_ACTIONS`. Since Phase 8
+- **The runner has no `entry_bot` and no scipy**, so exactly THREE checks are `mac_only` and print
+  SKIP under `GITHUB_ACTIONS`: the DSR cross-pin, the statsmodels BY comparison and `publish.py`
+  against a temp bare origin. **The launchd checks are not among them** — the plist walk, the
+  five-label retired set and the exactly-one-file check read committed files, call no `launchctl`,
+  and run on BOTH partitions, so a launchd regression is caught in the cloud too. Since Phase 8
   **the Deflated Sharpe is VENDORED** in `selfimprove/dsr.py` (numpy + `statistics.NormalDist`):
-  no scoring path imports the sibling repo, and verify bans the string `entry_bot` anywhere under
-  `selfimprove/`. `entry_bot` survives ONLY inside `verify.py`'s mac_only cross-check, where it is
-  `sys.path.append`ed and never inserted — both repos have a top-level `config.py`.
+  no scoring path imports the sibling repo, and verify bans the string `entry_bot` in **code**
+  under `selfimprove/` — a string constant outside a docstring, or `import stats`; comments and
+  docstrings that cite the sibling's measured incidents are history, not a dependency, and are
+  exempt. `entry_bot` survives in executable code ONLY inside `verify.py`'s mac_only cross-pin,
+  and even there the sibling is never put on `sys.path`: it is loaded by file path with
+  `importlib.util.spec_from_file_location`, so its `import config` resolves to OURS (already in
+  `sys.modules`) — both repos have a top-level `config.py`, and nothing under `selfimprove/` may
+  append to `sys.path` at all (verify checks that too).
 - **ScanHood's sell simulation fails on some tokens** (`sellable: null`, "could not simulate a
   sell"). `None` is unknown, never `False` — pass-through, not a reject.
 - **RobinX does not attribute Flap (launchpad) launches**: `deployer: null` for the MIZUKARA dev.

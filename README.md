@@ -351,9 +351,13 @@ file is mode 0600 and the loader warns otherwise. Nothing is hardcoded.
   pass 2 runs on GeckoTerminal + ScanHood, holders/template checks are NA (tier B, never a false A),
   and the DEGRADED alert, dashboard line and weekly dark share quantify it.
 - Cadence depends on the keeper staying alive — a scan every 240 s while it loops, restarted by
-  the `*/5` watchdog when it dies. If both fail, GitHub's own cron gives ~14 runs/day; the cursor
-  catches up exactly (up to 8.4 h per run), but horizon cells carry more drift and watchlist
-  promotions are rarer. No Mac is in this path.
+  the `*/5` watchdog when it dies. Two layers, not three: that watchdog cron **is** GitHub's own
+  cron (13.7 fires/day here against a nominal 288), and `screener.yml` carries no `schedule:` of
+  its own — so a dead keeper is restarted at one of ~14 real opportunities a day, and if the
+  watchdog's cron stops firing nothing scans at all until a human dispatches. SCAN STALE and the
+  dashboard tripwire are the signal. When scanning resumes the cursor catches up exactly (up to
+  8.4 h per run), but horizon cells carry more drift and watchlist promotions are rarer. No Mac is
+  in this path.
 - Aggregator outages leave tokens with no V2 pair `unpriced` (reported, split by pool type).
 - V3/V4-pool tokens rarely reach A-tier — LP status unknown by construction.
 - Entry lag inside the keeper is the scan's wall time after `alert_ts` plus at most one tick — a
