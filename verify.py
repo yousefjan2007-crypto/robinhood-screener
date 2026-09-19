@@ -4855,9 +4855,12 @@ check("DESIGN.md carries the livebook-in-the-keeper rows: feed source, state own
 # the constants line is documentation of a FILE, so it is generated from that file, not remembered:
 # it carried DISCOVERY_MAX_LOG_TOKENS_PER_RUN=80 / MAX_DISCOVER=200 / RUN_TIME_BUDGET_S=200 for days
 # after config said 200 / 400 / 240
+# The Phase 9 keeper/cadence rewrite put three more constants into prose, so they join the list:
+# a cadence quoted in a doc is exactly the kind of number that drifts away from config.
 _pins = ("DISCOVERY_MAX_LOG_TOKENS_PER_RUN", "DISCOVERY_MAX_LOG_TOKENS_CATCHUP", "DISCOVERY_CATCHUP_TRIGGER_BLOCKS",
          "MAX_DISCOVER", "RECHECK_PER_RUN", "RECHECK_MAX", "GT_NEW_POOLS_PAGES", "GT_NEW_POOLS_CACHE_S",
-         "FEED_PULL_FORWARD_MAX", "RUN_TIME_BUDGET_S", "WATCH_REFRESH_PER_RUN", "GT_INFO_BUDGET_PER_RUN")
+         "FEED_PULL_FORWARD_MAX", "RUN_TIME_BUDGET_S", "WATCH_REFRESH_PER_RUN", "GT_INFO_BUDGET_PER_RUN",
+         "KEEPER_CADENCE_S", "KEEPER_MAX_S", "KEEPER_BOOK_STOP_WAIT_S")
 _stale_pins = [n for n in _pins
                if not any(f"{n}={v}" in _design for v in (f"{getattr(config, n)}", f"{getattr(config, n):_}"))]
 check("DESIGN.md's discovery/budget constants are REGENERATED from config.py, not remembered (every pinned name appears as "
