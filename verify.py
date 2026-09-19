@@ -454,7 +454,7 @@ for rel in ("selfimprove/improve.py", "selfimprove/publish.py", "selfimprove/liv
 check("improve.py / publish.py / livebook.py / research scripts never run git pull/checkout/reset "
       "(a data job must never move the user's HEAD)", not py_git, str(py_git))
 sh_git = []
-for rel in ("selfimprove/research/run_research.sh", "launchd/dispatch.sh"):   # run_improve.sh: deleted, now weekly.yml
+for rel in ("selfimprove/research/run_research.sh",):   # run_improve.sh and launchd/dispatch.sh: deleted
     for i, ln in enumerate(_read(os.path.join(ROOT, rel)).splitlines(), 1):
         s = ln.strip()
         if s.startswith("#"):
@@ -582,14 +582,26 @@ for p in plists:
           str(d.get("Label", "")).startswith("com.yousefjan.") and pa and os.path.isabs(pa[0])
           and os.path.basename(pa[0]) in ("python3", "bash") and os.path.isabs(str(d.get("WorkingDirectory", ""))),
           str(d))
-# -improve joined the retired set when the Sunday gates moved to weekly.yml: the plist and
-# selfimprove/run_improve.sh are DELETED, so a stale copy on the Mac cannot double-run the gates
+# The retired set grew as each loop moved into the cloud: -screener / -dashboard at the rebuild,
+# -improve when the Sunday gates moved to weekly.yml, and -dispatch / -livebook on 2026-09-19 when
+# the keeper became the scan loop and started ticking the book itself. Each plist is DELETED along
+# with its script, so a stale copy on the Mac cannot double-run anything — and a label left loaded
+# after that fails every interval (its program is gone), which a sibling voice assistant reads as a
+# fault. The deletion and `launchctl bootout gui/$(id -u)/<label>` go together.
 retired = {"com.yousefjan.robinhood-screener", "com.yousefjan.robinhood-dashboard",
-           "com.yousefjan.robinhood-improve"}
-check("the retired launchd labels com.yousefjan.robinhood-screener / -dashboard / -improve do not exist under launchd/, and "
-      "selfimprove/run_improve.sh is gone (the Sunday gates run in .github/workflows/weekly.yml)",
+           "com.yousefjan.robinhood-improve", "com.yousefjan.robinhood-dispatch",
+           "com.yousefjan.robinhood-livebook"}
+check("the five retired launchd labels com.yousefjan.robinhood-screener / -dashboard / -improve / -dispatch / -livebook do not "
+      "exist under launchd/, and neither selfimprove/run_improve.sh nor launchd/dispatch.sh survives (the Sunday gates run in "
+      ".github/workflows/weekly.yml; the scan and the book run in .github/keeper.sh)",
       not (retired & set(labels)) and not any(os.path.basename(p).replace(".plist", "") in retired for p in plists)
-      and not os.path.exists(os.path.join(ROOT, "selfimprove", "run_improve.sh")), str(sorted(labels)))
+      and not os.path.exists(os.path.join(ROOT, "selfimprove", "run_improve.sh"))
+      and not os.path.exists(os.path.join(ROOT, "launchd", "dispatch.sh")), str(sorted(labels)))
+_launchd_files = sorted(os.path.basename(f_) for f_ in glob.glob(os.path.join(plist_dir, "*"))
+                        if os.path.isfile(f_))
+check("launchd/ holds EXACTLY com.yousefjan.robinhood-research.plist — one optional Mac job, nothing else: the scan, the book and "
+      "the Sunday gates all run on Actions, and a second file here would mean a loop has two owners",
+      _launchd_files == ["com.yousefjan.robinhood-research.plist"], str(_launchd_files))
 
 yml = _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
 for needle in ("cancel-in-progress: false", 'python-version: "3.11"', "git add data/ docs/",
