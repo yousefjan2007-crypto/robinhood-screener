@@ -29,7 +29,7 @@
    "symbol": "HAVOC",
    "tier": "A",
    "token": "0xee1f4da0aed27da2cf61bc01a92c5a6069d1a03e",
-   "tries": 0
+   "tries": 1
   }
  ],
  "positions": {
@@ -1639,7 +1639,28 @@
    "gas_usd": 0.07,
    "impact_pct_open": 7.7846,
    "opened_ts": 1789823262.5201864,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 1397,
+      "gap_s": 487.33568692207336,
+      "kind": "tp",
+      "levels": [
+       [
+        2.0,
+        0.5
+       ]
+      ],
+      "mult": 2.7867072111207647,
+      "price": 0.0002566,
+      "ret": 1.7867072111207647,
+      "symbol": "BITDOG",
+      "token": "0x2ea0fcc525a1cf39d95dc02fe587e498b9c20372"
+     },
+     "first_seen_ts": 1789823749.8558733,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
