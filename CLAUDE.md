@@ -31,13 +31,14 @@ python3 paper_exec.py                               # paper A book (--live marks
 python3 dashboard.py --write                        # render docs/index.html (no flag = smoke test only)
 python3 selfimprove/livebook.py --scorecard         # per-policy live P&L from the pulled snapshot (--tick runs inside the keeper ONLY)
 python3 selfimprove/improve.py [--apply --send]     # exit gate; --selftest = offline only
+python3 selfimprove/improve.py --band-scorecard     # the PAPER GATE alone (the ONE judge; returns before the Sunday gate)
 python3 selfimprove/entry_lab/improve_bands.py [--apply --send]   # entry gate; --selftest
 python3 selfimprove/entry_lab/scorecard.py --markdown
 python3 selfimprove/weekly_summary.py --dry|--send  # the ONE weekly message
 python3 selfimprove/candidates/register.py --scan [--max-new N] | --budget-remaining | --selftest
 python3 selfimprove/champion.py --set exit=<policy>|entry_band=<band> --reason "..." [--publish]
 python3 cloud_secrets.py [--check]                  # THE HUMAN runs this; values go over stdin
-bash selfimprove/run_improve.sh                     # the Sunday 11:00 chain (ff-sync, gates, publish)
+gh workflow run robinhood-weekly -f dry=true        # rehearse the Sunday pass: evaluates, writes nothing to origin
 RESEARCH_DRYRUN=1 bash selfimprove/research/run_research.sh   # plumbing only: no claude, never pushes
                                                               # (RESEARCH_ORIGIN=<bare repo> tests the push path)
 # the scan keeper (GitHub Actions; .github/keeper.sh runs ONLY on the runner — flock is util-linux, never on the Mac)
@@ -48,14 +49,21 @@ gh run cancel <id>                                                    # step 2: 
 python3 watchdog.py                                                   # offline fixtures + a DRY assessment of latest_scan.json
 ```
 
+The **Sunday pass runs on GitHub** (`.github/workflows/weekly.yml`, `name: robinhood-weekly`,
+cron `0 10 * * 0` — 10:00 UTC year-round, not the Mac's two-UTC-hour local 11:00): idempotency →
+both gates `--apply --send` → `--summary-json` → publish as `robinhood-improve[bot]` → the ONE
+weekly message. `keeper.sh`'s `sunday_insurance` dispatches it when a Sunday past 10:00 UTC has
+no run. The cloud pause switch is `champion.json.locked`; `selfimprove/PAUSE` is Mac-local.
+
 Mac launchd jobs (`launchd/`, labels `com.yousefjan.robinhood-*`, all exit 0): `dispatch`
 (StartInterval 240 → `gh workflow run robinhood-screener -f trigger=dispatch`; a scan job runs ~5 min so runs go back to back), `livebook`
 (StartInterval 60, `livebook.py --tick` — retired at the cloud-book cutover: booted out, never
-re-loaded; the keeper ticks the book), `improve` (Sun 11:00, `run_improve.sh`), `research`
-(Sun 12:00, `run_research.sh`). The retired `robinhood-screener` / `robinhood-dashboard` labels
-must stay absent. `--send` on the two gates means **event alerts only** (PROMOTED / DEMOTED /
-NOMINATED / APPARATUS FAULT / PUBLISH FAILED / PAUSED); the weekly summary is sent once, by
-`run_research.sh`, whether research ran or not.
+re-loaded; the keeper ticks the book), `research` (Sun 12:00, `run_research.sh` — now OPTIONAL: it
+ff-syncs the tree, proposes candidates, and only RENDERS the summary unless `RESEARCH_SEND_SUMMARY=1`).
+The retired `robinhood-screener` / `robinhood-dashboard` / `robinhood-improve` labels must stay
+absent (`selfimprove/run_improve.sh` is deleted). `--send` on the two gates means **event alerts
+only** (PROMOTED / DEMOTED / NOMINATED / APPARATUS FAULT / PUBLISH FAILED / PAUSED); the weekly
+summary is sent once, by `weekly.yml`, whether research ran or not.
 
 ## Architecture
 
@@ -234,6 +242,11 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   hour-1 volume ≥ $50k, buys ≥ 2× sells, mcap ≤ $2M). `DEFAULT_ENTRY_BAND` is still
   `band_a_strict`: it is the fallback and the demotion target, not the alerted band. Do not
   "fix" the champion back without the operator; `champion.py --set` is the path either way.
+- **The paper gate (`improve.py --band-scorecard`) judges the paper test ONCE and promotes
+  nothing.** `PAPER_GATE_WINDOW_START` is the operator's "start the window" commit; changing the
+  band, the policy or the start is a NEW counted window (a visible `paper:` trial), and a third on
+  one pair inside `BAND_RENOMINATE_COOLDOWN_DAYS` is refused. A 7-day verdict on fewer than
+  `MIN_BOOTSTRAP_CLUSTERS` alert-days says "a number, not a bound (floor 12)" in those words.
 - **MIZUKARA remains only as the V2-mechanics smoke fixture** (a renounced owner, a burned V2
   pair, router legs) in the sources' `__main__` blocks; it is not a reference for what to find.
 
@@ -241,9 +254,10 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   rate is 0.25 Hz (0.4 Hz gave ~47 % 429s, measured on the solana screener). The runner has its own IP and uses 0.4 Hz.
 - **`git fetch` + `git show origin/main:` — never `git pull`** in the 60 s book. A collection job
   must not be able to move HEAD or conflict.
-- **The Mac tree must equal `origin/main` before the Sunday jobs.** `run_improve.sh` ff-merges
-  first and again after publishing; a diverged tree is reported, never forced. Hand-edits left
-  uncommitted on the Mac will make it diverge.
+- **The Mac tree must equal `origin/main` before the Sunday jobs.** Since the gates moved to
+  `weekly.yml` the ff-merge lives in `run_research.sh`'s step 0 (skipped under DRYRUN); a diverged
+  tree is reported, never forced. Hand-edits left uncommitted on the Mac will make it diverge —
+  and the cloud pass no longer notices, because it scores the runner's own checkout.
 - **A sibling voice assistant reads the alphabetically-first `*ledger*.csv` under this repo.**
   `data/ledger.csv` must stay that file: no `*ledger*.csv` under `.claude/`, `.github/`, `cache/`
   or `data/archive/`; temp worktrees are created with `mkdtemp()` *outside* the repo.

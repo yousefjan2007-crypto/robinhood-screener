@@ -89,12 +89,12 @@ Claude session proposes new candidates that merge only if `verify.py` is green.
 | `cloud_secrets.py` | Pipes the alert secrets into `gh secret set` over stdin. The human runs it. |
 | `verify.py` | The invariant suite — the only tests. Offline, fail-fast. |
 | `sources/` | One module per vendor (`rpc`, `blockscout`, `geckoterminal`, `dexscreener`, `scanhood`, `robinx`, `kyber`, `gmgn`) plus `safety.py`, the adapter that fuses them into the one flat safety dict with the pass-through rule. |
-| `selfimprove/` | The exit loop: `policies.py` (16 policies + 2 controls), `livebook.py` (the keeper's live multi-policy book), `paths.py`/`backfill.py`/`evaluate.py` (bar backtest), `improve.py` (the 7-check exit gate), `champion.py` (the sole writer of `champion.json`), `publish.py`, `weekly_summary.py`, `run_improve.sh`, `trials.json`. |
+| `selfimprove/` | The exit loop: `policies.py` (16 policies + 2 controls), `livebook.py` (the keeper's live multi-policy book), `paths.py`/`backfill.py`/`evaluate.py` (bar backtest), `improve.py` (the 7-check exit gate), `champion.py` (the sole writer of `champion.json`), `dsr.py` (the Deflated Sharpe, numpy + `statistics.NormalDist`, vendored so the Sunday gates need no scipy and no sibling repo), `publish.py`, `weekly_summary.py`, `trials.json`. `improve.py` also carries `paper_gate` — the ONE pre-registered judge of the paper test (7 days, 20 fills, PASS / FAIL / VOID over one named (band, policy) pair), which promotes nothing. |
 | `selfimprove/entry_lab/` | The entry loop: `bands.py` (bands as pure functions + controls + the registry loader), `runtime.py` (feature normalizer, band evaluation, event decisions, watchlist), `store.py` (the verdict sidecar), `scorecard.py`, `improve_bands.py` (the 9-check entry gate). |
 | `selfimprove/candidates/` | The research pool: `registry.json`, `register.py --scan`, `_template.py`, and every candidate module the weekly session has proposed. |
 | `selfimprove/research/` | `run_research.sh` (the Sunday headless Claude session), `research_prompt.md`, `allowlist.py`, `proposals/`. |
 | `launchd/` | The Mac jobs: `dispatch` (5 min), `livebook` (60 s — retired at the cloud-book cutover; the keeper ticks the book), `improve` (Sun 11:00), `research` (Sun 12:00). |
-| `.github/workflows/` | `screener.yml` (the cloud scan + Pages deploy) and `verify.yml` (the invariant suite on human pushes). |
+| `.github/workflows/` | `screener.yml` (the cloud scan), `pages.yml` (the Pages deploy), `keeper-watchdog.yml` (the `*/5` restart cron), `weekly.yml` (`robinhood-weekly`: the Sunday 10:00 UTC gates, the publish and the ONE weekly message — it replaced the Mac's Sunday launchd chain, so a sleeping laptop no longer skips a week) and `verify.yml` (the invariant suite on human pushes). |
 | `docs/DESIGN.md` | The reconciled design: resolved decisions and module contracts. |
 | `docs/RETRO_2026-09-16_hype_runners.md` | What three 2026-09-16 runners did minute by minute on ordered 1-minute paths — descriptive, n = 3, chosen on the outcome; no rule is derived from it. |
 
@@ -293,7 +293,8 @@ python3 ledger.py                                   # the A-vs-B scorecard
 python3 paper_exec.py                               # the paper A book (add --live to mark it)
 python3 selfimprove/livebook.py --tick              # one live-book cycle (the keeper runs this; never on the Mac after the cutover)
 python3 selfimprove/livebook.py --scorecard         # per-policy live P&L
-python3 selfimprove/improve.py                      # exit gate, dry (add --apply --send on Sundays)
+python3 selfimprove/improve.py                      # exit gate, dry (the Sunday workflow adds --apply --send)
+python3 selfimprove/improve.py --band-scorecard     # the paper gate alone: PASS / FAIL / VOID, or "none registered"
 python3 selfimprove/entry_lab/improve_bands.py      # entry-band gate, dry
 python3 selfimprove/weekly_summary.py --dry         # the one weekly message, printed
 python3 selfimprove/candidates/register.py --scan   # validate + register new candidate modules
@@ -304,7 +305,8 @@ RESEARCH_DRYRUN=1 bash selfimprove/research/run_research.sh   # exercise the res
 
 Every module has a `__main__` smoke test (`python3 screen.py`, `python3 quotes.py`,
 `python3 sources/rpc.py`, ...). Dependencies: `pandas>=2,<4` and `certifi`; the Sunday statistics
-additionally use numpy/scipy on the Mac.
+additionally use numpy, on the Mac and on the runner alike (scipy is no longer needed anywhere outside
+`verify.py`'s mac_only cross-checks).
 
 ## Secrets
 

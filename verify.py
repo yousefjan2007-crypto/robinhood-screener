@@ -5371,4 +5371,30 @@ finally:
     POL.POLICIES.clear(); POL.POLICIES.update(_saved_q["policies"])
     shutil.rmtree(_tmp_q, ignore_errors=True)
 
+# ── 3. the docs say the same thing the code does ──
+_design_q = _read(os.path.join(ROOT, "docs", "DESIGN.md"))
+check("DESIGN.md's paper-gate row carries the pre-registered numbers, the VOID list, the one-shot rule, 'not a promotion' and the "
+      "double-conservative cost note (quoted slippage already embedded, gas outside the quote, $10 sizing understates impact)",
+      all(w in _design_q for w in ("Paper gate for a band-under-test", "PAPER_GATE_WINDOW_START", "PAPER_GATE_MIN_FILLS = 20",
+                                   "PAPER_GATE_MAX_REFUSED_SHARE = 0.05", "sidecar_true", "flow_dark_share", "0.50",
+                                   "a number, not a bound (floor 12)", "paper_verdict:", "not a promotion",
+                                   "double-conservative on purpose", "gas is not in the quote")),
+      str([w for w in ("Paper gate for a band-under-test", "a number, not a bound (floor 12)", "not a promotion",
+                       "double-conservative on purpose") if w not in _design_q]))
+check("DESIGN.md's weekly-jobs row is weekly.yml's (10:00 UTC, the idempotency rule, the staged list, robinhood-improve[bot], the ONE "
+      "message from the cloud, numpy only) and its pause row names champion.json.locked as the CLOUD switch with PAUSE Mac-local",
+      all(w in _design_q for w in ("weekly.yml", "robinhood-weekly", "Sunday 10:00 UTC year-round", "robinhood-improve[bot]",
+                                   "sunday_insurance", "RESEARCH_SEND_SUMMARY=1", "gh workflow disable robinhood-weekly"))
+      and "Sunday 11:00 `selfimprove/run_improve.sh`" not in _design_q)
+_claude_q, _readme_q = _read(os.path.join(ROOT, "CLAUDE.md")), _read(os.path.join(ROOT, "README.md"))
+check("CLAUDE.md lists --band-scorecard and the weekly workflow (including the `-f dry=true` rehearsal), and no longer tells anyone to "
+      "run the deleted run_improve.sh",
+      "--band-scorecard" in _claude_q and "gh workflow run robinhood-weekly -f dry=true" in _claude_q
+      and "robinhood-weekly" in _claude_q and "bash selfimprove/run_improve.sh" not in _claude_q)
+check("README's file table names selfimprove/dsr.py and weekly.yml, and its dependency line says numpy on BOTH sides (scipy is gone "
+      "from every path but verify's mac_only cross-checks) while keeping the measured 13.7×/day",
+      "`dsr.py`" in _readme_q and "weekly.yml" in _readme_q and "13.7×/day" in _readme_q
+      and "the Sunday statistics\nadditionally use numpy, on the Mac and on the runner alike" in _readme_q
+      and "`run_improve.sh`" not in _readme_q)
+
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")
