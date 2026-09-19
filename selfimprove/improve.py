@@ -505,6 +505,7 @@ def evaluate_all(now_s: float, book: dict | None = None,
 # ── the paper gate: the ONE judge of the paper test ──────────────────────────────
 PAPER_REFUSAL_REASONS = ("band_under_test_full", "entry lag exceeds MAX_ENTRY_LAG_S")
 PAPER_FLOW_DARK_MAX = 0.50            # the adaptive candidate's own kill line, read at tick level
+_VOID_CHECK_DETAIL = "suppressed — no number from this window may be quoted"
 _WINDOW_FORMATS = ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S+00:00", "%Y-%m-%dT%H:%MZ", "%Y-%m-%d")
 
 
@@ -855,28 +856,31 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
     net = prow["net_lb"] if prow else float("nan")
     closed = now_s >= closed_at
     ctl_ok = all(c in tbl["controls"] and tbl["controls"][c]["net_lb"] <= 0 for c in _CONTROLS)
+    # the 4th field says the detail quotes a PERFORMANCE number of this window — the VOID branch
+    # blanks exactly those, keeping the label and the boolean. The apparatus details (days, fills,
+    # shares, control names) are facts about the machinery and stay whatever the verdict is.
     checks = [
-        (f"window closed (now >= start + {W} d + LIVEBOOK_MAX_TRACK_S)", closed, f"{days_elapsed:.1f} of {W} days"),
-        ("no eligible position still open", n_open_elig == 0, f"{n_open_elig} open"),
-        (f">= {config.PAPER_GATE_MIN_FILLS} closed fills", n >= config.PAPER_GATE_MIN_FILLS, f"{n} fills"),
+        (f"window closed (now >= start + {W} d + LIVEBOOK_MAX_TRACK_S)", closed, f"{days_elapsed:.1f} of {W} days", False),
+        ("no eligible position still open", n_open_elig == 0, f"{n_open_elig} open", False),
+        (f">= {config.PAPER_GATE_MIN_FILLS} closed fills", n >= config.PAPER_GATE_MIN_FILLS, f"{n} fills", False),
         (f"{policy} net LB > 0 (day-clustered 2.5% bound minus the {cost:.3f} round trip)", bool(net > 0),
-         f"net LB {_fmt(net)}"),
+         f"net LB {_fmt(net)}", True),
         ("both exit controls net LB <= 0 on the same rows", ctl_ok,
-         ", ".join(f"{c} {_fmt(r['net_lb'])}" for c, r in tbl["controls"].items()) or "no control scored"),
-        ("no inert control", not tbl["inert_controls"], ", ".join(tbl["inert_controls"]) or "none"),
+         ", ".join(f"{c} {_fmt(r['net_lb'])}" for c, r in tbl["controls"].items()) or "no control scored", True),
+        ("no inert control", not tbl["inert_controls"], ", ".join(tbl["inert_controls"]) or "none", False),
         (f"gapped share <= BAND_MAX_GAPPED_SHARE {config.BAND_MAX_GAPPED_SHARE}",
-         gapped_share is None or gapped_share <= config.BAND_MAX_GAPPED_SHARE, _fmt(gapped_share, ".3f")),
+         gapped_share is None or gapped_share <= config.BAND_MAX_GAPPED_SHARE, _fmt(gapped_share, ".3f"), False),
         (f"refused share <= PAPER_GATE_MAX_REFUSED_SHARE {config.PAPER_GATE_MAX_REFUSED_SHARE}",
          not ref["unknown"] and (refused_share is None
                                  or refused_share <= config.PAPER_GATE_MAX_REFUSED_SHARE),
          f"{_fmt(refused_share, '.3f')} ({n_ref} refused / {n_admitted} admitted)"
-         + ("; UNKNOWN: " + "; ".join(ref["unknown"]) if ref["unknown"] else "")),
+         + ("; UNKNOWN: " + "; ".join(ref["unknown"]) if ref["unknown"] else ""), False),
     ]
     if has_flow:
         checks.append((f"flow-dark share over armed positions <= {PAPER_FLOW_DARK_MAX:.2f}",
                        flow_dark is None or flow_dark <= PAPER_FLOW_DARK_MAX,
-                       f"{_fmt(flow_dark, '.3f')} over n_armed {n_armed}"))
-    out["checks"] = [[lbl, bool(ok), det] for lbl, ok, det in checks]
+                       f"{_fmt(flow_dark, '.3f')} over n_armed {n_armed}", False))
+    out["checks"] = [[lbl, bool(ok), det] for lbl, ok, det, _q in checks]
     out["void"] = void
     head = f"{band}@{policy} window {start_str}"
     tail = f"n_days {n_days}" + (f", {label}" if label else "")
@@ -889,12 +893,12 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
                 + (f", {n_open_elig} eligible still open" if closed else "") + f"; {tail})")
         if void:
             line += " — would VOID if judged now: " + void[0]
-        out["reasons"] = [f"{lbl} — {det}" for lbl, ok, det in checks if not ok]
+        out["reasons"] = [f"{lbl} — {det}" for lbl, ok, det, _q in checks if not ok]
     else:
         if recorded:
             status, suffix = recorded.rsplit("=", 1)[1].upper(), " (recorded)"
         else:
-            status = "VOID" if void else ("PASS" if all(ok for _, ok, _ in checks) else "FAIL")
+            status = "VOID" if void else ("PASS" if all(ok for _, ok, _, _q in checks) else "FAIL")
             vline = f"{vprefix}{status.lower()}"
             if record:
                 TR.bump("nominations", [vline])
@@ -904,16 +908,22 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
                 out["would_record"].append(vline)
                 suffix = " (not recorded: dry)"
         if status == "VOID":
-            # no number from a void window may be quoted: the apparatus facts stay, the table goes
+            # No number from a void window may be quoted: the apparatus facts stay, the table
+            # goes — and so does every performance number in `checks`, which is built BEFORE this
+            # branch and is persisted whole by summary_json into the digest committed to the
+            # public repo. Suppressing the table alone left the policy's own "net LB +0.412" and
+            # each control's printed three lines under "no number from this window may be quoted".
             out.update({"table": None, "policy_row": None, "controls_net_lb": {}, "benchmark": None,
-                        "band_controls": {}, "complement": None})
+                        "band_controls": {}, "complement": None,
+                        "checks": [[lbl, bool(ok), _VOID_CHECK_DETAIL if q else det]
+                                   for lbl, ok, det, q in checks]})
             line = f"{head} VOID ({void[0] if void else 'recorded'}; n {n}, {tail}){suffix}"
             out["reasons"] = list(void)
         elif status == "PASS":
             line = f"{head} PASS (n {n}, {tail}; net LB {_fmt(net)}){suffix}"
             out["reasons"] = []
         else:
-            failed = [f"{lbl} — {det}" for lbl, ok, det in checks if not ok]
+            failed = [f"{lbl} — {det}" for lbl, ok, det, _q in checks if not ok]
             line = f"{head} FAIL ({failed[0] if failed else 'recorded'}; n {n}, {tail}){suffix}"
             out["reasons"] = failed
     out["status"], out["line"] = status, line

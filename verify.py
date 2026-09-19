@@ -5262,6 +5262,23 @@ try:
           and pgv1["table"] is None and pgv1["policy_row"] is None and "ctl_exit_immediately" in pgv1["line"]
           and "INERT" in pgv2["line"] and "SAMPLING GAP" in pgv3["line"] and pgv3["gapped_share"] > config.BAND_MAX_GAPPED_SHARE,
           f"{pgv1['line']} | {pgv2['line']} | {pgv3['line']}")
+    # ... and the suppression reaches out["checks"] too: it was built BEFORE the status branch, so the policy's own
+    # "net LB +0.412" and every control's survived the VOID, were printed three lines under "no number from this window
+    # may be quoted", and were persisted by summary_json into the digest committed to the public repo.
+    _v_num = [(l_, o_, d_) for l_, o_, d_ in pgv1["checks"] if "net LB" in l_]
+    _f_num = [(l_, o_, d_) for l_, o_, d_ in pgf["checks"] if "net LB" in l_]
+    _, out_v1 = _capture(IM._print_paper_gate, pgv1)
+    check("a VOID window quotes no number in out['checks'] either — the two net-LB checks keep their label and their boolean and "
+          "lose their detail, while the same two checks on a FAIL still carry theirs (the digest carries this dict verbatim)",
+          len(_v_num) == len(_f_num) == 2      # the same two checks either way (the policy name heads the first label)
+          and [l_.split(" ", 1)[1] for l_, _o, _d in _v_num] == [l_.split(" ", 1)[1] for l_, _o, _d in _f_num]
+          and all(d_ == IM._VOID_CHECK_DETAIL for _l, _o, d_ in _v_num)
+          and all(any(c_.isdigit() for c_ in d_) for _l, _o, d_ in _f_num)
+          and not any(c_.isdigit() for _l, _o, d_ in _v_num for c_ in d_)
+          and json.dumps(pgv1["checks"]).count("net LB") == 2      # the two labels, and nothing else
+          and [l_ for l_ in out_v1.splitlines() if l_.strip()[:3] in ("[x]", "[ ]") and "net LB" in l_]
+          == [f"  [{m_}] {l_} ({IM._VOID_CHECK_DETAIL})" for l_, o_, _d in _v_num for m_ in ("x" if o_ else " ",)],
+          str(_v_num))
     # refused share: missed lines inside the window whose event_seq the band selected (sidecar 1) with a refusal reason
     config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = "stop_50", "2027-07-01T00:00:00Z"
     _q_t5 = IM._parse_window_start(config.PAPER_GATE_WINDOW_START)
