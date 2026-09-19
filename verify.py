@@ -3788,6 +3788,100 @@ finally:
     SAFE.pass1_many, SAFE.pass2, scanhood.stock_tokens, RUN.send_all = _saved_rt2["p1"], _saved_rt2["p2"], _saved_rt2["st"], _saved_rt2["sa"]
     http_client.reset_health()
 
+# ── a pass-1 survivor that misses the PASS-2 budget is rescheduled on its ladder — it must neither
+# loop every run nor vanish. Day-one watch of the phase-6 inflow on origin/main (six scans,
+# 14:25-14:50Z): deferred_by_stage.pass2_overflow climbed 0 → 3 → 5 → 7 → 11 → 16 → 19 while every
+# other counter stayed clean. `deferred` is only COUNTED, so a rechecks-sourced overflow token kept
+# its record exactly as it was — still due — and came back the very next run (a Dexscreener enrich
+# and a pass-1 look each time, and one of the RECHECK_PER_RUN slots the Pons backlog needs), and the
+# loop set grew by every new survivor past slot GT_INFO_BUDGET_PER_RUN; a logs/feeds-sourced one had
+# no record anywhere and was lost outright. The pass-2 twin of the pass-1 budget-cut defect above. ──
+T_P2WIN, T_P2LOG = "0x" + "a5" * 20, "0x" + "b5" * 20
+T_P2RE, T_P2PULL = "0x" + "c5" * 20, "0x" + "d5" * 20
+PAIR_P2WIN, PAIR_P2LOG = "0x" + "e5" * 20, "0x" + "f5" * 20
+_p2_logs = [
+    _log(config.UNIV2_FACTORY, [config.TOPIC_PAIR_CREATED, _pad(config.WETH), _pad(T_P2WIN)],
+         "0x" + rpc.enc_addr(PAIR_P2WIN) + rpc.enc_uint(7), 2990, 0),
+    _log(config.UNIV2_FACTORY, [config.TOPIC_PAIR_CREATED, _pad(config.WETH), _pad(T_P2LOG)],
+         "0x" + rpc.enc_addr(PAIR_P2LOG) + rpc.enc_uint(7), 2991, 0),
+]
+# four pass-1 survivors, liquidity-ordered: with GT_INFO_BUDGET_PER_RUN pinned to 1 the first one
+# takes the only pass-2 slot and the other three overflow, one per source route
+_p2_mkts = {T_P2WIN: dict(_SURV_MKT, symbol="P2WIN", liq_usd=90_000.0),
+            T_P2LOG: dict(_SURV_MKT, symbol="P2LOG", liq_usd=60_000.0),
+            T_P2RE: dict(_SURV_MKT, symbol="P2RE", liq_usd=50_000.0),
+            T_P2PULL: dict(_SURV_MKT, symbol="P2PULL", liq_usd=40_000.0)}
+_p2_re_rec = {"n_checks": 1, "next_check": 1.0, "first_seen": 1.0,
+              "disc": {"kind": "gmgn_near_completion", "created_ts": 1789261939}}
+_p2_pull_rec = {"n_checks": 1, "next_check": 9.9e9, "first_seen": 1.0,
+                "disc": {"kind": "gmgn_completed", "created_ts": 1789261939}}
+_saved_p2b = config.GT_INFO_BUDGET_PER_RUN
+_saved_rt3 = {"bn": rpc.block_number, "gl": rpc.get_logs, "np_": GT.new_pools, "tr": GMR.trenches,
+              "en": RUN.dex.enrich_many, "fw": RUN.dex.forward_snapshot_many, "p1": SAFE.pass1_many,
+              "p2": SAFE.pass2, "st": scanhood.stock_tokens, "sa": RUN.send_all}
+try:
+    with tempfile.TemporaryDirectory() as _dd3:
+        for _k in _RPATHS:
+            setattr(config, _k, os.path.join(_dd3, os.path.basename(_saved_rp[_k])))
+        config.PAPER_EXEC = False
+        config.GT_INFO_BUDGET_PER_RUN = 1
+        with open(config.RECHECK_PATH, "w") as _fh:
+            json.dump({T_P2RE: _p2_re_rec, T_P2PULL: _p2_pull_rec}, _fh)
+        rpc.block_number = lambda: 3000
+        rpc.get_logs = lambda addrs, topics, a, b: ([lg for lg in _p2_logs if a <= int(lg["blockNumber"], 16) <= b], None)
+        GT.new_pools = lambda page=1, network=None: []
+        GMR.trenches = lambda **k: {"new_creation": [], "near_completion": [],
+                                    "completed": [{"address": T_P2PULL, "launchpad_platform": "pons"}]}
+        RUN.dex.enrich_many = lambda addrs, now_s, max_age_sec=None: {
+            "ok": {a_: dict(m_) for a_, m_ in _p2_mkts.items() if a_ in addrs},
+            "absent": set(), "deferred": set()}
+        RUN.dex.forward_snapshot_many = lambda toks, now_s: {}
+        SAFE.pass1_many = lambda toks, markets_, disc_, now_s, chain_cache=None: {t_: SAFE.empty_safety() for t_ in toks}
+        SAFE.pass2 = lambda token, market, s1_, now_s, **k: dict(s1_, **{"pass": 2})
+        scanhood.stock_tokens = lambda: set()
+        RUN.send_all = lambda title, body, dry_run=True: None
+        _t_p2 = time.time()
+        _capture(RUN.run, dry_run=False, send=False)
+        _rec_p2 = json.load(open(config.RECHECK_PATH))
+        _seen_p2 = json.load(open(config.SEEN_PATH))
+        _scan_p2 = json.load(open(config.SCAN_PATH))
+        _srv_p2 = {r_["token"] for r_ in (_scan_p2.get("survivors") or [])}
+        _re_next = config.RECHECK_SCHEDULE_BY_KIND["gmgn_near_completion"][1]
+        check("the one token inside the pass-2 budget is scored and ledgered as before, and the three that overflow are NOT scored on "
+              "their partial pass-1 facts (a survivor with no pass 2 never reaches the survivors list)",
+              _srv_p2 == {T_P2WIN}, str(sorted(_srv_p2)))
+        check("a RECHECKS-sourced survivor that overflows the pass-2 budget ADVANCES its ladder instead of staying due: n_checks 1 → 2, "
+              "next_check on the kind's next rung, and still not seen. Untouched it was due again the very next run — re-enriched and "
+              "re-gated for nothing — and the looping set grew by every survivor past slot GT_INFO_BUDGET_PER_RUN (pass2_overflow "
+              "climbed 0 → 3 → 5 → 7 → 11 → 16 → 19 over six consecutive runs on 2026-09-19)",
+              T_P2RE in _rec_p2 and int(_rec_p2[T_P2RE]["n_checks"]) == 2 and T_P2RE not in _seen_p2
+              and abs(float(_rec_p2[T_P2RE]["next_check"]) - (_t_p2 + _re_next)) < 30
+              and float(_rec_p2[T_P2RE]["next_check"]) > _t_p2, str(_rec_p2.get(T_P2RE)))
+        check("a LOGS-sourced survivor that overflows the pass-2 budget GETS a recheck record (n_checks 1, its own disc record, the "
+              "first rung of its ladder) and is not marked seen — it had no record anywhere and the cursor has already advanced past "
+              "it, so silence here is a permanent per-token loss, not a retry",
+              T_P2LOG in _rec_p2 and int(_rec_p2[T_P2LOG]["n_checks"]) == 1 and T_P2LOG not in _seen_p2
+              and abs(float(_rec_p2[T_P2LOG]["next_check"]) - (_t_p2 + config.RECHECK_SCHEDULE_S[0])) < 30
+              and (_rec_p2[T_P2LOG].get("disc") or {}).get("kind") == "pair_v2", str(_rec_p2.get(T_P2LOG)))
+        check("a PULLED-FORWARD survivor that overflows keeps its scheduled slot byte-identical (a pull-forward adds a look rather "
+              "than spending one — the rule used everywhere else in run.py)",
+              _rec_p2.get(T_P2PULL) == _p2_pull_rec, str(_rec_p2.get(T_P2PULL)))
+        check("the overflow is counted twice over, so the loop cannot come back unseen: deferred_by_stage.pass2_overflow is the three "
+              "survivors past the budget and pass2_rescheduled is the two of them this branch actually re-armed (the pulled-forward "
+              "one is deliberately left alone)",
+              _scan_p2.get("deferred_by_stage", {}).get("pass2_overflow") == 3
+              and _scan_p2.get("deferred_by_stage", {}).get("pass2_rescheduled") == 2,
+              str(_scan_p2.get("deferred_by_stage")))
+finally:
+    config.GT_INFO_BUDGET_PER_RUN = _saved_p2b
+    for _k in _RPATHS:
+        setattr(config, _k, _saved_rp[_k])
+    config.PAPER_EXEC = _saved_pe
+    rpc.block_number, rpc.get_logs, GT.new_pools, GMR.trenches = _saved_rt3["bn"], _saved_rt3["gl"], _saved_rt3["np_"], _saved_rt3["tr"]
+    RUN.dex.enrich_many, RUN.dex.forward_snapshot_many = _saved_rt3["en"], _saved_rt3["fw"]
+    SAFE.pass1_many, SAFE.pass2, scanhood.stock_tokens, RUN.send_all = _saved_rt3["p1"], _saved_rt3["p2"], _saved_rt3["st"], _saved_rt3["sa"]
+    http_client.reset_health()
+
 with tempfile.TemporaryDirectory() as d:
     pj = os.path.join(d, "x.json")
     RUN._atomic_json(pj, {"a": float("nan"), "b": [float("inf"), 1.0]}, indent=1)

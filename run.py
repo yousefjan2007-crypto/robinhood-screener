@@ -548,6 +548,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         print(f"  early alert: {', '.join(r['symbol'] for r in early_alerts)} at {stage_s['alert_sent']}s")
     _run_p2(p2_rest)
     stage_s["pass2"] = round(budget.elapsed(), 1)
+    n_resched = 0
     for t in survivors1:
         if t in safety:
             continue
@@ -556,9 +557,22 @@ def run(dry_run: bool = True, send: bool = False) -> list:
             merged = dict(w["last_safety"]); merged.update({k: v for k, v in (s1.get(t) or {}).items() if v is not None})
             safety[t] = merged
         elif src_of.get(t) != "watchlist" and t in fresh:
-            deferred.add(t)                # pass-2 overflow: retried next run, never seen
+            # pass-2 overflow (or a pass-2 budget cut inside _p2): never scored on partial facts and
+            # never seen — but it comes back on its LADDER, not every run. Left untouched, a
+            # rechecks-sourced survivor is still due next run and is re-enriched and re-gated for
+            # nothing, spending one of the RECHECK_PER_RUN slots the Pons backlog needs, and the
+            # looping set grows by every survivor past slot GT_INFO_BUDGET_PER_RUN (pass2_overflow
+            # climbed 0-3-5-7-11-16-19 over six runs on 2026-09-19); a logs/feeds-sourced one has no
+            # record at all and the cursor has moved past it, so it is lost outright.
+            if src_of.get(t) in ("logs", "feeds", "rechecks") and t not in pulled:
+                r = recheck.get(t) or {"n_checks": 0, "first_seen": now_s}
+                d0 = disc.get(t) or feed_disc.get(t)
+                _advance_recheck(t, r, d0, now_s, recheck, seen, allow_seen=False)
+                n_resched += 1
+            deferred.add(t)
         else:
             safety[t] = s1.get(t) or SAFE.empty_safety()
+    deferred_by_stage["pass2_rescheduled"] = n_resched
 
     # ── score, bands, tier ───────────────────────────────────────────────────────
     survivors: list = []
