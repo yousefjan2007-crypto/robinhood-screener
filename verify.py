@@ -420,7 +420,7 @@ for rel in ("selfimprove/improve.py", "selfimprove/publish.py", "selfimprove/liv
 check("improve.py / publish.py / livebook.py / research scripts never run git pull/checkout/reset "
       "(a data job must never move the user's HEAD)", not py_git, str(py_git))
 sh_git = []
-for rel in ("selfimprove/research/run_research.sh", "selfimprove/run_improve.sh", "launchd/dispatch.sh"):
+for rel in ("selfimprove/research/run_research.sh", "launchd/dispatch.sh"):   # run_improve.sh: deleted, now weekly.yml
     for i, ln in enumerate(_read(os.path.join(ROOT, rel)).splitlines(), 1):
         s = ln.strip()
         if s.startswith("#"):
@@ -548,9 +548,14 @@ for p in plists:
           str(d.get("Label", "")).startswith("com.yousefjan.") and pa and os.path.isabs(pa[0])
           and os.path.basename(pa[0]) in ("python3", "bash") and os.path.isabs(str(d.get("WorkingDirectory", ""))),
           str(d))
-retired = {"com.yousefjan.robinhood-screener", "com.yousefjan.robinhood-dashboard"}
-check("the retired launchd labels com.yousefjan.robinhood-screener / -dashboard do not exist under launchd/",
-      not (retired & set(labels)) and not any(os.path.basename(p).replace(".plist", "") in retired for p in plists))
+# -improve joined the retired set when the Sunday gates moved to weekly.yml: the plist and
+# selfimprove/run_improve.sh are DELETED, so a stale copy on the Mac cannot double-run the gates
+retired = {"com.yousefjan.robinhood-screener", "com.yousefjan.robinhood-dashboard",
+           "com.yousefjan.robinhood-improve"}
+check("the retired launchd labels com.yousefjan.robinhood-screener / -dashboard / -improve do not exist under launchd/, and "
+      "selfimprove/run_improve.sh is gone (the Sunday gates run in .github/workflows/weekly.yml)",
+      not (retired & set(labels)) and not any(os.path.basename(p).replace(".plist", "") in retired for p in plists)
+      and not os.path.exists(os.path.join(ROOT, "selfimprove", "run_improve.sh")), str(sorted(labels)))
 
 yml = _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
 for needle in ("cancel-in-progress: false", 'python-version: "3.11"', "git add data/ docs/",
@@ -591,6 +596,69 @@ check("verify.yml runs verify.py with fetch-depth 0 on human pushes only (never 
 reqs = {re.split(r"[<>=~!\s]", ln.strip())[0] for ln in _read(os.path.join(ROOT, "requirements.txt")).splitlines()
         if ln.strip() and not ln.startswith("#")}
 check("requirements.txt is exactly pandas + certifi", reqs == {"pandas", "certifi"}, str(reqs))
+
+# ── weekly.yml: the Sunday gates, the publish and the ONE weekly message, in the cloud ──
+wyml = _read(os.path.join(ROOT, ".github", "workflows", "weekly.yml"))
+for needle in ("name: robinhood-weekly", "group: screener-weekly", "cancel-in-progress: false",
+               'python-version: "3.11"', "timeout-minutes: 40", "contents: write", "workflow_dispatch",
+               "pip install -r requirements.txt numpy",            # numpy only: dsr.py replaced scipy
+               "python selfimprove/improve.py --apply --send",     # the exit gate
+               "python selfimprove/entry_lab/improve_bands.py --apply --send",   # the entry gate
+               "python selfimprove/improve.py --summary-json", "robinhood-improve[bot]",
+               "improve: Sunday gates", "git pull --rebase --autostash", "rebase --abort",
+               "PUBLISH FAILED", "alerts.format_event", "IMPROVE_PUBLISH_RETRIES",
+               "python selfimprove/weekly_summary.py --send --research",
+               "if: ${{ always() }}", "applied"):
+    check(f"weekly.yml contains {needle!r}", needle in wyml, wyml[:0])
+check("weekly.yml fires on a SUNDAY cron at 10:00 UTC year-round (the Mac's 11:00 LOCAL was two UTC hours) and takes a `dry` input "
+      "defaulting to false",
+      re.search(r'^\s*- cron: "0 10 \* \* 0"', wyml, re.M) is not None
+      and re.search(r"^\s+dry:", wyml, re.M) is not None and 'default: "false"' in wyml)
+check("weekly.yml wires the three alert secrets and carries the private-repo guard",
+      all(f"{s}: ${{{{ secrets.{s} }}}}" in wyml for s in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "NTFY_TOPIC"))
+      and "repository.private" in wyml and "github.event_name != 'schedule'" in wyml)
+check("weekly.yml's idempotency step skips the gates only when the last improve_history.jsonl line is BOTH dated today and "
+      "applied — a `dry=true` rehearsal leaves applied false and never consumes the Sunday",
+      "improve_history.jsonl" in wyml and 'same_day and last.get("applied")' in wyml
+      and "steps.idem.outputs.skip != 'true'" in wyml and "--summary-json" in wyml)
+_wpub = wyml[wyml.index("name: Publish"):wyml.index("name: Weekly summary")]
+for _p in ("selfimprove/champion.json", "selfimprove/trials.json", "selfimprove/improve_history.jsonl",
+           "selfimprove/candidates/registry.json", "data/entry_lab_history.jsonl", "data/livebook_summary.json",
+           "data/proposals/"):
+    check(f"weekly.yml's publish step stages {_p!r} (exactly the deleted run_improve.sh's list)", _p in _wpub)
+check("weekly.yml never stages a Mac-local book file: data/livebook.json / _fills.csv / _feed.json / _missed.jsonl / _ticks.jsonl "
+      "appear nowhere in it (they ride keeper.sh's `git add data/ docs/`); the ONE data/livebook* path is the weekly digest",
+      not any(x in wyml for x in ("data/livebook.json", "data/livebook_fills.csv", "data/livebook_feed.json",
+                                  "data/livebook_missed.jsonl", "data/livebook_ticks.jsonl"))
+      and wyml.count("data/livebook") == wyml.count("data/livebook_summary.json"))
+check("weekly.yml sends the ONE weekly message itself (--send, or --dry under the rehearsal) with a --research line built from the "
+      "merged proposals and the unmerged research branches — it no longer depends on the Mac's research session",
+      "--research" in wyml and "PROPOSAL_*.md" in wyml and "refs/heads/research/*" in wyml
+      and "python selfimprove/weekly_summary.py --dry --research" in wyml)
+_res_src0 = _read(os.path.join(ROOT, "selfimprove", "research", "run_research.sh"))
+check("run_research.sh: step 0 ff-syncs the Mac tree to origin/main (never forced — the deleted run_improve.sh's job) and its "
+      "finish() renders the summary with --dry unless RESEARCH_SEND_SUMMARY=1, so exactly ONE weekly message goes out",
+      'git -C "$REPO" fetch -q origin' in _res_src0 and 'merge -q --ff-only origin/main' in _res_src0
+      and 'RESEARCH_SEND_SUMMARY:-0' in _res_src0
+      and re.search(r'RESEARCH_SEND_SUMMARY:-0\}" = "1" \].*MODE="--send"; else MODE="--dry"', _res_src0) is not None,
+      _res_src0[:0])
+_wbn = subprocess.run(["bash", "-n", os.path.join(ROOT, "selfimprove", "research", "run_research.sh")],
+                      capture_output=True, text=True)
+check("bash -n selfimprove/research/run_research.sh parses", _wbn.returncode == 0, _wbn.stderr[-300:])
+# every `run: |` block of weekly.yml must parse as bash AFTER the YAML block indent is stripped. A
+# heredoc body written at column 0 silently ENDS the block scalar (found writing this file), and a
+# broken Sunday step would only be discovered on a Sunday.
+_wbad = []
+for _ind, _body in re.findall(r"^(\s+)run: \|\n((?:\1  .*\n|\n)+)", wyml, re.M):
+    _txt = "".join(l[len(_ind) + 2:] if l.strip() else "\n" for l in _body.splitlines(keepends=True))
+    with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as _fh:
+        _fh.write(_txt)
+    _r = subprocess.run(["bash", "-n", _fh.name], capture_output=True, text=True)
+    os.unlink(_fh.name)
+    if _r.returncode != 0:
+        _wbad.append(_txt.splitlines()[0][:60] + " :: " + _r.stderr.strip()[:120])
+check("every `run: |` block in weekly.yml parses as bash once the YAML block indent is stripped (4 steps), so no heredoc has "
+      "silently escaped its block scalar", len(re.findall(r"^\s+run: \|\n", wyml, re.M)) == 4 and not _wbad, str(_wbad))
 
 
 def _local_module(name: str, from_file: str):
@@ -4200,11 +4268,12 @@ check("pages.yml owns the Pages deploy in its own group (a deploy never delays t
       and "upload-pages-artifact" in _wf_pages and "workflow_dispatch" in _wf_pages and "name: robinhood-pages" in _wf_pages
       and "schedule:" not in _wf_pages)
 _groups = {}
-for _name, _txt in (("screener.yml", _wf), ("pages.yml", _wf_pages), ("keeper-watchdog.yml", _wf_dog)):
-    for _g in re.findall(r"screener-(?:keeper-|scan|pages|watchdog)", _txt):
-        _groups.setdefault(_g, set()).add(_name)
-check("across the three workflow files every concurrency group name appears in exactly one file",
-      set(_groups) == {"screener-keeper-", "screener-scan", "screener-pages", "screener-watchdog"}
+for _f_ in sorted(glob.glob(os.path.join(ROOT, ".github", "workflows", "*.yml"))):
+    for _g in re.findall(r"screener-(?:keeper-|scan|pages|watchdog|weekly)", _read(_f_)):
+        _groups.setdefault(_g, set()).add(os.path.basename(_f_))
+check("across ALL workflow files every concurrency group name appears in exactly one file — the Sunday gates (screener-weekly) "
+      "can never queue behind, or cancel, the scan",
+      set(_groups) == {"screener-keeper-", "screener-scan", "screener-pages", "screener-watchdog", "screener-weekly"}
       and all(len(v) == 1 for v in _groups.values()), str(_groups))
 check("REFERENCE_TOKENS name the two winners and the registry lists the launchpad band as a candidate, never the champion",
       set(config.REFERENCE_TOKENS) == {"CATGPT", "ANTHROPIG"} and CHAMP == "band_a_strict"

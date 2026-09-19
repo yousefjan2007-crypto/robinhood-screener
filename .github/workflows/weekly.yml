@@ -1,0 +1,169 @@
+# robinhood_screener — the Sunday self-improvement pass, in the cloud. This replaces the Mac's
+# selfimprove/run_improve.sh (deleted with its launchd plist): the two gates, the summary json,
+# the publish and the ONE weekly message now run on the runner, so a sleeping laptop no longer
+# skips a week. 10:00 UTC year-round on purpose — the Mac's launchd hour was 11:00 LOCAL, which
+# is 10:00 UTC in BST and 11:00 UTC in GMT; a fixed UTC hour is one cadence, not two.
+#
+# The scan (screener.yml's keeper) and this job share nothing but the repo: separate concurrency
+# group, separate commit. keeper.sh's `sunday_insurance` dispatches this workflow by name when a
+# Sunday >= 10:00 UTC has no run yet, so a missed GitHub cron fire is caught by the scan loop.
+#
+# --send on the two gates means EVENT alerts only (PROMOTED / DEMOTED / NOMINATED / APPARATUS
+# FAULT / PUBLISH FAILED / PAUSED). The weekly summary is the ONE message, sent from here whether
+# the Mac's research session ran or not (run_research.sh sends it only under RESEARCH_SEND_SUMMARY=1).
+#
+# The pause switch in the cloud is selfimprove/champion.json's `locked` (both gates honour it);
+# selfimprove/PAUSE stays a Mac-local switch and is not read here. `dry=true` evaluates and reports
+# and writes nothing to origin — the rehearsal: `gh workflow run robinhood-weekly -f dry=true`.
+# Nothing here touches keys or funds.
+name: robinhood-weekly
+run-name: weekly · ${{ (inputs.dry == 'true') && 'dry (writes nothing)' || 'apply' }}
+
+on:
+  schedule:
+    - cron: "0 10 * * 0"          # Sunday 10:00 UTC, year-round
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "true = evaluate and report only: no --apply, no publish, the summary is --dry"
+        default: "false"
+        type: string
+
+permissions:
+  contents: write                 # commit the Sunday state back to main
+
+jobs:
+  weekly:
+    concurrency:
+      group: screener-weekly
+      cancel-in-progress: false   # never interrupt a gate mid-write; at most one queued run
+    # Private-repo minutes: the scheduled path is inert until the repo is public, as in screener.yml.
+    # Dispatch/manual runs (and keeper.sh's Sunday insurance) are allowed either way.
+    if: ${{ github.event_name != 'schedule' || github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      # numpy is the gates' only extra: the Deflated Sharpe is vendored in selfimprove/dsr.py
+      # (numpy + statistics.NormalDist), so no scipy and no sibling repo are needed here.
+      - run: pip install -r requirements.txt numpy
+
+      - name: Idempotency (the gates run once per Sunday; a dry run never stamps the day)
+        id: idem
+        run: |
+          python - >> "$GITHUB_OUTPUT" <<'PY'
+          import json, sys, time
+          skip = False
+          try:
+              lines = [l for l in open("selfimprove/improve_history.jsonl") if l.strip()]
+              last = json.loads(lines[-1]) if lines else {}
+              today = time.strftime("%Y-%m-%d", time.gmtime())
+              same_day = time.strftime("%Y-%m-%d", time.gmtime(float(last.get("ts") or 0))) == today
+              # BOTH: a dry run leaves applied=false, so a rehearsal never consumes the Sunday
+              skip = bool(same_day and last.get("applied"))
+          except FileNotFoundError:
+              pass
+          except Exception as exc:
+              print(f"history unreadable ({exc}); running the gates", file=sys.stderr)
+          print(f"skip={'true' if skip else 'false'}")
+          PY
+          echo "last improve_history line: $(tail -1 selfimprove/improve_history.jsonl 2>/dev/null || echo none)"
+
+      - name: Gates (exit policy, then entry band, then the summary json)
+        if: ${{ steps.idem.outputs.skip != 'true' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          DRY: ${{ inputs.dry || 'false' }}
+        run: |
+          # No early exit: a gate that blows up must not cost the other gate or the summary.
+          # (--send without --apply sends nothing: only apply() emits an event.)
+          set +e -o pipefail
+          if [ "$DRY" = "true" ]; then
+            python selfimprove/improve.py --send
+            echo "improve.py rc=$?  (dry: no --apply, champion.json untouched)"
+            python selfimprove/entry_lab/improve_bands.py --send
+            echo "improve_bands.py rc=$?  (dry)"
+          else
+            python selfimprove/improve.py --apply --send
+            echo "improve.py rc=$?"
+            python selfimprove/entry_lab/improve_bands.py --apply --send
+            echo "improve_bands.py rc=$?"
+          fi
+          python selfimprove/improve.py --summary-json
+          echo "summary-json rc=$?"
+
+      - name: Publish (explicit paths only — never the Mac-local book files)
+        if: ${{ steps.idem.outputs.skip != 'true' && (inputs.dry || 'false') != 'true' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          git config user.name "robinhood-improve[bot]"          # publish.py's identity
+          git config user.email "bot@users.noreply.github.com"
+          # EXACTLY run_improve.sh's list: the six state files plus the last 4 proposals. The four
+          # committed book files ride keeper.sh's `git add data/ docs/` and are never staged here;
+          # the one book path below is the weekly digest the dashboard and the summary read.
+          for f in selfimprove/champion.json \
+                   selfimprove/trials.json \
+                   selfimprove/improve_history.jsonl \
+                   selfimprove/candidates/registry.json \
+                   data/entry_lab_history.jsonl \
+                   data/livebook_summary.json \
+                   $(ls data/proposals/*.md 2>/dev/null | sort | tail -n 4); do
+            if [ -f "$f" ]; then git add -- "$f"; fi
+          done
+          if git diff --cached --quiet; then echo "no state change to publish"; exit 0; fi
+          git commit -q -m "improve: Sunday gates $(date -u +%F)"
+          N="$(python -c 'import config; print(int(config.IMPROVE_PUBLISH_RETRIES))')"
+          pushed=0
+          for i in $(seq 1 "$N"); do
+            # rebase our one commit onto whatever the keeper pushed while the gates ran; a failed
+            # rebase is ABORTED, never forced (keeper.sh's sync_main, same rule)
+            git pull --rebase --autostash -q origin main || { git rebase --abort 2>/dev/null; git merge --abort 2>/dev/null; }
+            if git push -q origin HEAD:main; then pushed=1; break; fi
+            echo "push attempt $i/$N rejected"
+            sleep 5
+          done
+          if [ "$pushed" != 1 ]; then
+            # the existing event alert, through the existing formatter (heredoc body sits at the
+            # step's base indent so YAML strips it to column 0 and python sees no indentation)
+          python - <<'PY' || echo "PUBLISH FAILED alert could not be sent"
+          import alerts, config
+          t, b = alerts.format_event("PUBLISH FAILED", [
+              f"weekly.yml could not push the Sunday state after {config.IMPROVE_PUBLISH_RETRIES} attempts.",
+              "The gates ran and their run log stands; nothing was published.",
+              "selfimprove/publish.reconcile() republishes a diverged champion.json next week."])
+          alerts.send_all(t, b, dry_run=False)
+          PY
+            exit 1
+          fi
+          echo "published: $(git rev-parse --short HEAD)"
+
+      - name: Weekly summary (the ONE weekly message — sent whether research ran or not)
+        if: ${{ always() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          DRY: ${{ inputs.dry || 'false' }}
+        run: |
+          # As in run_research.sh: no set -e here — silence from a Sunday job is indistinguishable
+          # from a broken one, so every failure above still funnels into this one message.
+          set +e -o pipefail
+          REASON="research: newest merged proposal $(ls selfimprove/research/proposals/PROPOSAL_*.md 2>/dev/null | sort | tail -1 | xargs -n1 basename 2>/dev/null || echo none); unmerged research branches: $(git ls-remote --heads origin 'refs/heads/research/*' | wc -l | tr -d ' ')"
+          echo "$REASON"
+          if [ "$DRY" = "true" ]; then
+            python selfimprove/weekly_summary.py --dry --research "$REASON"
+          else
+            python selfimprove/weekly_summary.py --send --research "$REASON"
+          fi
+          echo "weekly_summary rc=$?"

@@ -3,6 +3,14 @@
 # com.yousefjan.robinhood-research). It proposes CANDIDATE bands/policies as code; nothing it
 # does can touch the champion.
 #
+# SINCE THE GATES MOVED TO THE CLOUD (.github/workflows/weekly.yml, Sunday 10:00 UTC) this is the
+# only Sunday job left on the Mac, and it is OPTIONAL: the two gates, the summary json, the
+# publish and the ONE weekly message all run on the runner whether this session runs or not.
+# Two consequences, both below: step 0 carries the ff-only sync the deleted run_improve.sh used
+# to do (the Mac tree must still equal origin/main before a human reads it), and finish() SENDS
+# the summary only under RESEARCH_SEND_SUMMARY=1 — by default it prints the same lines with
+# --dry, because weekly.yml already sent the week's one message and two would be worse than none.
+#
 # WORKTREE DISCIPLINE. Every step after the context dump runs inside a DETACHED TEMPORARY
 # WORKTREE created with mktemp -d OUTSIDE the repo (a worktree inside it would carry a
 # data/ledger.csv that a sibling voice assistant globs for). The Mac checkout is never
@@ -16,19 +24,23 @@
 #
 # EVERY FAILURE FUNNELS INTO THE SUMMARY. There is no `set -e`: a missing claude binary, a spent
 # budget, a PAUSE file, a fetch failure, an allowlist violation or a red verify.py all set
-# REASON and fall through to the ONE weekly summary (weekly_summary.py), which is sent whether
-# research happened or not — silence from a Sunday job is indistinguishable from a broken job,
-# and the summary is what the human reads. The script exits 0 always (launchd contract).
+# REASON and fall through to weekly_summary.py, which renders the same lines on every path out —
+# silence from a Sunday job is indistinguishable from a broken job. It is DELIVERED from
+# weekly.yml (the one message, with its own research line); here it is rendered with --dry unless
+# RESEARCH_SEND_SUMMARY=1 says the cloud job is down and this run owns delivery. The script exits
+# 0 always (launchd contract).
 #
 # MERGE RULE. A research branch merges only if (a) the diff is inside the allowlist, (b) no more
 # new candidate modules than the weekly budget, (c) register.py --scan has run, and (d) verify.py
 # is GREEN in the worktree (missing verify.py counts as red — never merge unverified). Anything
 # else pushes the branch for a human and merges nothing.
 #
-# Env: RESEARCH_DRYRUN=1 skips the claude call (a dummy proposal exercises the plumbing) and
-#      NEVER pushes to origin; RESEARCH_ORIGIN=<temp bare repo> makes a dry run push there
-#      instead, so the push/merge path is testable; RESEARCH_MAX_TURNS caps the session;
-#      CLAUDE_BIN overrides the binary; REPO/PY override the tree and interpreter.
+# Env: RESEARCH_DRYRUN=1 skips the claude call (a dummy proposal exercises the plumbing), NEVER
+#      pushes to origin and never syncs the Mac tree; RESEARCH_ORIGIN=<temp bare repo> makes a
+#      dry run push there instead, so the push/merge path is testable; RESEARCH_SEND_SUMMARY=1
+#      delivers the summary from here instead of rendering it (weekly.yml owns delivery);
+#      RESEARCH_MAX_TURNS caps the session; CLAUDE_BIN overrides the binary; REPO/PY override the
+#      tree and interpreter.
 
 set -uo pipefail
 export PATH="$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
@@ -59,10 +71,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# The ONE weekly summary — sent (or, under DRYRUN, printed) on every path out of this script.
+# The weekly summary, RENDERED on every path out of this script so the outcome is always in the
+# log. weekly.yml sends the week's ONE message; this one is --dry unless RESEARCH_SEND_SUMMARY=1
+# hands delivery back (the cloud job down, or a deliberate local send).
 finish() {
     log "outcome: ${REASON:-no outcome recorded}"
-    if [ "$DRY" = "1" ]; then MODE="--dry"; else MODE="--send"; fi
+    if [ "${RESEARCH_SEND_SUMMARY:-0}" = "1" ] && [ "$DRY" != "1" ]; then MODE="--send"; else MODE="--dry"; fi
     (cd "$REPO" && "$PY" selfimprove/weekly_summary.py "$MODE" --research "${REASON:-no outcome recorded}") \
         2>&1 | tee -a "$LOGDIR/run_$DATE.log"
     exit 0
@@ -81,6 +95,19 @@ push_branch_for_human() {
         git -C "$WT" push -q origin "research/$DATE" 2>&1 | tail -1 || true
     fi
 }
+
+# ── 0. sync the Mac tree to origin/main — inherited from the deleted run_improve.sh ──────
+# ff-only and never forced: a diverged or dirty tree is REPORTED and the run continues (the
+# session's own worktree is cut from origin/main regardless, so nothing below depends on this).
+# Skipped under DRYRUN: the plumbing test must not move the user's tree.
+if [ "$DRY" != "1" ]; then
+    if git -C "$REPO" fetch -q origin; then
+        git -C "$REPO" merge -q --ff-only origin/main 2>/dev/null \
+            || log "local main has diverged from origin/main (or the tree is dirty) — not forced"
+    else
+        log "git fetch failed — the Mac tree is not synced; the session still reads origin/main below"
+    fi
+fi
 
 # ── 2. refusals (each exits 0 through the summary) ───────────────────────────────
 if [ -z "$CLAUDE_BIN" ] && [ "$DRY" != "1" ]; then
