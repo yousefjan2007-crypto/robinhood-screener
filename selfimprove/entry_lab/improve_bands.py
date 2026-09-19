@@ -51,8 +51,9 @@ Guards, none optional:
     python3 selfimprove/entry_lab/improve_bands.py --apply --send  # + event alerts (PROMOTED …)
 
 --send is EVENT alerts only (PROMOTED / DEMOTED / NOMINATED / APPARATUS FAULT / PAUSED); the weekly
-summary is sent elsewhere. Publishing to origin/main is run_improve.sh's job (publish.py from a
-detached worktree), not this module's. PAUSE file or champion.json.locked ⇒ evaluate and report
+summary is sent elsewhere. Publishing to origin/main is the Sunday workflow's job — since 2026-09-19
+.github/workflows/weekly.yml's Publish step, which stages its six state paths explicitly and commits
+as robinhood-improve[bot] — not this module's. PAUSE file or champion.json.locked ⇒ evaluate and report
 only. time.time() is called ONCE, in main(). Randomness only via np.random.default_rng(SEED+k).
 """
 from __future__ import annotations

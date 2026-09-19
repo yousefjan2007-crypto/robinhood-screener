@@ -26,7 +26,8 @@ python3 run.py --commit                             # write ledger/state/scan/ve
 python3 run.py --send                               # write AND alert — only the workflow runs this
 python3 preflight.py                                # source probes from wherever it runs; commits nothing
 python3 sources/gmgn.py                             # one live Trenches pull + one token_info (needs the GMGN key)
-python3 ledger.py                                   # A-vs-B scorecard, promoted-B n, suspect line
+python3 -c 'import ledger; ledger.summary()'         # the READ-ONLY A-vs-B scorecard (promoted-B n, suspect line)
+python3 ledger.py                                    # the same table, after a tempdir smoke fixture — prefer the -c form
 python3 paper_exec.py                               # paper A book (--live marks the open book: one Multicall3)
 python3 dashboard.py --write                        # render docs/index.html (no flag = smoke test only)
 python3 selfimprove/livebook.py --scorecard         # per-policy live P&L from the pulled snapshot (--tick runs inside the keeper ONLY)
@@ -34,6 +35,8 @@ python3 selfimprove/improve.py [--apply --send]     # exit gate; --selftest = of
 python3 selfimprove/improve.py --band-scorecard     # the PAPER GATE alone (the ONE judge; read-only: writes nothing)
 python3 selfimprove/entry_lab/improve_bands.py [--apply --send]   # entry gate; --selftest
 python3 selfimprove/entry_lab/scorecard.py --markdown
+python3 selfimprove/backfill.py --since=5 --ledger=data/ledger.csv  # ordered GT bars → cache/paths.jsonl; BY HAND, never scheduled
+python3 selfimprove/evaluate.py                     # score the bar backtest on those paths (zero NEW trials: every built-in is counted)
 python3 selfimprove/weekly_summary.py --dry|--send  # the ONE weekly message
 python3 selfimprove/candidates/register.py --scan [--max-new N] | --budget-remaining | --selftest
 python3 selfimprove/champion.py --set exit=<policy>|entry_band=<band> --reason "..." [--publish]
@@ -55,28 +58,36 @@ both gates `--apply --send` → `--summary-json` → publish as `robinhood-impro
 weekly message. `keeper.sh`'s `sunday_insurance` dispatches it when a Sunday past 10:00 UTC has
 no run. The cloud pause switch is `champion.json.locked`; `selfimprove/PAUSE` is Mac-local.
 
-Mac launchd jobs (`launchd/`, labels `com.yousefjan.robinhood-*`, all exit 0): `dispatch`
-(StartInterval 240 → `gh workflow run robinhood-screener -f trigger=dispatch`; a scan job runs ~5 min so runs go back to back), `livebook`
-(StartInterval 60, `livebook.py --tick` — retired at the cloud-book cutover: booted out, never
-re-loaded; the keeper ticks the book), `research` (Sun 12:00, `run_research.sh` — now OPTIONAL: it
-ff-syncs the tree, proposes candidates, and only RENDERS the summary unless `RESEARCH_SEND_SUMMARY=1`).
-The retired `robinhood-screener` / `robinhood-dashboard` / `robinhood-improve` labels must stay
-absent (`selfimprove/run_improve.sh` is deleted). `--send` on the two gates means **event alerts
-only** (PROMOTED / DEMOTED / NOMINATED / APPARATUS FAULT / PUBLISH FAILED / PAUSED); the weekly
-summary is sent once, by `weekly.yml`, whether research ran or not.
+**One Mac launchd job is left** (`launchd/`, label `com.yousefjan.robinhood-research`, exit 0):
+`research` (Sun 12:00, `run_research.sh` — OPTIONAL: it ff-syncs the tree, proposes candidates,
+and only RENDERS the summary unless `RESEARCH_SEND_SUMMARY=1`). **Five retired labels must stay
+absent** from `launchd/` — `robinhood-screener`, `-dashboard`, `-improve`, and since 2026-09-19
+`-dispatch` and `-livebook` (the keeper is the scan loop and ticks the book itself;
+`selfimprove/run_improve.sh` and `launchd/dispatch.sh` are deleted). The bootout accompanies the
+deletion: `launchctl bootout gui/$(id -u)/com.yousefjan.robinhood-<name>`. A retired job left
+loaded now fails every interval — its program is gone from the tree — and the sibling voice
+assistant reads a non-zero launchd exit as a fault, so this is loud rather than silent.
+`--send` on the two gates means **event alerts only** (PROMOTED / DEMOTED / NOMINATED /
+APPARATUS FAULT / PUBLISH FAILED / PAUSED); the weekly summary is sent once, by `weekly.yml`,
+whether research ran or not.
 
 ## Architecture
 
-**Cloud vs Mac.** GitHub Actions (`screener.yml`) is the system of record: `run.py --send`,
-`dashboard.py --write`, commit `data/` + `docs/` as `robinhood-screener[bot]`, deploy Pages from
-the workflow. The trigger is the Mac's dispatch job; GitHub's cron is the fallback (measured
-13.7 fires/day against a nominal 288 on this account). `latest_scan.json.trigger` records which.
-The keeper also ticks the live book (`KEEPER_BOOK=1`: a 60 s `livebook.py --tick` whose state
-reads and write phase take the scan's lock from Python, four state files committed with the
-scan). The Mac runs the Sunday gates and the
-research session on the pulled snapshot, and publishes `selfimprove/*` + `data/proposals/` +
-`data/livebook_summary.json` through `publish.py` from a detached temp worktree — path sets
-disjoint from the runner's, so `git pull --rebase` on both sides is conflict-free.
+**Cloud vs Mac — the Mac is down to one optional job.** GitHub Actions is the system of record
+for all three loops. The SCAN is a self-chaining keeper (`screener.yml` `mode=keeper` →
+`.github/keeper.sh`): `run.py --send` → `dashboard.py --write` → commit `data/` + `docs/` as
+`robinhood-screener[bot]` every `KEEPER_CADENCE_S`, handing off to a successor in the other
+concurrency slot; `keeper-watchdog.yml`'s `*/5` cron restarts a dead keeper and alerts SCAN
+STALE; GitHub's own cron is the fallback of last resort (measured 13.7 fires/day against a
+nominal 288 on this account) and `latest_scan.json.trigger` records who fired. The BOOK ticks
+inside that same keeper (`KEEPER_BOOK=1`: a 60 s `livebook.py --tick` whose state reads and write
+phase take the scan's lock from Python, four state files committed with the scan). The SUNDAY
+GATES run in `weekly.yml` at 10:00 UTC on the runner's own checkout, and its Publish step stages
+its six state paths plus the last four proposals explicitly, as `robinhood-improve[bot]`. What is left on the Mac is the
+OPTIONAL research session, which ff-syncs the tree, works in a detached temp worktree and
+publishes `selfimprove/candidates/*` + `data/proposals/` through `publish.py` — `publish.py`
+survives as that path and as `reconcile()`, not as the gates' publisher. The Mac's and the
+runner's path sets stay disjoint, so `git pull --rebase` on both sides is conflict-free.
 
 **Discovery.** `data/discovery_cursor.json` is a block cursor over `DISCOVERY_LOG_SOURCES`; log
 tokens are never truncated (`DISCOVERY_MAX_LOG_TOKENS_PER_RUN` caps the window; the cursor advances
@@ -222,6 +233,19 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   verdict. Registered as a pre-declared null; the scorecard's inert check flags it.
 - **GitHub cron 13.7×/day** — measured on the live solana workflow; hence Mac dispatch and
   "correct at any cadence" discovery.
+- **The 69-hour sleep, 2026-09-14 → 09-17** — the Mac slept, its dispatch job stopped firing, and
+  the scan fell back to GitHub's own cron at ~14 fires/day for nearly three days while the
+  ledger's forward cells went stale on a collapsed grid. Hence the keeper (a scan loop with no Mac
+  in it) and, once more, "correct at any cadence": a system whose cadence depends on a laptop
+  being awake has a sample it cannot explain.
+- **The GMGN half-landing, 2026-09-13** — the GMGN source landed without its feed plumbing, so the
+  fields that come only from a Trenches ROW were 0 of 65 populated while the `/v1/token/info`
+  fields filled normally — a dark half that reads like a quiet source, not an outage. Hence the
+  row being attached at PASS 1 to every enriched token (`safety.apply_gmgn_row`) and pinned there.
+- **The LITVM clone, 2026-09-16** — a symbol-matched clone cleared the hard gates on farmed
+  LIFETIME volume (~$30k liquidity, $25–38k volume, buys/sells 1.4–1.5×, all above the floors).
+  Hence "never match by symbol" and the separation that actually works: $50k of volume in HOUR ONE
+  at an age ≤ 15 min, which the real runners cleared by 20× and the clones never do.
 
 ## Gotchas
 
@@ -256,8 +280,38 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
 
 - **GeckoTerminal is a hard 30/min per IP, shared on the Mac** with the sibling screeners; the Mac
   rate is 0.25 Hz (0.4 Hz gave ~47 % 429s, measured on the solana screener). The runner has its own IP and uses 0.4 Hz.
+- **GeckoTerminal OHLCV pages with `before_timestamp`, and every page needs its own `cache_path`**
+  — one page of minute bars covers ~16 h on a busy pool, so an older alert is unreachable without
+  paging (FOMOPAD's unpaged page began at 18:34Z for a 14:51Z alert; one `before_timestamp` call
+  returned the 227 bars containing it), and without a per-page cache file page 0 is served for
+  every window. Against the 30/min budget that makes the ordered-path lab expensive: about 25
+  calls at 3 s spacing was enough to start 429ing on the Mac while the other GT readers were
+  running. `backfill.py` is a by-hand job for that reason — never a scheduled one — and a 429 is
+  `deferred`, absent from the output, retried by the next pass, never a dead row.
 - **`git fetch` + `git show origin/main:` — never `git pull`** in the 60 s book. A collection job
   must not be able to move HEAD or conflict.
+- **Cadence is load-bearing evidence, not plumbing.** A forward return is a SPOT reading on the run
+  grid, so `max_ret_seen` / `min_ret_seen` and every horizon cell are floors on what actually
+  happened between two scans: a coarser grid does not add noise, it systematically understates the
+  extremes. Two consequences when counting anything: read `lag_{h}` before trusting a cell (the
+  scorecards exclude cells sampled past `LEDGER_MAX_CELL_LAG_S`; `ledger.summary()` and the
+  dashboard do not — those are diagnostics), and **pin an `origin/main` SHA before you start
+  counting**, because the branch moves every ~4 minutes and two queries an hour apart are two
+  different populations.
+- **There are TWO paper books and only ONE of them can test a candidate band.** `paper_exec.py` is
+  the cloud A book: A rows only, one position per `(token, event_seq)`, plan frozen at open.
+  `selfimprove/livebook.py` is the multi-policy book: same key, but it admits A and promotion rows
+  unconditionally AND the band under test's picks under a sub-cap, and only it stamps each row's
+  `sidecar_true` (the bands whose verdict was 1 at that event). So a candidate band's evidence
+  lives in the livebook alone — join the two books, or a book and the ledger, on `event_seq`, and
+  read `sidecar_true` for "which bands would have taken this row". Never join on the token: a
+  promotion opens a SECOND position beside the token's B row, on purpose.
+- **`candidates/registry.json` can run ahead of `bands.py` on `origin/main`** — the Sunday publish
+  stages the registry separately, and `Registry.names()` reads the registry's status field, not the
+  loaded specs. A band that is listed but whose module has not landed is "registered" enough to get
+  past `run.py`'s fallback check and then returns `None` on every token: tier B everywhere plus an
+  APPARATUS FAULT alert per `DEGRADED_ALERT_COOLDOWN_HOURS` until one side catches up. Check both
+  before setting an entry band.
 - **The Mac tree must equal `origin/main` before the Sunday jobs.** Since the gates moved to
   `weekly.yml` the ff-merge lives in `run_research.sh`'s step 0 (skipped under DRYRUN); a diverged
   tree is reported, never forced. Hand-edits left uncommitted on the Mac will make it diverge —
@@ -266,8 +320,11 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   `data/ledger.csv` must stay that file: no `*ledger*.csv` under `.claude/`, `.github/`, `cache/`
   or `data/archive/`; temp worktrees are created with `mkdtemp()` *outside* the repo.
 - **The runner has no `entry_bot` and no scipy**, so the DSR pin, the statsmodels BY comparison,
-  launchd and publish checks are `mac_only` and print SKIP under `GITHUB_ACTIONS`. `entry_bot` is
-  `sys.path.append`ed, never inserted — both repos have a top-level `config.py`.
+  launchd and publish checks are `mac_only` and print SKIP under `GITHUB_ACTIONS`. Since Phase 8
+  **the Deflated Sharpe is VENDORED** in `selfimprove/dsr.py` (numpy + `statistics.NormalDist`):
+  no scoring path imports the sibling repo, and verify bans the string `entry_bot` anywhere under
+  `selfimprove/`. `entry_bot` survives ONLY inside `verify.py`'s mac_only cross-check, where it is
+  `sys.path.append`ed and never inserted — both repos have a top-level `config.py`.
 - **ScanHood's sell simulation fails on some tokens** (`sellable: null`, "could not simulate a
   sell"). `None` is unknown, never `False` — pass-through, not a reject.
 - **RobinX does not attribute Flap (launchpad) launches**: `deployer: null` for the MIZUKARA dev.
@@ -282,7 +339,8 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   `cache/gmgn_info_*.json`) — never assumed. A Trenches ROW carries `visiting_count`,
   `top_10_holder_rate` (a 0–1 rate, ×100 into `gmgn_top10_holder_pct`), `market_cap`, `volume_24h`,
   `buys_24h`, `sells_24h`, `is_honeypot` (a **string** 'yes'/'no'/'unknown', three-valued),
-  `created_timestamp`, `is_wash_trading` and `suspected_insider_hold_rate`. `/v1/token/info` carries
+  `created_timestamp`, `is_wash_trading` and `suspected_insider_hold_rate`; the bonding-curve
+  progress arrives as **`launchpad_progress`**, never `progress`. `/v1/token/info` carries
   `data.visiting_count`, `stat.top_10_holder_rate` and `data.creation_timestamp` (16/16 payloads) and
   carries **none** of market cap / volume / buy-sell counts / honeypot / wash flag / insider rate — the
   row is their only source. Every one of these is a FEATURE; no hard gate and no hc check reads a
@@ -310,13 +368,21 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   sets it — halving the book's rate lengthens its ticks in proportion, so it is not a recommended
   setting there (verify pins the unscaled rates).
 - **Alerts go out EARLY in a run**: tokens the champion band selects on pass-1 facts get pass 2
-  first and are alerted before the rest of pass 2, the watchlist refresh and the forward update; the non-candidate survivors past `GT_INFO_BUDGET_PER_RUN` are rescheduled on their recheck ladder (never looped, never dropped), so their pass-2 facts lag by a ladder rung;
+  first and are alerted before the rest of pass 2, the watchlist refresh and the forward update;
+  the non-candidate survivors past `GT_INFO_BUDGET_PER_RUN` are rescheduled on their recheck
+  ladder (never looped, never dropped), so their pass-2 facts lag by a ladder rung;
   `latest_scan.json.stage_seconds.alert_sent` is the measured latency inside the run.
 - **Entry lag inside the keeper is the scan's wall time after `alert_ts` plus at most one tick**
   (the retired Mac mode's 3–8 min came from dispatch + run + commit + fetch); refusals past
   `MAX_ENTRY_LAG_S` land in `data/livebook_missed.jsonl` (committed). Read `entry_lag_s` before
   trusting a live number.
 - Everything is stdlib urllib + certifi; system certs fail with `CERTIFICATE_VERIFY_FAILED`.
+- **The credential chain has FOUR steps, not three** (`config.load_credentials`): environment
+  (GitHub Secrets) → this repo's gitignored `config.local.json` → the shared Mac secrets file for
+  the Telegram token/chat id and the ntfy topic ONLY → **the sibling Solana screener's own
+  gitignored `config.local.json`, for `gmgn_api_key` and nothing else** (one GMGN key serves both
+  chains). A GMGN key that works here and nowhere obvious is living in that fourth place; every
+  file in the chain is mode 0600 and the loader warns otherwise.
 - Never `echo` a key into a config file; `cloud_secrets.py` and `load_credentials()` are the only
   paths, and an assistant may not enter credentials.
 
