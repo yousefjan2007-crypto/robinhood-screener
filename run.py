@@ -271,6 +271,28 @@ def _size_gates_only(market: dict) -> bool:
     return (market.get("price_usd") or 0) > 0 and (liq < config.LIQ_FLOOR_USD or vol < config.MIN_VOL_H24_USD)
 
 
+def _advance_recheck(t: str, r: dict, d0, now_s: float, recheck: dict, seen: dict, allow_seen: bool = True) -> None:
+    """Advance token t along its discovery kind's ladder (RECHECK_SCHEDULE_BY_KIND / the default),
+    or — when the ladder is exhausted and `allow_seen` — hand it to `seen` (a market snapshot was
+    taken and there is nothing left to schedule). The ONE place this logic lives; every caller that
+    needs to write a recheck record goes through it rather than re-deriving the ladder.
+
+    `allow_seen=False` is for a token whose OWN look was cut by the pass-1 TIME budget: it was
+    never actually gated, so an 'exhausted' ladder must keep retrying it rather than abandon it to
+    `seen` — the cursor has already advanced past it, so `seen` here would be a silent, permanent
+    per-token loss, not a retry."""
+    n = int(r.get("n_checks", 0))
+    sched = _recheck_schedule(r.get("disc") or d0)
+    if n < len(sched):
+        r.update({"next_check": now_s + sched[n], "n_checks": n + 1, "disc": r.get("disc") or d0})
+        recheck[t] = r
+    elif allow_seen:
+        recheck.pop(t, None); seen[t] = now_s
+    else:
+        r.update({"next_check": now_s + sched[-1], "disc": r.get("disc") or d0})
+        recheck[t] = r
+
+
 def run(dry_run: bool = True, send: bool = False) -> list:
     now_s = time.time()                       # THE single wall-clock capture
     budget = _Budget(config.RUN_TIME_BUDGET_S)
@@ -358,14 +380,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         r = recheck.get(t) or {"n_checks": 0, "first_seen": now_s}
         d0 = disc.get(t) or feed_disc.get(t)
         if src in ("logs", "feeds") or (src == "rechecks" and r.get("disc")):
-            n = int(r.get("n_checks", 0))
-            sched = _recheck_schedule(r.get("disc") or d0)
-            if n < len(sched):
-                r.update({"next_check": now_s + sched[n], "n_checks": n + 1,
-                          "disc": r.get("disc") or d0})
-                recheck[t] = r
-            else:
-                recheck.pop(t, None); seen[t] = now_s
+            _advance_recheck(t, r, d0, now_s, recheck, seen)
         elif src == "watchlist":
             rejected.append(t)
         else:
@@ -385,6 +400,15 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         stocks = set()
     for t, m in markets.items():
         if not budget.ok("pass1"):
+            # the cursor has already moved past this token, so — unlike an ordinary skip — losing
+            # it here is PERMANENT, not a retry; a fresh logs/feeds sighting keeps its recheck
+            # record exactly as the absent branch above does, never marked seen (it was never
+            # actually gated). A rechecks-sourced token already has its record; leave it untouched.
+            src = src_of.get(t)
+            if src in ("logs", "feeds") and t not in pulled:
+                r = recheck.get(t) or {"n_checks": 0, "first_seen": now_s}
+                d0 = disc.get(t) or feed_disc.get(t)
+                _advance_recheck(t, r, d0, now_s, recheck, seen, allow_seen=False)
             deferred.add(t); continue
         if t in stocks or _excluded_symbol(m.get("symbol")):
             pass1_rejects["infra_or_stock"] = pass1_rejects.get("infra_or_stock", 0) + 1
@@ -399,13 +423,9 @@ def run(dry_run: bool = True, send: bool = False) -> list:
                 rejected.append(t)
             elif t not in pulled:     # a pulled-forward look never spends the scheduled slot
                 r = recheck.get(t) or {"n_checks": 0, "first_seen": now_s}
-                n = int(r.get("n_checks", 0))
                 d0 = disc.get(t) or feed_disc.get(t)
-                sched = _recheck_schedule(r.get("disc") or d0)
-                if n < len(sched) and (m.get("pair_age_min") or 0) < config.AGE_MAX_MINUTES:
-                    r.update({"next_check": now_s + sched[n], "n_checks": n + 1,
-                              "disc": r.get("disc") or d0})
-                    recheck[t] = r
+                if (m.get("pair_age_min") or 0) < config.AGE_MAX_MINUTES:
+                    _advance_recheck(t, r, d0, now_s, recheck, seen)
                 else:
                     recheck.pop(t, None); seen[t] = now_s
             continue

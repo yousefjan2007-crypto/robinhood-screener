@@ -3646,6 +3646,90 @@ finally:
     SAFE.pass1_many, SAFE.pass2, scanhood.stock_tokens, RUN.send_all = _saved_rt["p1"], _saved_rt["p2"], _saved_rt["st"], _saved_rt["sa"]
     http_client.reset_health()
 
+# ── a token cut by the pass-1 TIME budget (never evaluated at all) still gets a recheck record —
+# the cursor has already moved past it, so dropping it here is a silent PER-TOKEN loss, not a retry
+# (task-6 review Important #2: catch-up makes this reachable at up to ~790 addresses against 240 s) ──
+_saved_bgt = RUN._Budget
+
+
+class _CutAfterFirst(_saved_bgt):
+    """budget.ok('pass1') is True exactly once, then False — forces the pass-1 budget-cut branch
+    deterministically for the SECOND and later tokens without racing a real clock."""
+    def __init__(self, seconds):
+        super().__init__(seconds)
+        self._pass1_n = 0
+
+    def ok(self, stage):
+        if stage != "pass1":
+            return True
+        self._pass1_n += 1
+        if self._pass1_n == 1:
+            return True
+        self.cuts[stage] = self.cuts.get(stage, 0) + 1
+        return False
+
+
+T_CBFIRST, T_CBLOG, T_CBRECHECK = "0x" + "aa" * 20, "0x" + "bb" * 20, "0x" + "cc" * 20
+PAIR_CBFIRST, PAIR_CBLOG = "0x" + "dd" * 20, "0x" + "ee" * 20
+_cb_logs = [
+    _log(config.UNIV2_FACTORY, [config.TOPIC_PAIR_CREATED, _pad(config.WETH), _pad(T_CBFIRST)],
+         "0x" + rpc.enc_addr(PAIR_CBFIRST) + rpc.enc_uint(7), 1990, 0),
+    _log(config.UNIV2_FACTORY, [config.TOPIC_PAIR_CREATED, _pad(config.WETH), _pad(T_CBLOG)],
+         "0x" + rpc.enc_addr(PAIR_CBLOG) + rpc.enc_uint(7), 1991, 0),
+]
+_CB_MKT = dict(_SURV_MKT, symbol="CUT")
+_precut_rec = {"n_checks": 1, "next_check": 1.0, "first_seen": 1.0,
+               "disc": {"kind": "pons_create", "pair": "0x" + "ff" * 20}}
+_saved_rt2 = {"bn": rpc.block_number, "gl": rpc.get_logs, "np_": GT.new_pools, "tr": GMR.trenches,
+              "en": RUN.dex.enrich_many, "fw": RUN.dex.forward_snapshot_many, "p1": SAFE.pass1_many,
+              "p2": SAFE.pass2, "st": scanhood.stock_tokens, "sa": RUN.send_all}
+try:
+    with tempfile.TemporaryDirectory() as _dd2:
+        for _k in _RPATHS:
+            setattr(config, _k, os.path.join(_dd2, os.path.basename(_saved_rp[_k])))
+        config.PAPER_EXEC = False
+        with open(config.RECHECK_PATH, "w") as _fh:
+            json.dump({T_CBRECHECK: _precut_rec}, _fh)
+        RUN._Budget = _CutAfterFirst
+        rpc.block_number = lambda: 2000
+        rpc.get_logs = lambda addrs, topics, a, b: ([lg for lg in _cb_logs if a <= int(lg["blockNumber"], 16) <= b], None)
+        GT.new_pools = lambda page=1, network=None: []
+        GMR.trenches = lambda **k: {"new_creation": [], "near_completion": [], "completed": []}
+        RUN.dex.enrich_many = lambda addrs, now_s, max_age_sec=None: {
+            "ok": {a_: dict(_CB_MKT) for a_ in (T_CBFIRST, T_CBLOG, T_CBRECHECK) if a_ in addrs},
+            "absent": set(), "deferred": set()}
+        RUN.dex.forward_snapshot_many = lambda toks, now_s: {}
+        SAFE.pass1_many = lambda toks, markets_, disc_, now_s, chain_cache=None: {t_: SAFE.empty_safety() for t_ in toks}
+        SAFE.pass2 = lambda token, market, s1_, now_s, **k: dict(s1_, **{"pass": 2})
+        scanhood.stock_tokens = lambda: set()
+        RUN.send_all = lambda title, body, dry_run=True: None
+        _t_cb = time.time()
+        _capture(RUN.run, dry_run=False, send=False)
+        _rec_cb = json.load(open(config.RECHECK_PATH))
+        _seen_cb = json.load(open(config.SEEN_PATH))
+        _scan_cb = json.load(open(config.SCAN_PATH))
+        _sched_default = config.RECHECK_SCHEDULE_S[0]
+        check("a log token that IS enriched but then hits the pass-1 TIME budget (not the size gates) still gets a recheck record: "
+              "n_checks 1, its own disc record, next_check on the kind's first ladder slot, and it is NOT marked seen — the cursor "
+              "has already advanced past it, so silence here means it is never retried or re-discovered (task-6 review Important #2)",
+              T_CBLOG in _rec_cb and int(_rec_cb[T_CBLOG]["n_checks"]) == 1 and T_CBLOG not in _seen_cb
+              and abs(float(_rec_cb[T_CBLOG]["next_check"]) - (_t_cb + _sched_default)) < 30
+              and (_rec_cb[T_CBLOG].get("disc") or {}).get("kind") == "pair_v2", str(_rec_cb.get(T_CBLOG)))
+        check("a RECHECK-sourced token cut by the same budget keeps its existing record byte-identical (it is already in the queue; "
+              "a budget cut is not a new fact about it, so it stays untouched rather than re-armed)",
+              _rec_cb.get(T_CBRECHECK) == _precut_rec, str(_rec_cb.get(T_CBRECHECK)))
+        check("the cut is counted, not silent: deferred_by_stage.budget_pass1 records both tokens the pass-1 loop never reached",
+              _scan_cb.get("deferred_by_stage", {}).get("budget_pass1") == 2, str(_scan_cb.get("deferred_by_stage")))
+finally:
+    RUN._Budget = _saved_bgt
+    for _k in _RPATHS:
+        setattr(config, _k, _saved_rp[_k])
+    config.PAPER_EXEC = _saved_pe
+    rpc.block_number, rpc.get_logs, GT.new_pools, GMR.trenches = _saved_rt2["bn"], _saved_rt2["gl"], _saved_rt2["np_"], _saved_rt2["tr"]
+    RUN.dex.enrich_many, RUN.dex.forward_snapshot_many = _saved_rt2["en"], _saved_rt2["fw"]
+    SAFE.pass1_many, SAFE.pass2, scanhood.stock_tokens, RUN.send_all = _saved_rt2["p1"], _saved_rt2["p2"], _saved_rt2["st"], _saved_rt2["sa"]
+    http_client.reset_health()
+
 with tempfile.TemporaryDirectory() as d:
     pj = os.path.join(d, "x.json")
     RUN._atomic_json(pj, {"a": float("nan"), "b": [float("inf"), 1.0]}, indent=1)
