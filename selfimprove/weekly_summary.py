@@ -18,7 +18,8 @@ WHAT IT READS (all committed or derived; nothing live, nothing from the network)
                                    per-policy top 3 by mean and the two controls. improve.summary_json
                                    NESTS the book counts under "book" and keeps the gate's own
                                    per_policy / controls tables at the top level — read each from
-                                   where it lives (_book()), or the counts print 0 and '?'
+                                   where it lives (_book()), or the counts print 0 and '?';
+                                   its "paper_gate" key is the paper gate's one line, relayed
   selfimprove/champion.json     -> champions, nominees, last promoted/demoted history lines
   selfimprove/trials.json       -> trial counts (the DSR denominators)
   data/entry_lab_history.jsonl, selfimprove/improve_history.jsonl -> last verdicts
@@ -309,6 +310,18 @@ def gates_section(P: dict) -> list:
     return lines
 
 
+def paper_gate_section(P: dict) -> list:
+    """The paper gate's ONE line, relayed from data/livebook_summary.json (improve.paper_gate
+    writes it there through summary_json; the verdict machinery lives in improve.py — this only
+    repeats the line, never recomputes it). 'none registered' until the operator's window
+    commit, or when the digest predates the gate."""
+    d = _read_json(P["livebook"])
+    pg = d.get("paper_gate") if isinstance(d, dict) else None
+    if not isinstance(pg, dict) or not pg.get("line"):
+        return ["paper gate: none registered"]
+    return [f"paper gate: {str(pg['line']).strip()[:220]}"]
+
+
 def _selected_mask(led, wide, champion_band: str):
     """Rows the champion band selected: verdict == 1 in the sidecar (joined on event_seq),
     falling back to tier A where the sidecar has no line for the event."""
@@ -472,6 +485,7 @@ def compose(now_s: float, research_line: str | None = None, paths: dict | None =
     _add("champions", champion_section, P)
     _add("trials", trials_section, P)
     _add("gates", gates_section, P)
+    _add("paper gate", paper_gate_section, P)
     _add("K5 kill", kill_section, led, wide, champion_band, now_s, P)
     _add("earliest possible promotion", promotion_eta_section, led, wide, champion_band, now_s, P)
     _add("paused", paused_section, P)
@@ -558,7 +572,10 @@ def _fixture(d: str, now_s: float) -> dict:
                    "per_policy": {"hold_to_end": {"n": 70, "mean": -0.61}, "sell_3h": {"n": 70, "mean": -0.05},
                                   "sell_1h": {"n": 70, "mean": -0.12}, "trail_30": {"n": 70, "mean": -0.2}},
                    "controls": {"ctl_exit_immediately": {"n": 70, "mean": -0.034},
-                                "ctl_random_exit": {"n": 70, "mean": -0.45}}}, f)
+                                "ctl_random_exit": {"n": 70, "mean": -0.45}},
+                   "paper_gate": {"status": "open",
+                                  "line": "band_no_age@sell_3h window 2026-09-21T00:00:00Z open (12 fills, "
+                                          "3.0 of 7 days; n_days 3, a number, not a bound (floor 12))"}}, f)
     champion.write_state(exit={"champion": "sell_3h", "promoted_ts": now_s - 5 * 86400,
                                "previous": "cfg_ladder_stop", "nominee": None},
                          entry_band={"nominee": "band_no_age", "nominated_ts": now_s - 2 * 86400},
@@ -603,6 +620,7 @@ if __name__ == "__main__":
         assert "blocking: only 39 retained days (needs 40)" in body and "third line" not in body
         assert "blocking: only 80 completed positions" in body
         assert "K5 kill (180 d): day 40/180" in body and "champion DSR" in body
+        assert "paper gate: band_no_age@sell_3h window 2026-09-21T00:00:00Z open (12 fills" in body
         assert "earliest possible promotion (from trailing-28d observed rates:" in body
         assert "entry band: >=" in body and "exit policy: >=" in body
         assert "PAUSED (PAUSE file)" in body
@@ -633,6 +651,7 @@ if __name__ == "__main__":
         assert "insufficient (n=0)" in el[0] and "ledger: insufficient (n=0)" in eb
         assert "band verdicts: insufficient (n=0)" in eb and "livebook: insufficient (n=0)" in eb
         assert "not computable" in eb and "clock not started" in eb and "PAUSED" not in eb
+        assert "paper gate: none registered" in eb
         assert f"exit={config.IMPROVE_DEFAULT_EXIT_CHAMPION} (default)" in eb
         assert len(el) <= MAX_LINES
     print("\nweekly_summary self-test OK (nothing sent)")

@@ -567,6 +567,28 @@ IMPROVE_FWD_MIN_DAYS = 40
 IMPROVE_RENOMINATE_COOLDOWN_DAYS = 90
 IMPROVE_PUBLISH_RETRIES = 5
 
+# ── the paper gate (selfimprove/improve.py paper_gate — the ONE judge of the paper test) ──
+# The operator's decision (2026-09-17): ONE pre-registered window of PAPER_GATE_WINDOW_DAYS
+# calendar days over ONE named (band, policy) pair, judged ONCE as PASS / FAIL / VOID on at least
+# PAPER_GATE_MIN_FILLS closed fills, with the repo's existing statistics (day-clustered bound net
+# of policies.round_trip_cost(), both exit controls on the same rows, the inert-control self-test).
+# The band is LIVEBOOK_BAND_UNDER_TEST; the policy is PAPER_GATE_POLICY (None ⇒ the exit
+# champion's executable plan, cfg_ladder_stop until the adaptive policy is registered); the
+# window opens at PAPER_GATE_WINDOW_START, an ISO-8601 UTC string the operator's "start the
+# window" commit sets (e.g. "2026-09-21T00:00:00Z"; None ⇒ "none registered"). Changing any of
+# the three later is a NEW counted window (a `paper:` line in selfimprove/trials.json). The 7-day
+# form was chosen knowingly: the bound-validity floor MIN_BOOTSTRAP_CLUSTERS (12 alert-days) is a
+# LABEL here, not a gate — every verdict on fewer days says "a number, not a bound" in those
+# words. A verdict promotes nothing: champion.json, registry.json and the Sunday gates never
+# read it.
+PAPER_GATE_POLICY = None
+PAPER_GATE_WINDOW_START = None
+PAPER_GATE_WINDOW_DAYS = 7
+PAPER_GATE_MIN_FILLS = 20
+PAPER_GATE_MAX_REFUSED_SHARE = 0.05   # refusals (band_under_test_full / entry lag, rows the band
+                                      # selected) over refused + admitted inside the window; above
+                                      # it the window was capacity-limited and is VOID
+
 # ── price paths (selfimprove/paths.py) ────────────────────────────────────────────
 PATHS_CACHE_MAX_AGE_S = 7 * 86400
 PATHS_LIMIT = 1000

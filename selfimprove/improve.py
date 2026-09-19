@@ -65,13 +65,21 @@ its own machinery: the per-policy table is suppressed and no number from the run
     python3 selfimprove/improve.py                 # dry: evaluate, decide, proposal + history
     python3 selfimprove/improve.py --apply --send  # the Sunday job: write champion.json, alert
     python3 selfimprove/improve.py --summary-json  # data/livebook_summary.json only (no gate)
+    python3 selfimprove/improve.py --band-scorecard  # the PAPER GATE alone (see paper_gate); no gate
     python3 selfimprove/improve.py --quiet         # same as dry, no stdout
+
+THE PAPER GATE (paper_gate, 2026-09-17) is the ONE judge of the paper test — a pre-registered
+window of config.PAPER_GATE_WINDOW_DAYS over one named (band, policy) pair, judged once as
+PASS / FAIL / VOID with the statistics above and nothing new. It is not a promotion: it writes
+only the `paper:` / `paper_verdict:` lines of trials.json.
 
 No wall-clock in any compute path: main() reads time.time() ONCE and threads now_s through.
 Not financial advice.
 """
 from __future__ import annotations
 
+import calendar
+import csv
 import json
 import math
 import os
@@ -420,6 +428,13 @@ def evaluate_all(now_s: float, book: dict | None = None,
         res["book"] = LB.live_stats_dict(now_s)
     except Exception as exc:
         res["book"] = {"error": str(exc)[:120]}
+    # the paper gate rides every evaluation (its one-shot bookkeeping is idempotent; "none
+    # registered" until the operator's window commit) and never touches the verdict below
+    try:
+        res["paper_gate"] = paper_gate(now_s, book=book, counts=counts)
+    except Exception as exc:
+        print(f"  [improve] paper gate failed: {type(exc).__name__}: {exc}")
+        res["paper_gate"] = {"status": "error", "line": f"unavailable ({type(exc).__name__}: {str(exc)[:60]})"}
     if n_all == 0:
         return res
     main = _score_table(rets, days, score_mask, champ, n_trials, counts)
@@ -482,6 +497,413 @@ def evaluate_all(now_s: float, book: dict | None = None,
                 dem["ctl_lb"] = dem["controls"][dem["ctl_name"]]
         res["demotion"] = dem
     return res
+
+
+# ── the paper gate: the ONE judge of the paper test ──────────────────────────────
+PAPER_REFUSAL_REASONS = ("band_under_test_full", "entry lag exceeds MAX_ENTRY_LAG_S")
+PAPER_FLOW_DARK_MAX = 0.50            # the adaptive candidate's own kill line, read at tick level
+_WINDOW_FORMATS = ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S+00:00", "%Y-%m-%dT%H:%MZ", "%Y-%m-%d")
+
+
+def _parse_window_start(s) -> float | None:
+    """config.PAPER_GATE_WINDOW_START (ISO-8601 UTC, e.g. "2026-09-21T00:00:00Z") → epoch
+    seconds with the stdlib only; None when unset. A malformed string is None too, printed: a
+    window that cannot be parsed is not registered — never "today"."""
+    if s is None or not str(s).strip():
+        return None
+    txt = str(s).strip()
+    for fmt in _WINDOW_FORMATS:
+        try:
+            return float(calendar.timegm(time.strptime(txt, fmt)))
+        except ValueError:
+            continue
+    print(f"  [paper gate] PAPER_GATE_WINDOW_START {s!r} is not ISO-8601 UTC "
+          f"(e.g. 2026-09-21T00:00:00Z); none registered")
+    return None
+
+
+def band_mask(book: dict, meta: list, band: str) -> np.ndarray:
+    """True where the position's `sidecar_true` stamp (the bands whose sidecar verdict was 1 at
+    the row's event_seq) names `band`, aligned to live_returns' meta rows."""
+    return np.array([band in ((book.get(m["key"]) or {}).get("sidecar_true") or [])
+                     for m in meta], dtype=bool)
+
+
+def _policy_shape(pol: dict, drop=("flow",)) -> str:
+    return json.dumps({k: v for k, v in (pol or {}).items() if k not in drop},
+                      sort_keys=True, default=list)
+
+
+def _price_only_twin(policy: str) -> str | None:
+    """The registered policy whose price legs equal `policy`'s minus its `flow` block — the
+    paired benchmark of an adaptive policy (the two differ in exactly the flow rule). None when
+    `policy` carries no flow leg or no such twin is registered."""
+    pol = POL.POLICIES.get(policy) or {}
+    if not isinstance(pol.get("flow"), dict):
+        return None
+    want = _policy_shape(pol)
+    for name, p in POL.POLICIES.items():
+        if name != policy and not isinstance(p.get("flow"), dict) and _policy_shape(p) == want:
+            return name
+    return None
+
+
+def _paper_refusals(start: float, end: float, band: str) -> dict:
+    """The refusals the book logged inside the window for rows the band selected: lines of
+    data/livebook_missed.jsonl with a PAPER_REFUSAL_REASONS reason (the sub-cap, or the entry
+    lag), whose event_seq has a sidecar verdict 1 for `band` (data/band_verdicts.csv, read ONCE)
+    and whose ts is inside [start, end). Unreadable files count 0, printed."""
+    selected: set = set()
+    n_side = 0
+    try:
+        with open(config.BAND_VERDICTS_PATH, newline="") as fh:
+            for r in csv.DictReader(fh):
+                if str(r.get("band")) != band or str(r.get("verdict")).strip() != "1":
+                    continue
+                try:
+                    selected.add(int(float(r.get("event_seq"))))
+                    n_side += 1
+                except (TypeError, ValueError):
+                    continue
+    except FileNotFoundError:
+        pass
+    except Exception as exc:
+        print(f"  [paper gate] sidecar unreadable ({exc}); refusals counted as 0")
+    n_ref = n_lines = 0
+    if os.path.exists(LB.MISSED_PATH):
+        try:
+            with open(LB.MISSED_PATH) as fh:
+                for ln in fh:
+                    if not ln.strip():
+                        continue
+                    n_lines += 1
+                    try:
+                        m = json.loads(ln)
+                    except Exception:
+                        continue
+                    reason = str(m.get("reason") or "")
+                    if not any(reason.startswith(x) for x in PAPER_REFUSAL_REASONS):
+                        continue
+                    ts = LB._num(m.get("ts"), LB._num(m.get("alert_ts")))
+                    try:
+                        seq = int(float(m.get("event_seq")))
+                    except (TypeError, ValueError):
+                        continue
+                    if ts is not None and start <= ts < end and seq in selected:
+                        n_ref += 1
+        except Exception as exc:
+            print(f"  [paper gate] missed log unreadable ({exc}); refusals counted as 0")
+    return {"n_refused": n_ref, "n_lines": n_lines, "n_sidecar_rows": n_side}
+
+
+def _iso(ts: float) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(float(ts)))
+
+
+def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = None) -> dict:
+    """The ONE judge of the paper test. Pre-registered by three config constants — the band
+    (LIVEBOOK_BAND_UNDER_TEST), the policy (PAPER_GATE_POLICY, None ⇒ the exit champion's plan)
+    and the window start (PAPER_GATE_WINDOW_START) — and computed with the machinery above and
+    nothing new: eligible = stamped ∧ WINDOW_START <= opened_ts < WINDOW_START + WINDOW_DAYS,
+    `_score_table` on those rows (the exit champion as the paired base, both exit controls on the
+    SAME rows, the inert-control self-test), net_lb = day_lb − policies.round_trip_cost() for
+    every row. Double-conservative on purpose: live returns already embed the quoted slippage,
+    but gas is not in the quote and $10 sizing understates impact.
+
+    The verdict, judged ONCE when the window has closed (now >= start + WINDOW_DAYS +
+    LIVEBOOK_MAX_TRACK_S) and no eligible position is still open:
+      PASS iff n >= PAPER_GATE_MIN_FILLS ∧ net_lb[policy] > 0 ∧ both exit controls' net_lb <= 0
+           ∧ no inert control ∧ gapped share <= BAND_MAX_GAPPED_SHARE ∧ refused share <=
+           PAPER_GATE_MAX_REFUSED_SHARE (∧ flow-dark share <= 0.50 for a policy with a flow leg);
+      VOID (no number quoted) when a control's net_lb > 0, a control is inert, either share is
+           exceeded, or the flow leg was dark on more than half of its armed ticks (the tick-level
+           share over armed positions from livebook.live_stats_dict — a close-level count cannot
+           see a rule that never ran when it mattered);
+      FAIL otherwise.
+    REPORTED, never gated: DSR and the implied Sharpe bar, the paired LB of the adaptive policy
+    against its price-only twin, the band controls from the stamp ("capacity-selected"), means /
+    medians / win rates, the in-window unstamped complement, n_armed and flow_dark_share on every
+    evaluation. Every verdict line carries n_days and, below MIN_BOOTSTRAP_CLUSTERS, the words
+    "a number, not a bound (floor 12)". While the window is open the same table prints with
+    "window <start> open (n fills, D of W days)" and no verdict.
+
+    One-shot bookkeeping in trials.json (append-only, a visible counted trial): `paper:<band>/
+    <policy>@<start>` on the first evaluation of a window, `paper_verdict:...=<pass|fail|void>`
+    once after closure; later runs print the recorded line. A changed band / policy / start is a
+    new `paper:` line; after two windows on the same pair a third inside
+    BAND_RENOMINATE_COOLDOWN_DAYS is refused. A verdict promotes nothing — champion.json,
+    registry.json and the Sunday gates never read it.
+
+    `book` defaults to the file at livebook.BOOK_PATH; the flow-dark share is read through
+    livebook.live_stats_dict (the one implementation), which reads that file.
+    """
+    W = int(config.PAPER_GATE_WINDOW_DAYS)
+    band = config.LIVEBOOK_BAND_UNDER_TEST or None
+    start_str = config.PAPER_GATE_WINDOW_START
+    start = _parse_window_start(start_str)
+    policy = config.PAPER_GATE_POLICY or champion.exit_plan()["name"]
+    cost = float(POL.round_trip_cost())
+    out = {"status": "none", "band": band, "policy": policy, "window_start": start_str,
+           "window_days": W, "min_fills": int(config.PAPER_GATE_MIN_FILLS), "cost": cost,
+           "line": "none registered", "n": 0, "n_days": 0, "n_open_eligible": 0, "n_admitted": 0,
+           "days_elapsed": None, "table": None, "policy_row": None, "controls_net_lb": {},
+           "benchmark": None, "band_controls": {}, "complement": None, "gapped_share": None,
+           "refused_share": None, "n_refused": 0, "has_flow": False, "n_armed": None,
+           "flow_dark_share": None, "checks": [], "void": [], "reasons": [],
+           "nomination_key": None, "recorded": None, "bound_label": ""}
+    if band is None or start is None:
+        why = ("no band under test (config.LIVEBOOK_BAND_UNDER_TEST)" if band is None
+               else "no window start (config.PAPER_GATE_WINDOW_START)")
+        out["line"], out["reasons"] = f"none registered ({why})", [why]
+        return out
+    if policy not in POL.POLICIES or policy in _CONTROLS:
+        why = f"policy {policy!r} is not a registered non-control policy"
+        out["line"], out["reasons"] = f"none registered ({why})", [why]
+        return out
+    end = start + W * 86400.0
+    closed_at = end + float(config.LIVEBOOK_MAX_TRACK_S)
+    key = f"paper:{band}/{policy}@{start_str}"
+    out.update({"start_ts": start, "end_ts": end, "closed_at_ts": closed_at, "nomination_key": key})
+
+    # ── one-shot bookkeeping: the cap, then the `paper:` line (once per band/policy/start)
+    tr = TR.load()
+    known = key in tr["nominations_ever"]
+    prefix = f"paper:{band}/{policy}@"
+    prior = []
+    for name in tr["nominations_ever"]:
+        if name.startswith(prefix) and name != key:
+            t = _parse_window_start(name[len(prefix):])
+            if t is not None:
+                prior.append(t)
+    cooldown_s = (W + config.BAND_RENOMINATE_COOLDOWN_DAYS) * 86400.0
+    if not known and len(prior) >= 2 and start < max(prior) + cooldown_s:
+        why = (f"a third window on {band}@{policy} inside the {config.BAND_RENOMINATE_COOLDOWN_DAYS}-day "
+               f"cooldown after two ({len(prior)} prior windows, the last {_iso(max(prior))}; "
+               f"earliest allowed start {_iso(max(prior) + cooldown_s)})")
+        out.update({"status": "refused", "line": f"refused: {why}", "reasons": [why]})
+        return out
+    if not known:
+        TR.bump("nominations", [key])
+    vprefix = f"paper_verdict:{band}/{policy}@{start_str}="
+    recorded = next((x for x in tr["nominations_ever"] if x.startswith(vprefix)), None)
+    out["recorded"] = recorded
+
+    # ── the sample: stamped ∧ in-window, completed and scorable (live_returns' rows)
+    if book is None:
+        book = LB._load(LB.BOOK_PATH, {})
+    counts = {} if counts is None else counts
+    rets, days, meta = live_returns(book, counts)
+    stamped = band_mask(book, meta, band)
+    in_win = np.array([start <= m["opened_ts"] < end for m in meta], dtype=bool)
+    elig = stamped & in_win
+    n_open_elig = n_admitted = 0
+    for p in book.values():
+        if not isinstance(p, dict) or band not in (p.get("sidecar_true") or []):
+            continue
+        ots = float(LB._num(p.get("opened_ts"), 0.0) or 0.0)
+        if start <= ots < end:
+            n_admitted += 1
+            if not p.get("done"):
+                n_open_elig += 1
+    champ = champion.exit_champion()
+    n_trials = TR.family_count("policies")
+    idx = np.where(elig)[0]
+    if idx.size:
+        tbl = _score_table(rets, days, elig, champ, n_trials, counts)
+    else:
+        tbl = {"policies": {}, "controls": {}, "inert_controls": [], "n": 0, "n_days": 0}
+    for t in (tbl["policies"], tbl["controls"]):
+        for r in t.values():
+            r["net_lb"] = r["day_lb"] - cost
+    prow = tbl["policies"].get(policy)
+    n = int(prow["n"]) if prow else 0
+    n_days = int(prow["n_days"]) if prow else 0
+    if prow is not None:
+        prow["sharpe_bar"] = implied_sharpe_bar(n_days, n_trials)
+        prow["n_trials"] = int(n_trials)
+    n_gapped = sum(1 for i in idx if (((book.get(meta[i]["key"]) or {}).get("policies") or {})
+                                      .get(policy) or {}).get("gapped"))
+    gapped_share = (n_gapped / idx.size) if idx.size else None
+    ref = _paper_refusals(start, end, band)
+    n_ref = ref["n_refused"]
+    refused_share = (n_ref / (n_ref + n_admitted)) if (n_ref + n_admitted) else None
+    has_flow = isinstance((POL.POLICIES.get(policy) or {}).get("flow"), dict)
+    n_armed = flow_dark = None
+    if has_flow:
+        try:
+            ls = (LB.live_stats_dict(now_s).get("per_policy") or {}).get(policy) or {}
+            n_armed, flow_dark = ls.get("n_armed"), ls.get("flow_dark_share")
+        except Exception as exc:
+            print(f"  [paper gate] live_stats_dict failed ({exc}); flow-dark share unknown")
+    # reported, never gated
+    twin = _price_only_twin(policy)
+    if twin and twin in rets:
+        a, b = rets[policy][idx], rets[twin][idx]
+        both = ~(np.isnan(a) | np.isnan(b))
+        d_idx = [days[i] for i in idx]
+        out["benchmark"] = {"name": twin, "n": int(both.sum()),
+                            "paired_mean": float(np.mean((a - b)[both])) if both.any() else float("nan"),
+                            "paired_lb": paired_lb(a, b, d_idx) if both.any() else float("nan"),
+                            "note": "adaptive minus price-only twin on the same rows; reported, never gated"}
+    ctl_bands = sorted({str(b) for i in np.where(in_win)[0]
+                        for b in ((book.get(meta[i]["key"]) or {}).get("sidecar_true") or [])
+                        if str(b).startswith("ctl_")})
+    for cname in ctl_bands:
+        ci = np.where(in_win & band_mask(book, meta, cname))[0]
+        if not ci.size:
+            continue
+        row = _row(rets[policy][ci], [days[i] for i in ci], n_trials)
+        row["net_lb"] = row["day_lb"] - cost
+        row["label"] = ("capacity-selected: the sidecar stamp on ADMITTED rows, not the control's "
+                        "full selection")
+        out["band_controls"][cname] = row
+    ci = np.where((~stamped) & in_win)[0]
+    if ci.size:
+        crow = _row(rets[policy][ci], [days[i] for i in ci], n_trials)
+        crow["net_lb"] = crow["day_lb"] - cost
+        out["complement"] = {"n": int(ci.size), "n_days": len({days[i] for i in ci}), "policy": crow,
+                             "note": "in-window rows the band did NOT select — context, never gated"}
+
+    # ── the verdict
+    days_elapsed = max(0.0, min(float(W), (now_s - start) / 86400.0))
+    label = ("" if n_days >= config.MIN_BOOTSTRAP_CLUSTERS
+             else f"a number, not a bound (floor {config.MIN_BOOTSTRAP_CLUSTERS})")
+    out.update({"n": n, "n_days": n_days, "n_open_eligible": n_open_elig, "n_admitted": n_admitted,
+                "days_elapsed": days_elapsed, "table": tbl, "policy_row": prow,
+                "controls_net_lb": {c: r["net_lb"] for c, r in tbl["controls"].items()},
+                "gapped_share": gapped_share, "refused_share": refused_share, "n_refused": n_ref,
+                "has_flow": has_flow, "n_armed": n_armed, "flow_dark_share": flow_dark,
+                "bound_label": label})
+    void = []
+    if tbl["inert_controls"]:
+        void.append("INERT CONTROL: " + ", ".join(tbl["inert_controls"])
+                    + " is bit-identical to the champion on every eligible position")
+    prof = [c for c, r in tbl["controls"].items() if r["net_lb"] > 0]
+    if prof:
+        void.append("CONTROL PROFITABLE NET OF COST: " + ", ".join(
+            f"{c} net LB {tbl['controls'][c]['net_lb']:+.3f}" for c in prof))
+    if gapped_share is not None and gapped_share > config.BAND_MAX_GAPPED_SHARE:
+        void.append(f"SAMPLING GAP: gapped share {gapped_share:.3f} > BAND_MAX_GAPPED_SHARE "
+                    f"{config.BAND_MAX_GAPPED_SHARE}")
+    if refused_share is not None and refused_share > config.PAPER_GATE_MAX_REFUSED_SHARE:
+        void.append(f"CAPACITY: refused share {refused_share:.3f} > PAPER_GATE_MAX_REFUSED_SHARE "
+                    f"{config.PAPER_GATE_MAX_REFUSED_SHARE} ({n_ref} refused / {n_admitted} admitted)")
+    if has_flow and flow_dark is not None and flow_dark > PAPER_FLOW_DARK_MAX:
+        void.append(f"FLOW DARK: tick-level dark share over armed positions {flow_dark:.3f} > "
+                    f"{PAPER_FLOW_DARK_MAX:.2f} (n_armed {n_armed}) — the rule was mostly not running "
+                    f"when it mattered")
+    net = prow["net_lb"] if prow else float("nan")
+    closed = now_s >= closed_at
+    ctl_ok = all(c in tbl["controls"] and tbl["controls"][c]["net_lb"] <= 0 for c in _CONTROLS)
+    checks = [
+        (f"window closed (now >= start + {W} d + LIVEBOOK_MAX_TRACK_S)", closed, f"{days_elapsed:.1f} of {W} days"),
+        ("no eligible position still open", n_open_elig == 0, f"{n_open_elig} open"),
+        (f">= {config.PAPER_GATE_MIN_FILLS} closed fills", n >= config.PAPER_GATE_MIN_FILLS, f"{n} fills"),
+        (f"{policy} net LB > 0 (day-clustered 2.5% bound minus the {cost:.3f} round trip)", bool(net > 0),
+         f"net LB {_fmt(net)}"),
+        ("both exit controls net LB <= 0 on the same rows", ctl_ok,
+         ", ".join(f"{c} {_fmt(r['net_lb'])}" for c, r in tbl["controls"].items()) or "no control scored"),
+        ("no inert control", not tbl["inert_controls"], ", ".join(tbl["inert_controls"]) or "none"),
+        (f"gapped share <= BAND_MAX_GAPPED_SHARE {config.BAND_MAX_GAPPED_SHARE}",
+         gapped_share is None or gapped_share <= config.BAND_MAX_GAPPED_SHARE, _fmt(gapped_share, ".3f")),
+        (f"refused share <= PAPER_GATE_MAX_REFUSED_SHARE {config.PAPER_GATE_MAX_REFUSED_SHARE}",
+         refused_share is None or refused_share <= config.PAPER_GATE_MAX_REFUSED_SHARE,
+         f"{_fmt(refused_share, '.3f')} ({n_ref} refused / {n_admitted} admitted)"),
+    ]
+    if has_flow:
+        checks.append((f"flow-dark share over armed positions <= {PAPER_FLOW_DARK_MAX:.2f}",
+                       flow_dark is None or flow_dark <= PAPER_FLOW_DARK_MAX,
+                       f"{_fmt(flow_dark, '.3f')} over n_armed {n_armed}"))
+    out["checks"] = [[lbl, bool(ok), det] for lbl, ok, det in checks]
+    out["void"] = void
+    head = f"{band}@{policy} window {start_str}"
+    tail = f"n_days {n_days}" + (f", {label}" if label else "")
+    if now_s < start:
+        status = "pending"
+        line = f"{head} pending (starts in {(start - now_s) / 86400.0:.1f} d)"
+    elif not closed or n_open_elig > 0:
+        status = "open"
+        line = (f"{head} open ({n} fills, {days_elapsed:.1f} of {W} days"
+                + (f", {n_open_elig} eligible still open" if closed else "") + f"; {tail})")
+        if void:
+            line += " — would VOID if judged now: " + void[0]
+        out["reasons"] = [f"{lbl} — {det}" for lbl, ok, det in checks if not ok]
+    else:
+        if recorded:
+            status, suffix = recorded.rsplit("=", 1)[1].upper(), " (recorded)"
+        else:
+            status = "VOID" if void else ("PASS" if all(ok for _, ok, _ in checks) else "FAIL")
+            TR.bump("nominations", [f"{vprefix}{status.lower()}"])
+            suffix = ""
+        if status == "VOID":
+            # no number from a void window may be quoted: the apparatus facts stay, the table goes
+            out.update({"table": None, "policy_row": None, "controls_net_lb": {}, "benchmark": None,
+                        "band_controls": {}, "complement": None})
+            line = f"{head} VOID ({void[0] if void else 'recorded'}; n {n}, {tail}){suffix}"
+            out["reasons"] = list(void)
+        elif status == "PASS":
+            line = f"{head} PASS (n {n}, {tail}; net LB {_fmt(net)}){suffix}"
+            out["reasons"] = []
+        else:
+            failed = [f"{lbl} — {det}" for lbl, ok, det in checks if not ok]
+            line = f"{head} FAIL ({failed[0] if failed else 'recorded'}; n {n}, {tail}){suffix}"
+            out["reasons"] = failed
+    out["status"], out["line"] = status, line
+    return out
+
+
+def _print_paper_gate(pg: dict) -> None:
+    print(f"paper gate: {pg['line']}")
+    if pg["status"] in ("none", "refused", "pending", "error"):
+        for r in pg.get("reasons") or []:
+            print(f"  - {r}")
+        return
+    print(f"  band {pg['band']} · policy {pg['policy']} · window {pg['window_start']} + {pg['window_days']} d "
+          f"(+ LIVEBOOK_MAX_TRACK_S to close) · cost bar {pg['cost']:.3f} per round trip (live returns already "
+          f"embed the quoted slippage: double-conservative on purpose)")
+    print(f"  eligible: {pg['n']} closed fills / {pg['n_days']} alert-days"
+          + (f" — {pg['bound_label']}" if pg["bound_label"] else "")
+          + f"; {pg['n_open_eligible']} still open; admitted {pg['n_admitted']}, refused {pg['n_refused']} "
+          f"(share {_fmt(pg['refused_share'], '.3f')}); gapped share {_fmt(pg['gapped_share'], '.3f')}")
+    print(f"  flow leg: {'yes' if pg['has_flow'] else 'no'}; n_armed {pg['n_armed']}; "
+          f"flow_dark_share {_fmt(pg['flow_dark_share'], '.3f')}")
+    if pg["table"] is None:
+        print("  per-policy table suppressed — VOID: no number from this window may be quoted")
+    else:
+        print(f"\n  {'policy':<28s} {'n':>4s} {'mean':>8s} {'median':>8s} {'win':>6s} {'day LB':>8s} "
+              f"{'net LB':>8s} {'days':>5s} {'DSR':>6s}")
+        rows = sorted(pg["table"]["policies"].items(),
+                      key=lambda kv: -(kv[1]["net_lb"] if math.isfinite(kv[1]["net_lb"]) else -1e9))
+        for name, r in rows:
+            mark = "*" if name == pg["policy"] else " "
+            print(f" {mark}{name:<27s} {r['n']:>4} {_fmt(r['mean']):>8s} {_fmt(r['median']):>8s} "
+                  f"{_fmt(r['win_rate'], '.2f'):>6s} {_fmt(r['day_lb']):>8s} {_fmt(r['net_lb']):>8s} "
+                  f"{r['n_days']:>5} {_fmt(r.get('dsr'), '.3f'):>6s}")
+        for name, r in pg["table"]["controls"].items():
+            print(f"  {name:<27s} {r['n']:>4} {_fmt(r['mean']):>8s} {_fmt(r['median']):>8s} "
+                  f"{_fmt(r['win_rate'], '.2f'):>6s} {_fmt(r['day_lb']):>8s} {_fmt(r['net_lb']):>8s} "
+                  f"{r['n_days']:>5} {_fmt(r.get('dsr'), '.3f'):>6s}   (control)")
+        prow = pg["policy_row"]
+        if prow:
+            print(f"  DSR {_fmt(prow.get('dsr'), '.3f')} at {prow.get('n_trials')} cumulative trials; implied per-day "
+                  f"Sharpe bar {_fmt(prow.get('sharpe_bar'), '.2f')} (reported, never gated)")
+        if pg["benchmark"]:
+            b = pg["benchmark"]
+            print(f"  paired vs price-only twin {b['name']}: mean {_fmt(b['paired_mean'])}, LB {_fmt(b['paired_lb'])} "
+                  f"over {b['n']} rows (reported, never gated)")
+        for c, r in pg["band_controls"].items():
+            print(f"  band control {c} ({r['label']}): n {r['n']}, net LB {_fmt(r['net_lb'])}, {r['n_days']} days")
+        if pg["complement"]:
+            c = pg["complement"]
+            print(f"  complement (in-window, unstamped): n {c['n']} / {c['n_days']} days, {pg['policy']} net LB "
+                  f"{_fmt(c['policy']['net_lb'])} — context")
+    for lbl, ok, det in pg["checks"]:
+        print(f"  [{'x' if ok else ' '}] {lbl} ({det})")
+    for v in pg["void"]:
+        print(f"  VOID: {v}")
+    if pg["recorded"]:
+        print(f"  recorded: {pg['recorded']}")
+    print("  a verdict promotes nothing: champion.json, registry.json and the Sunday gates are untouched by it")
 
 
 # ── the gate ─────────────────────────────────────────────────────────────────────
@@ -720,6 +1142,7 @@ def write_proposal(res: dict, verdict: dict) -> str:
              f"gapped (any policy) {bk.get('n_gapped', '?')}, no-route {bk.get('n_no_route', '?')}, "
              f"refused {bk.get('n_missed', '?')}",
              f"- entry-lag median: {('%.0f s' % lag) if isinstance(lag, (int, float)) else '?'}",
+             f"- paper gate: {(res.get('paper_gate') or {}).get('line', 'none registered')} (not a promotion)",
              ""]
     ex = res.get("exit_state") or {}
     if ex.get("nominee"):
@@ -787,12 +1210,16 @@ def write_proposal(res: dict, verdict: dict) -> str:
     return path
 
 
-def _append_history(res: dict, verdict: dict, published=None, paused: bool = False) -> None:
+def _append_history(res: dict, verdict: dict, published=None, paused: bool = False,
+                    applied: bool = False) -> None:
+    """One line per run. `applied` = this line was written by an --apply run (paused or not:
+    it had the authority and reported); weekly.yml's idempotency step reads the last line's
+    date and `applied`, so a dry run never stamps the day."""
     line = {"ts": res["ts"], "n": res["n_positions"], "days": res["n_days"],
             "champion": res["champion"], "winner": verdict.get("winner"),
             "promote": bool(verdict.get("promote")), "nominated": verdict.get("nominate"),
             "demoted": bool(verdict.get("demote")), "gate_broken": bool(verdict.get("gate_broken")),
-            "paused": bool(paused), "published": published}
+            "paused": bool(paused), "published": published, "applied": bool(applied)}
     try:
         os.makedirs(os.path.dirname(config.IMPROVE_HISTORY_PATH), exist_ok=True)
         with open(config.IMPROVE_HISTORY_PATH, "a") as fh:
@@ -849,7 +1276,7 @@ def apply(res: dict, verdict: dict, now_s: float, send: bool = False,
                               f"would have: {what}", f"champion stays `{champ}`",
                               f"{res['n_positions']} positions / {res['n_days']} alert-days",
                               f"proposal: {proposal_path}"])
-            _append_history(res, verdict, paused=True)
+            _append_history(res, verdict, paused=True, applied=True)
             return out
         if verdict.get("gate_broken"):
             _event("APPARATUS FAULT", ["exit gate VOID — no number from this run may be quoted"]
@@ -941,7 +1368,7 @@ def apply(res: dict, verdict: dict, now_s: float, send: bool = False,
     except Exception as exc:
         print(f"  [improve] apply failed: {type(exc).__name__}: {exc}")
         out["error"] = str(exc)[:200]
-    _append_history(res, verdict, paused=False)
+    _append_history(res, verdict, paused=False, applied=True)
     return out
 
 
@@ -964,9 +1391,11 @@ def summary_json(res: dict, path: str | None = None) -> str:
            "nomination": res.get("nomination"), "demotion": res.get("demotion"),
            "strata_A": {"n": a.get("n", 0), "n_days": a.get("n_days", 0)},
            "dsr_bar": res.get("dsr_bar"), "book": res.get("book"),
-           "note": "Weekly livebook digest from the Mac (improve.py --summary-json). Bounds are "
+           "paper_gate": res.get("paper_gate"),
+           "note": "Weekly livebook digest (improve.py --summary-json, the Sunday workflow). Bounds are "
                    "day-clustered bootstrap 2.5th percentiles; a bound from fewer than "
-                   f"{config.MIN_BOOTSTRAP_CLUSTERS} clusters is not a bound. Not financial advice."}
+                   f"{config.MIN_BOOTSTRAP_CLUSTERS} clusters is not a bound. The paper gate is not a "
+                   "promotion. Not financial advice."}
     LB._save_atomic(obj, path)
     return path
 
@@ -1024,6 +1453,9 @@ def _print_report(res: dict, verdict: dict, path: str | None, mode: str) -> None
                       f"(leading is not evidence — only the paired bound is)")
     except Exception:
         pass
+    pg = res.get("paper_gate")
+    if pg:
+        print(f"\n  paper gate: {pg.get('line')}  (not a promotion)")
     if path:
         print(f"\n  proposal written: {path}")
 
@@ -1034,6 +1466,17 @@ def main(argv=None) -> int:
     quiet = "--quiet" in argv
     do_apply = "--apply" in argv
     send = "--send" in argv
+    if "--band-scorecard" in argv:
+        # the paper gate alone, and return BEFORE the Sunday gate: no proposal, no history
+        # line, no champion read-modify-write (its own bookkeeping is the trials.json lines)
+        try:
+            pg = paper_gate(now_s)
+        except Exception as exc:
+            print(f"  [improve] paper gate failed: {type(exc).__name__}: {exc}")
+            return 0
+        if not quiet:
+            _print_paper_gate(pg)
+        return 0
     try:
         res = evaluate_all(now_s)
     except Exception as exc:
@@ -1050,9 +1493,10 @@ def main(argv=None) -> int:
         return 0
     if res["n_positions"] == 0 and not res.get("policies"):
         verdict = {"promote": False, "winner": None, "reasons": ["insufficient (n=0)"]}
-        _append_history(res, verdict)
+        _append_history(res, verdict, applied=do_apply)   # an --apply run stamps its day even at n=0
         if not quiet:
             print("insufficient (n=0) — no completed positions in the live book yet")
+            print(f"  paper gate: {(res.get('paper_gate') or {}).get('line')}")
         return 0
     verdict = decide(res)
     try:
@@ -1077,12 +1521,16 @@ def _synthetic_book(n_days: int, per_day: int, t0: float, seed: int, adv: dict |
                     champ_mean: float = -0.10, ctl_mean: float = -0.05, base_sd: float = 0.5,
                     pol_sd: float = 0.15, seq0: int = 1, gapped: dict | None = None,
                     n_suspect: int = 0, n_unpriced: int = 0, inert_random: bool = False,
-                    ctl_immediate_mean: float | None = None) -> dict:
+                    ctl_immediate_mean: float | None = None, stamp: list | None = None,
+                    stamp_frac: float = 1.0) -> dict:
     """A synthetic live book: N = n_days*per_day completed positions, every policy sharing one
-    position-level fate (so pairing is real) plus a planted per-policy advantage `adv`."""
+    position-level fate (so pairing is real) plus a planted per-policy advantage `adv`.
+    `stamp` plants a `sidecar_true` list on a `stamp_frac` share of the positions (the paper
+    gate's eligibility stamp); the rest carry []."""
     rng = np.random.default_rng(seed)
     adv = adv or {}
     gapped = gapped or {}
+    stamp = list(stamp or [])
     book: dict = {}
     seq = seq0
     cost = float(config.STACK_USD * config.POSITION_PCT)
@@ -1100,7 +1548,8 @@ def _synthetic_book(n_days: int, per_day: int, t0: float, seed: int, adv: dict |
                    "entry_lag_s": 200.0, "opened_ts": opened, "alert_seq": seq, "cost_usd": cost,
                    "tokens_raw": 10 ** 24, "entry_px": cost / 1e24, "last_tick_ts": opened + 6 * 3600,
                    "n_ticks": 360, "done": True, "suspect": False, "unpriced": False,
-                   "max_gap_s": 60.0, "policies": {}}
+                   "max_gap_s": 60.0, "policies": {},
+                   "sidecar_true": (list(stamp) if stamp and rng.random() < stamp_frac else [])}
             for name in POL.POLICIES:
                 r = shared + adv.get(name, 0.0) + rng.normal(0.0, pol_sd)
                 st = LB._new_policy_state()

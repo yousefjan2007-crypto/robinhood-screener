@@ -27,6 +27,7 @@ Fail-fast: the first failing check raises. Ends with 'ALL INVARIANTS PASSED (N c
 from __future__ import annotations
 
 import ast
+import calendar
 import contextlib
 import csv
 import glob
@@ -5038,5 +5039,267 @@ for _rel_ in ("selfimprove/improve.py", "selfimprove/entry_lab/improve_bands.py"
 _imps = _imports_outside_main(_tree(os.path.join(ROOT, "selfimprove", "entry_lab", "scorecard.py")))
 check("selfimprove/entry_lab/scorecard.py imports scipy / statsmodels / sklearn nowhere outside its __main__ (the statsmodels BY "
       "cross-check in the smoke test is mac_only by construction)", not (_imps & {"scipy", "statsmodels", "sklearn"}), str(sorted(_imps)))
+
+# ── 2. the paper gate — the ONE judge of the paper test (pre-registered; no new statistics) ──
+check("config carries the paper gate at the operator's values: policy None (⇒ the exit champion), window start None (⇒ none "
+      "registered), 7 days, 20 fills, refused share 0.05",
+      (config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START, config.PAPER_GATE_WINDOW_DAYS, config.PAPER_GATE_MIN_FILLS,
+       config.PAPER_GATE_MAX_REFUSED_SHARE) == (None, None, 7, 20, 0.05))
+_q_t0 = float(calendar.timegm((2027, 1, 15, 0, 0, 0)))
+check("_parse_window_start: ISO-8601 UTC (Z and +00:00) → epoch seconds with the stdlib; None / malformed → None (never 'today')",
+      IM._parse_window_start("2027-01-15T00:00:00Z") == _q_t0 == IM._parse_window_start("2027-01-15T00:00:00+00:00")
+      and IM._parse_window_start(None) is None and _capture(IM._parse_window_start, "15/01/2027")[0] is None
+      and _capture(IM._parse_window_start, "")[0] is None)
+_saved_q = {"BOOK_PATH": LB.BOOK_PATH, "MISSED_PATH": LB.MISSED_PATH, "CHAMPION_PATH": config.CHAMPION_PATH,
+            "TRIALS_PATH": config.TRIALS_PATH, "IMPROVE_HISTORY_PATH": config.IMPROVE_HISTORY_PATH,
+            "PROPOSALS_DIR": config.PROPOSALS_DIR, "LIVEBOOK_SUMMARY_PATH": config.LIVEBOOK_SUMMARY_PATH,
+            "PAUSE_PATH": config.PAUSE_PATH, "BAND_VERDICTS_PATH": config.BAND_VERDICTS_PATH,
+            "LIVEBOOK_BAND_UNDER_TEST": config.LIVEBOOK_BAND_UNDER_TEST, "PAPER_GATE_POLICY": config.PAPER_GATE_POLICY,
+            "PAPER_GATE_WINDOW_START": config.PAPER_GATE_WINDOW_START, "send_all": alerts.send_all,
+            "policies": dict(POL.POLICIES)}
+_tmp_q = tempfile.mkdtemp(prefix="verify_papergate_")
+try:
+    LB.BOOK_PATH = os.path.join(_tmp_q, "livebook.json")
+    LB.MISSED_PATH = os.path.join(_tmp_q, "missed.jsonl")
+    config.CHAMPION_PATH = os.path.join(_tmp_q, "champion.json")
+    config.TRIALS_PATH = os.path.join(_tmp_q, "trials.json")
+    config.IMPROVE_HISTORY_PATH = os.path.join(_tmp_q, "improve_history.jsonl")
+    config.PROPOSALS_DIR = os.path.join(_tmp_q, "proposals")
+    config.LIVEBOOK_SUMMARY_PATH = os.path.join(_tmp_q, "livebook_summary.json")
+    config.PAUSE_PATH = os.path.join(_tmp_q, "PAUSE")
+    config.BAND_VERDICTS_PATH = os.path.join(_tmp_q, "band_verdicts.csv")
+    alerts.send_all = lambda title, body, dry_run=True: None
+    DEFQ, CHQ, BQ = config.IMPROVE_DEFAULT_EXIT_CHAMPION, "sell_3h", "band_x"
+    W = config.PAPER_GATE_WINDOW_DAYS
+    START = "2027-01-15T00:00:00Z"
+    t_open = _q_t0 + 3.5 * 86400
+    t_closed = _q_t0 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0
+
+    def _tr_lines(prefix):
+        return [x for x in TR.load()["nominations_ever"] if x.startswith(prefix)]
+
+    def _pg(book, now_s):
+        LB._save_atomic(book, LB.BOOK_PATH)         # live_stats_dict (the flow-dark share) reads the file
+        return _capture(IM.paper_gate, now_s, book=book)
+
+    # none registered: no band, or no window start — and the CLI returns before the Sunday gate
+    config.LIVEBOOK_BAND_UNDER_TEST, config.PAPER_GATE_WINDOW_START, config.PAPER_GATE_POLICY = None, None, None
+    pg0, _ = _pg({}, t_open)
+    config.LIVEBOOK_BAND_UNDER_TEST = BQ
+    pg1, _ = _pg({}, t_open)
+    config.LIVEBOOK_BAND_UNDER_TEST, config.PAPER_GATE_WINDOW_START = None, START
+    pg2, _ = _pg({}, t_open)
+    rc_bs, out_bs = _capture(IM.main, ["--band-scorecard"])
+    check("paper_gate with no band under test, or no window start, is 'none registered' (status none, nothing bumped); "
+          "`improve.py --band-scorecard` prints it and returns BEFORE the Sunday gate (no history line, no proposal)",
+          pg0["status"] == pg1["status"] == pg2["status"] == "none" and all(p["line"].startswith("none registered") for p in (pg0, pg1, pg2))
+          and TR.family_count("nominations") == 0 and rc_bs == 0 and "none registered" in out_bs
+          and not os.path.exists(config.IMPROVE_HISTORY_PATH) and not os.path.exists(config.PROPOSALS_DIR), out_bs[-300:])
+    check("PAPER_GATE_POLICY None resolves to the exit champion's executable plan (the default champion here)",
+          pg0["policy"] == DEFQ)
+
+    # the stamp and the window: band_mask reads sidecar_true; the synthetic book can plant it
+    book_half = IM._synthetic_book(4, 6, _q_t0, seed=31, stamp=[BQ], stamp_frac=0.5)
+    _, _, meta_h = IM.live_returns(book_half)
+    n_st = sum(1 for p in book_half.values() if BQ in p["sidecar_true"])
+    check("band_mask is True exactly on the meta rows whose position carries the band in sidecar_true (Phase 4's stamp)",
+          0 < n_st < len(meta_h) and int(IM.band_mask(book_half, meta_h, BQ).sum()) == n_st
+          and int(IM.band_mask(book_half, meta_h, "band_y").sum()) == 0)
+
+    # an OPEN window: the table prints, no verdict, the paper: line is bumped exactly once
+    config.LIVEBOOK_BAND_UNDER_TEST, config.PAPER_GATE_WINDOW_START, config.PAPER_GATE_POLICY = BQ, START, CHQ
+    book_a = IM._synthetic_book(W, 5, _q_t0, seed=32, adv={CHQ: 0.60}, stamp=[BQ])            # 35 stamped, in-window
+    book_a.update(IM._synthetic_book(W, 3, _q_t0 + 100.0, seed=33, seq0=1000))               # 21 unstamped: the complement
+    book_a.update(IM._synthetic_book(2, 4, _q_t0 - 5 * 86400, seed=34, stamp=[BQ], seq0=2000))   # 8 stamped BEFORE the window
+    pga, out_a = _pg(book_a, t_open)
+    pga2, _ = _pg(book_a, t_open)
+    rc_bs, out_bs = _capture(IM.main, ["--band-scorecard"])
+    check("an open window: status 'open', the line says 'window <start> open (n fills, D of 7 days)', eligible = stamped ∧ in-window "
+          "(35, not the 8 pre-window stamped rows nor the 21 unstamped), the complement is reported, no verdict, no paper_verdict line",
+          pga["status"] == "open" and f"{BQ}@{CHQ} window {START} open (" in pga["line"] and "3.5 of 7 days" in pga["line"]
+          and pga["n"] == 35 and pga["complement"]["n"] == 21 and pga["policy_row"]["n"] == 35
+          and not _tr_lines("paper_verdict:") and pga["table"] is not None, pga["line"])
+    _, out_tab = _capture(IM._print_paper_gate, pga)
+    check("the paper: nomination line is bumped ONCE for a (band, policy, start) — a second evaluation adds nothing; the CLI prints the "
+          "pair's line on its own wall clock ('pending' before the 2027 window) and its renderer prints the open-window table with "
+          "the policy under test, the controls, the complement and the checks",
+          _tr_lines("paper:") == [f"paper:{BQ}/{CHQ}@{START}"] and pga2["line"] == pga["line"]
+          and rc_bs == 0 and f"paper gate: {BQ}@{CHQ} window {START} pending" in out_bs
+          and f"window {START} open (" in out_tab and f"*{CHQ}" in out_tab and "net LB" in out_tab
+          and "(control)" in out_tab and "complement (in-window, unstamped)" in out_tab and "[x] " in out_tab
+          and "promotes nothing" in out_tab, out_bs[-200:] + out_tab[-400:])
+    check("every evaluation reports n_armed and flow_dark_share (None for a policy with no flow leg) and n_days with the bound label "
+          "when n_days < MIN_BOOTSTRAP_CLUSTERS (7 days here)",
+          pga["n_armed"] is None and pga["flow_dark_share"] is None and not pga["has_flow"]
+          and pga["n_days"] == 7 and "a number, not a bound (floor 12)" in pga["line"], pga["line"])
+
+    # CLOSED window, everything clears ⇒ PASS, recorded once, printed from the record afterwards
+    pgp, _ = _pg(book_a, t_closed)
+    pgp2, _ = _pg(book_a, t_closed)
+    check("a closed window that clears every pre-registered check is PASS: n >= 20, policy net LB > 0, both controls' net LB <= 0, no "
+          "inert control, gapped and refused shares within bounds, no eligible position open",
+          pgp["status"] == "PASS" and pgp["policy_row"]["net_lb"] > 0 and pgp["n"] >= config.PAPER_GATE_MIN_FILLS
+          and all(v <= 0 for v in pgp["controls_net_lb"].values()) and len(pgp["controls_net_lb"]) == 2
+          and all(ok for _, ok, _ in pgp["checks"]) and pgp["line"].startswith(f"{BQ}@{CHQ} window {START} PASS ("),
+          f"{pgp['line']} {pgp['checks']}")
+    check("the verdict is one-shot: paper_verdict:<band>/<policy>@<start>=pass is recorded once and a later run prints the RECORDED line",
+          _tr_lines("paper_verdict:") == [f"paper_verdict:{BQ}/{CHQ}@{START}=pass"] and pgp2["recorded"] == _tr_lines("paper_verdict:")[0]
+          and pgp2["status"] == "PASS" and "(recorded)" in pgp2["line"] and "(recorded)" not in pgp["line"])
+    check("net LB is day_lb minus policies.round_trip_cost() for every row, controls included (double-conservative on purpose)",
+          abs(pgp["policy_row"]["net_lb"] - (pgp["policy_row"]["day_lb"] - POL.round_trip_cost())) < 1e-12
+          and all(abs(r["net_lb"] - (r["day_lb"] - POL.round_trip_cost())) < 1e-12 for r in pgp["table"]["controls"].values()))
+    # the same pair with a still-open eligible position is NOT judged
+    book_open = json.loads(json.dumps(book_a))
+    k_first = next(k for k, p in book_open.items() if BQ in p["sidecar_true"] and _q_t0 <= p["opened_ts"] < _q_t0 + W * 86400)
+    book_open[k_first]["done"] = False
+    pgo, _ = _pg(book_open, t_closed)
+    check("an eligible position still open past the window keeps the status 'open' (no verdict is minted while a fill can change)",
+          pgo["status"] == "open" and pgo["n_open_eligible"] == 1 and "still open" in pgo["line"], pgo["line"])
+
+    # FAIL: a new pair (policy without the edge) ⇒ net LB <= 0; and too few fills
+    config.PAPER_GATE_POLICY = "sell_1h"
+    pgf, _ = _pg(book_a, t_closed)
+    config.PAPER_GATE_POLICY = CHQ
+    config.PAPER_GATE_WINDOW_START = "2027-03-01T00:00:00Z"
+    _q_t1 = IM._parse_window_start(config.PAPER_GATE_WINDOW_START)
+    book_thin = IM._synthetic_book(W, 2, _q_t1, seed=35, adv={CHQ: 0.60}, stamp=[BQ])       # 14 < 20 fills
+    pgt, _ = _pg(book_thin, _q_t1 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0)
+    config.PAPER_GATE_WINDOW_START = START
+    check("FAIL when the policy's net LB is not above zero, and FAIL below PAPER_GATE_MIN_FILLS — each on its own (band, policy, start) "
+          "with its own paper: line (a changed policy or start is a NEW counted window)",
+          pgf["status"] == "FAIL" and "net LB" in pgf["line"] and pgt["status"] == "FAIL" and "fills" in pgt["line"]
+          and _tr_lines("paper:") == [f"paper:{BQ}/{CHQ}@{START}", f"paper:{BQ}/sell_1h@{START}", f"paper:{BQ}/{CHQ}@2027-03-01T00:00:00Z"]
+          and len(_tr_lines("paper_verdict:")) == 3, f"{pgf['line']} | {pgt['line']} | {_tr_lines('paper')}")
+
+    # VOID (no number quoted): a profitable control, an inert control, a collapsed grid, a capacity-limited window —
+    # each on a FRESH (band, policy) pair: sell_3h already has two windows and the cap would refuse a third
+    config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = "sell_2h", "2027-05-01T00:00:00Z"
+    _q_t2 = IM._parse_window_start(config.PAPER_GATE_WINDOW_START)
+    t2_closed = _q_t2 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0
+    pgv1, _ = _pg(IM._synthetic_book(W, 5, _q_t2, seed=36, adv={"sell_2h": 0.60}, stamp=[BQ], ctl_immediate_mean=0.20), t2_closed)
+    config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = "sell_6h", "2027-05-20T00:00:00Z"
+    _q_t3 = IM._parse_window_start(config.PAPER_GATE_WINDOW_START)
+    pgv2, _ = _pg(IM._synthetic_book(W, 5, _q_t3, seed=37, adv={"sell_6h": 0.60}, stamp=[BQ], inert_random=True),
+                  _q_t3 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0)
+    config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = "trail_30", "2027-06-10T00:00:00Z"
+    _q_t4 = IM._parse_window_start(config.PAPER_GATE_WINDOW_START)
+    pgv3, _ = _pg(IM._synthetic_book(W, 5, _q_t4, seed=38, adv={"trail_30": 0.60}, stamp=[BQ], gapped={"trail_30": 0.6}),
+                  _q_t4 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0)
+    check("VOID on a control profitable NET OF COST, on an inert control, and on a gapped share above BAND_MAX_GAPPED_SHARE — the table "
+          "is suppressed (no number quoted) and the line names the fault",
+          pgv1["status"] == pgv2["status"] == pgv3["status"] == "VOID"
+          and pgv1["table"] is None and pgv1["policy_row"] is None and "ctl_exit_immediately" in pgv1["line"]
+          and "INERT" in pgv2["line"] and "SAMPLING GAP" in pgv3["line"] and pgv3["gapped_share"] > config.BAND_MAX_GAPPED_SHARE,
+          f"{pgv1['line']} | {pgv2['line']} | {pgv3['line']}")
+    # refused share: missed lines inside the window whose event_seq the band selected (sidecar 1) with a refusal reason
+    config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = "stop_50", "2027-07-01T00:00:00Z"
+    _q_t5 = IM._parse_window_start(config.PAPER_GATE_WINDOW_START)
+    book_r = IM._synthetic_book(W, 5, _q_t5, seed=39, adv={"stop_50": 0.60}, stamp=[BQ])     # 35 admitted
+    with open(config.BAND_VERDICTS_PATH, "w", newline="") as fh:
+        w_ = csv.writer(fh); w_.writerow(["event_seq", "token", "alert_ts", "band", "verdict"])
+        for seq_, v_ in ((9001, "1"), (9002, "1"), (9003, "1"), (9004, "0"), (9005, "1")):
+            w_.writerow([seq_, "0x%040x" % seq_, _q_t5 + 3600, BQ, v_])
+    with open(LB.MISSED_PATH, "w") as fh:
+        for seq_, reason_, ts_ in ((9001, "band_under_test_full", _q_t5 + 3600), (9002, "entry lag exceeds MAX_ENTRY_LAG_S", _q_t5 + 7200),
+                                   (9003, "band_under_test_full", _q_t5 + 10800), (9004, "band_under_test_full", _q_t5 + 3600),
+                                   (9005, "book_full", _q_t5 + 3600), (9001, "band_under_test_full", _q_t5 - 86400)):
+            fh.write(json.dumps({"ts": ts_, "token": "0x%040x" % seq_, "event_seq": seq_, "symbol": "R", "tier": "B",
+                                 "alert_ts": ts_ - 200, "entry_lag_s": 200.0, "reason": reason_}) + "\n")
+    pgr, _ = _pg(book_r, _q_t5 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0)
+    os.remove(LB.MISSED_PATH); os.remove(config.BAND_VERDICTS_PATH)
+    check("refused share = refusals / (refusals + admitted): only band_under_test_full / entry-lag lines INSIDE the window whose "
+          "event_seq the band selected count (3 of 6 lines: a verdict-0 row, a book_full row and a pre-window row do not) ⇒ 3/38 > 0.05 ⇒ VOID",
+          pgr["n_refused"] == 3 and pgr["n_admitted"] == 35 and abs(pgr["refused_share"] - 3 / 38) < 1e-12
+          and pgr["status"] == "VOID" and "CAPACITY" in pgr["line"], f"{pgr['n_refused']} {pgr['n_admitted']} {pgr['line']}")
+
+    # the adaptive policy: the price-only twin is the paired benchmark; the flow-dark share VOIDs above 0.50
+    from selfimprove.candidates import tp15_half_flowtrail_stop50_6h as _FLOWC, tp15_half_armtrail30_stop50_6h as _ARMC
+    POL.POLICIES["zz_flow_probe"] = json.loads(json.dumps(_FLOWC.POLICY))
+    POL.POLICIES["zz_price_probe"] = json.loads(json.dumps(_ARMC.POLICY))
+    config.PAPER_GATE_POLICY = "zz_flow_probe"
+    config.PAPER_GATE_WINDOW_START = "2027-08-01T00:00:00Z"
+    _q_t6 = IM._parse_window_start(config.PAPER_GATE_WINDOW_START)
+    t6_closed = _q_t6 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0
+    book_f = IM._synthetic_book(W, 5, _q_t6, seed=40, adv={"zz_flow_probe": 0.60, "zz_price_probe": 0.30}, stamp=[BQ])
+    for p_ in book_f.values():
+        p_["policies"]["zz_flow_probe"].update(flow_ticks=1, flow_dark_ticks=3)
+    pgd, _ = _pg(book_f, t6_closed)
+    for p_ in book_f.values():
+        p_["policies"]["zz_flow_probe"].update(flow_ticks=4, flow_dark_ticks=0)
+    config.PAPER_GATE_WINDOW_START = "2027-08-20T00:00:00Z"
+    _q_t7 = IM._parse_window_start(config.PAPER_GATE_WINDOW_START)
+    for p_ in book_f.values():
+        p_["opened_ts"] += (_q_t7 - _q_t6)
+    pgl, _ = _pg(book_f, _q_t7 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0)
+    check("a policy with a flow leg: the tick-level dark share over ARMED positions comes from livebook.live_stats_dict (the one "
+          "implementation) — 3 dark of 4 ticks on every close ⇒ 0.75 > 0.50 ⇒ VOID naming FLOW DARK, n_armed reported",
+          pgd["has_flow"] and pgd["n_armed"] == 35 and abs(pgd["flow_dark_share"] - 0.75) < 1e-12 and pgd["status"] == "VOID"
+          and "FLOW DARK" in pgd["line"], pgd["line"])
+    check("...and with the feed lit (0 dark ticks) the same pair is judged on its numbers: the price-only twin is found as the paired "
+          "benchmark (reported, never gated) and the flow-dark check passes",
+          pgl["status"] in ("PASS", "FAIL") and pgl["flow_dark_share"] == 0.0 and pgl["n_armed"] == 35
+          and pgl["benchmark"]["name"] == "zz_price_probe" and pgl["benchmark"]["n"] == 35 and pgl["benchmark"]["paired_lb"] == pgl["benchmark"]["paired_lb"]
+          and any("flow-dark" in l_ and ok_ for l_, ok_, _ in pgl["checks"]), f"{pgl['line']} {pgl['benchmark']}")
+    check("_price_only_twin: the twin is the registered policy whose price legs equal the adaptive policy's minus `flow`; a policy "
+          "without a flow leg has none", IM._price_only_twin("zz_flow_probe") == "zz_price_probe" and IM._price_only_twin(CHQ) is None)
+    del POL.POLICIES["zz_flow_probe"], POL.POLICIES["zz_price_probe"]
+
+    # the cap: after two windows on a pair, a third inside BAND_RENOMINATE_COOLDOWN_DAYS is refused (no bump)
+    config.PAPER_GATE_POLICY = "sell_15m"
+    TR.bump("nominations", [f"paper:{BQ}/sell_15m@2026-12-01T00:00:00Z", f"paper:{BQ}/sell_15m@2026-12-15T00:00:00Z"])
+    n_before = TR.family_count("nominations")
+    config.PAPER_GATE_WINDOW_START = "2027-01-15T00:00:00Z"                                    # 31 d after the 2nd: refused
+    pgc, _ = _pg(book_a, t_open)
+    n_after_refusal = TR.family_count("nominations")
+    config.PAPER_GATE_WINDOW_START = "2027-06-01T00:00:00Z"                                    # 168 d after: allowed
+    pgc2, _ = _pg({}, t_open)
+    check("the cap: a third window on the same (band, policy) inside BAND_RENOMINATE_COOLDOWN_DAYS of the second is REFUSED with no "
+          "paper: line; past the cooldown it is registered",
+          pgc["status"] == "refused" and "cooldown" in pgc["line"] and n_after_refusal == n_before
+          and pgc2["status"] in ("open", "pending") and TR.family_count("nominations") == n_before + 1, f"{pgc['line']} | {pgc2['line']}")
+
+    # summary_json carries the paper gate (NaN-free); evaluate_all threads it; the weekly line relays it
+    config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = CHQ, START
+    LB._save_atomic(book_a, LB.BOOK_PATH)
+    res_q, _ = _capture(IM.evaluate_all, t_open, book_a)
+    pj = IM.summary_json(res_q)
+    strict_q = json.loads(_read(pj), parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
+    check("evaluate_all carries res['paper_gate'] and summary_json writes it NaN-free under 'paper_gate' with the line and the status",
+          res_q["paper_gate"]["status"] == "open" and strict_q["paper_gate"]["status"] == "open"
+          and strict_q["paper_gate"]["line"] == res_q["paper_gate"]["line"] and "NaN" not in _read(pj))
+    with tempfile.TemporaryDirectory() as d_:
+        PQ = {k: os.path.join(d_, os.path.basename(v_)) for k, v_ in WS.default_paths().items()}
+        lines_q0, _ = _capture(WS.compose, t_open, None, PQ)
+        shutil.copyfile(pj, PQ["livebook"])
+        lines_q1, _ = _capture(WS.compose, t_open, None, PQ)
+    check("weekly_summary prints ONE 'paper gate:' line — 'none registered' on an empty repo, the gate's own line from "
+          "data/livebook_summary.json otherwise (wrapped by _add: never a crash)",
+          [l_ for l_ in lines_q0 if l_.startswith("paper gate:")] == ["paper gate: none registered"]
+          and [l_ for l_ in lines_q1 if l_.startswith("paper gate:")] == ["paper gate: " + res_q["paper_gate"]["line"]],
+          str([l_ for l_ in lines_q0 + lines_q1 if "paper gate" in l_]))
+    # a verdict is not a promotion: champion.json and the registry are untouched by every evaluation above
+    check("a verdict promotes nothing: champion.json was never written by the paper gate (only trials.json grew)",
+          not os.path.exists(config.CHAMPION_PATH))
+
+    # the history line's `applied` stamp (weekly.yml's idempotency reads it): a dry run never stamps the day
+    if os.path.exists(config.IMPROVE_HISTORY_PATH):
+        os.remove(config.IMPROVE_HISTORY_PATH)
+    LB._save_atomic({}, LB.BOOK_PATH)
+    _capture(IM.main, [])
+    _capture(IM.main, ["--apply"])
+    _hist = [json.loads(l_) for l_ in _read(config.IMPROVE_HISTORY_PATH).splitlines() if l_.strip()]
+    check("improve_history.jsonl lines carry `applied`: false for a dry run, true for an --apply run (the day is stamped only by --apply)",
+          len(_hist) == 2 and _hist[0]["applied"] is False and _hist[1]["applied"] is True and "ts" in _hist[1], str(_hist))
+finally:
+    LB.BOOK_PATH, LB.MISSED_PATH = _saved_q["BOOK_PATH"], _saved_q["MISSED_PATH"]
+    config.CHAMPION_PATH, config.TRIALS_PATH = _saved_q["CHAMPION_PATH"], _saved_q["TRIALS_PATH"]
+    config.IMPROVE_HISTORY_PATH, config.PROPOSALS_DIR = _saved_q["IMPROVE_HISTORY_PATH"], _saved_q["PROPOSALS_DIR"]
+    config.LIVEBOOK_SUMMARY_PATH, config.PAUSE_PATH = _saved_q["LIVEBOOK_SUMMARY_PATH"], _saved_q["PAUSE_PATH"]
+    config.BAND_VERDICTS_PATH = _saved_q["BAND_VERDICTS_PATH"]
+    config.LIVEBOOK_BAND_UNDER_TEST = _saved_q["LIVEBOOK_BAND_UNDER_TEST"]
+    config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = _saved_q["PAPER_GATE_POLICY"], _saved_q["PAPER_GATE_WINDOW_START"]
+    alerts.send_all = _saved_q["send_all"]
+    POL.POLICIES.clear(); POL.POLICIES.update(_saved_q["policies"])
+    shutil.rmtree(_tmp_q, ignore_errors=True)
 
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")
