@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1789823262.5201864,
+   "event_seq": 1396,
+   "first_seen_ts": 1789823262.5201864,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "HAVOC",
+   "tier": "A",
+   "token": "0xee1f4da0aed27da2cf61bc01a92c5a6069d1a03e",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x00c25c499ce818d01b47bb0d6358620b4967b434:858": {
    "alert_ts": 1789677156.289408,
@@ -1594,6 +1626,50 @@
    "tokens_raw": 28844731123672081760256,
    "tokens_remaining_raw": 28844731123672081760256,
    "weth_px_usd_open": 2637.067
+  },
+  "0x2ea0fcc525a1cf39d95dc02fe587e498b9c20372:1397": {
+   "alert_ts": 1789823262.5201864,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.8761807998427665e-22,
+   "event_seq": 1397,
+   "gas_usd": 0.07,
+   "impact_pct_open": 7.7846,
+   "opened_ts": 1789823262.5201864,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "BITDOG",
+   "tier": "A",
+   "token": "0x2ea0fcc525a1cf39d95dc02fe587e498b9c20372",
+   "tokens_raw": 53299767276362973315072,
+   "tokens_remaining_raw": 53299767276362973315072,
+   "weth_px_usd_open": 2636.31
   },
   "0x3081b48e6f9ded8a1e5bb3edf09d3e7a8a7de3d0:154": {
    "alert_ts": 1789249094.6806264,
@@ -4628,7 +4704,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.8235572517544608e-22,
    "event_seq": 1395,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 1.0343,
    "opened_ts": 1789823022.907176,
    "pending_exits": [],
@@ -4655,12 +4731,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 7.1580336718391395,
    "symbol": "HAVOC",
    "tier": "A",
    "token": "0xbe6adaad4694f245ec5000a8b802527b0599a5b5",
    "tokens_raw": 54837872462621667491840,
-   "tokens_remaining_raw": 54837872462621667491840,
+   "tokens_remaining_raw": 27418936231310833745920,
    "weth_px_usd_open": 2642.049
   },
   "0xbfeda09e715c8994ed0dc2b759343e9aeee65a12:55": {
