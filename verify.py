@@ -3602,6 +3602,29 @@ try:
     check("K1: the run is VOID when the random control alone has own_lb > 0 (the apparatus is measuring itself)",
           res["controls"]["ctl_random_band"]["own_lb"] > 0 and v["gate_broken"] and v["winner"] is None
           and "no number from this run may be quoted" in _read(IB.write_proposal(res, v, P5)))
+    # F4: the bar for check 2 is `max(control lift bounds)`. With no finite control bound that bar
+    # was -inf and check 2 passed vacuously — the state ctl_random_band was actually in for 647+
+    # verdict rows. A control that produced no evidence is an apparatus fault, not a cleared bar.
+    res_nc = json.loads(json.dumps(IB.evaluate_all(now_i, paths=Pi, shuffle_reps=SH), default=lambda o: None))
+    for _c in res_nc["controls"].values():
+        _c["lift_lb"] = float("nan")
+    res_nc["bands"][planted]["lift_lb"] = -0.9     # would have "beaten" a -inf bar
+    v_nc = IB.decide(res_nc)
+    check("K1b: a run in which NO negative control produced a finite lift bound is VOID (the bar for check 2 would be "
+          "-inf and everything would clear it) — unknown is never a pass, so the apparatus fault fires instead",
+          v_nc["gate_broken"] and v_nc["winner"] is None and not v_nc["promote"] and v_nc["nominate"] is None
+          and any(x.startswith("CONTROLS PRODUCED NO EVIDENCE:") for x in v_nc["void"])
+          and "ctl_random_band" in v_nc["void"][0] and v_nc["checks"] == []
+          and "no number from this run may be quoted" in _read(IB.write_proposal(res_nc, v_nc, Pi)),
+          str(v_nc["void"]))
+    res_1c = json.loads(json.dumps(res_nc, default=lambda o: None))
+    res_1c["controls"]["ctl_inverse_band"]["lift_lb"] = -0.5
+    v_1c = IB.decide(res_1c)
+    check("one finite control bound is a bar: the VOID lifts and check 2 is then decided against it (a -0.900 lift "
+          "bound no longer clears a -0.500 control)",
+          not v_1c["gate_broken"] and v_1c["winner"] == planted and not v_1c["checks"][1][1]
+          and "ctl_inverse_band" in v_1c["checks"][1][0] and "undefined" not in v_1c["checks"][1][2],
+          str(v_1c["checks"][1]))
     d10 = os.path.join(base_dir, "x"); os.makedirs(d10)
     P10 = IB._fixture(d10, gapped_frac=0.5)
     res10 = IB.evaluate_all(now_i, paths=P10, shuffle_reps=SH)

@@ -327,7 +327,22 @@ def decide(res: dict) -> dict:
         return out
 
     # apparatus faults first — disqualifying, and the table is suppressed
+    #
+    # The bar for check 2 is the best NEGATIVE CONTROL lift bound, and it is only a bar if some
+    # control actually produced one: `max(ctl_lifts) if ctl_lifts else -inf` would let ANY finite
+    # lift bound clear check 2 for free on a run where no control fired at all. Unknown is never a
+    # pass here either, so that state is an apparatus fault, exactly as improve.paper_gate treats a
+    # control that produced no row (`c in tbl["controls"] and net_lb <= 0`).
+    ctl_lifts = [x["lift_lb"] for x in ctl.values() if _fin(x.get("lift_lb"))]
+    ctl_lift_max = max(ctl_lifts) if ctl_lifts else float("-inf")
+    ctl_best = (max((n for n in ctl if _fin(ctl[n].get("lift_lb"))), key=lambda n: ctl[n]["lift_lb"])
+                if ctl_lifts else "none defined")
     void = []
+    if not ctl_lifts:
+        void.append("CONTROLS PRODUCED NO EVIDENCE: no negative control has a finite lift bound ("
+                    + (", ".join(sorted(ctl)) if ctl else "no control scored") +
+                    ") — a control that never fires cannot detect anything, and the bar for "
+                    "'beats the best negative control' would be -inf (everything clears it)")
     for n, x in ctl.items():
         if _fin(x.get("own_lb")) and x["own_lb"] > 0:
             void.append(f"CONTROL PROFITABLE ON ITS OWN BOUND: {n} own LB {x['own_lb']:+.3f} > 0")
@@ -377,10 +392,6 @@ def decide(res: dict) -> dict:
     cooldown_s = config.BAND_RENOMINATE_COOLDOWN_DAYS * 86400
     failed, failed_ts = st.get("failed_nominee"), st.get("failed_ts")
     nom = res.get("nomination")
-    ctl_lifts = [x["lift_lb"] for x in ctl.values() if _fin(x.get("lift_lb"))]
-    ctl_lift_max = max(ctl_lifts) if ctl_lifts else float("-inf")
-    ctl_best = (max((n for n in ctl if _fin(ctl[n].get("lift_lb"))), key=lambda n: ctl[n]["lift_lb"])
-                if ctl_lifts else "none defined")
     best = None
     if nom and nom["nominee"] in bands:
         best = nom["nominee"]
