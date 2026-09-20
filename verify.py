@@ -682,6 +682,34 @@ check("weekly.yml never stages a Mac-local book file: data/livebook.json / _fill
       not any(x in wyml for x in ("data/livebook.json", "data/livebook_fills.csv", "data/livebook_feed.json",
                                   "data/livebook_missed.jsonl", "data/livebook_ticks.jsonl"))
       and wyml.count("data/livebook") == wyml.count("data/livebook_summary.json"))
+# PUBLISH FAILED is the ONE message the operator gets at the moment the Sunday state failed to
+# land, so it must be true of the CLOUD. It used to promise a recovery that does not exist here:
+# that the run log "stands" and that publish.reconcile() republishes a diverged champion.json
+# next week. reconcile() acts on a LOCAL file, and on a runner the workspace — the champion.json
+# change, the trials bumps, the history line — is destroyed when the job ends; nothing schedules
+# it either. An operator who believed it would wait for a republish that can never happen.
+_pf = wyml[wyml.index('alerts.format_event("PUBLISH FAILED"'):wyml.index("alerts.send_all(t, b, dry_run=False)")]
+_rec_hits = []
+for _f in sorted(glob.glob(os.path.join(ROOT, ".github", "workflows", "*.yml"))
+                 + glob.glob(os.path.join(ROOT, ".github", "*.sh"))
+                 + glob.glob(os.path.join(ROOT, "selfimprove", "*.sh"))
+                 + glob.glob(os.path.join(ROOT, "selfimprove", "research", "*.sh"))
+                 + glob.glob(os.path.join(ROOT, "launchd", "*"))):
+    _inside = _pf if _rel(_f) == ".github/workflows/weekly.yml" else ""
+    _code = "\n".join(l_ for l_ in _read(_f).splitlines() if not l_.strip().startswith("#"))
+    if _code.count("reconcile") != _inside.count("reconcile"):
+        _rec_hits.append(f"{_rel(_f)} ({_code.count('reconcile')})")
+check("PUBLISH FAILED tells the operator the CLOUD's truth: the gates decided in this runner's workspace only, it is discarded "
+      "with the runner, nothing republishes automatically, and the fix is to clear the push obstacle and re-run "
+      "`gh workflow run robinhood-weekly` (the day is not consumed — improve_history.jsonl never landed either). "
+      "publish.reconcile() is named as a MANUAL Mac-side recovery this workflow does not run — and that is true: no workflow, "
+      "keeper script, selfimprove shell script or launchd job names reconcile outside this alert's own body",
+      all(w in _pf for w in ("only in this runner's workspace", "discarded with the runner",
+                             "nothing republishes automatically", "gh workflow run robinhood-weekly",
+                             "day is not consumed", "MANUAL Mac-side recovery",
+                             "This workflow does not run it, and no schedule does."))
+      and "republishes a diverged champion.json next week" not in wyml and "their run log stands" not in wyml
+      and not _rec_hits, str(_rec_hits))
 check("weekly.yml sends the ONE weekly message itself (--send, or --dry under the rehearsal) with a --research line built from the "
       "merged proposals and the unmerged research branches — it no longer depends on the Mac's research session",
       "--research" in wyml and "PROPOSAL_*.md" in wyml and "refs/heads/research/*" in wyml

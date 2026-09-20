@@ -136,13 +136,24 @@ jobs:
           done
           if [ "$pushed" != 1 ]; then
             # the existing event alert, through the existing formatter (heredoc body sits at the
-            # step's base indent so YAML strips it to column 0 and python sees no indentation)
+            # step's base indent so YAML strips it to column 0 and python sees no indentation).
+            # The body is the CLOUD's truth: this is a runner, not the Mac, so the gates' writes
+            # live only in a workspace that is destroyed when the job ends, and NOTHING schedules
+            # publish.reconcile() — it is a manual Mac-side recovery for a diverged LOCAL
+            # champion.json, and there is no surviving local file here for it to find. An
+            # operator told to wait would wait for a republish that can never happen.
           python - <<'PY' || echo "PUBLISH FAILED alert could not be sent"
           import alerts, config
           t, b = alerts.format_event("PUBLISH FAILED", [
               f"weekly.yml could not push the Sunday state after {config.IMPROVE_PUBLISH_RETRIES} attempts.",
-              "The gates ran and their run log stands; nothing was published.",
-              "selfimprove/publish.reconcile() republishes a diverged champion.json next week."])
+              "The gates DECIDED, but only in this runner's workspace: the champion.json change, the "
+              "trials.json bumps, the history lines and the proposal are discarded with the runner. "
+              "Nothing landed on origin/main and nothing republishes automatically.",
+              "The gates are a pure re-evaluation of the committed ledger and book, so nothing is lost "
+              "for good: clear the push obstacle, then re-run `gh workflow run robinhood-weekly` (the "
+              "day is not consumed — improve_history.jsonl never landed either), or wait for next Sunday.",
+              "selfimprove/publish.reconcile() is a MANUAL Mac-side recovery for a diverged local "
+              "champion.json. This workflow does not run it, and no schedule does."])
           alerts.send_all(t, b, dry_run=False)
           PY
             exit 1
