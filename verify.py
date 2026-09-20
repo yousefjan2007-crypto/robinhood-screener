@@ -5623,11 +5623,19 @@ with tempfile.TemporaryDirectory() as _d_sim:
     finally:
         (config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START,
          config.LIVEBOOK_BAND_UNDER_TEST) = _sw_saved_sim
-_q_t0 = float(calendar.timegm((2027, 1, 15, 0, 0, 0)))
 check("_parse_window_start: ISO-8601 UTC (Z and +00:00) → epoch seconds with the stdlib; None / malformed → None (never 'today')",
-      IM._parse_window_start("2027-01-15T00:00:00Z") == _q_t0 == IM._parse_window_start("2027-01-15T00:00:00+00:00")
+      IM._parse_window_start("2027-01-15T00:00:00Z") == float(calendar.timegm((2027, 1, 15, 0, 0, 0)))
+      == IM._parse_window_start("2027-01-15T00:00:00+00:00")
       and IM._parse_window_start(None) is None and _capture(IM._parse_window_start, "15/01/2027")[0] is None
       and _capture(IM._parse_window_start, "")[0] is None)
+# Section Q's whole clock. Every paper_gate call below is handed an explicit now_s, and the ONE
+# assertion that used to be made against the REAL wall clock — `--band-scorecard` printing the
+# fixture window as "pending" — is now made at Q_NOW too. The fixture's window start is DERIVED
+# from that frozen clock (pending BY CONSTRUCTION) rather than being a literal date the calendar
+# eventually reaches: a literal start was a date bomb that would have turned a green suite red
+# on BOTH partitions and on every push from 2027-01-15, with nothing wrong in the system.
+Q_NOW = 1_800_000_000.0
+_q_t0 = Q_NOW + 30.0 * 86400.0
 _saved_q = {"BOOK_PATH": LB.BOOK_PATH, "MISSED_PATH": LB.MISSED_PATH, "CHAMPION_PATH": config.CHAMPION_PATH,
             "TRIALS_PATH": config.TRIALS_PATH, "IMPROVE_HISTORY_PATH": config.IMPROVE_HISTORY_PATH,
             "PROPOSALS_DIR": config.PROPOSALS_DIR, "LIVEBOOK_SUMMARY_PATH": config.LIVEBOOK_SUMMARY_PATH,
@@ -5649,7 +5657,7 @@ try:
     alerts.send_all = lambda title, body, dry_run=True: None
     DEFQ, CHQ, BQ = config.IMPROVE_DEFAULT_EXIT_CHAMPION, "sell_3h", "band_x"
     W = config.PAPER_GATE_WINDOW_DAYS
-    START = "2027-01-15T00:00:00Z"
+    START = IM._iso(_q_t0)                       # derived from Q_NOW, never a literal date
     t_open = _q_t0 + 3.5 * 86400
     t_closed = _q_t0 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0
 
@@ -5700,14 +5708,22 @@ try:
           and pga["n"] == 35 and pga["complement"]["n"] == 21 and pga["policy_row"]["n"] == 35
           and not _tr_lines("paper_verdict:") and pga["table"] is not None, pga["line"])
     _, out_tab = _capture(IM._print_paper_gate, pga)
-    check("the paper: nomination line is bumped ONCE for a (band, policy, start) — a second evaluation adds nothing; the CLI prints the "
-          "pair's line on its own wall clock ('pending' before the 2027 window) and its renderer prints the open-window table with "
-          "the policy under test, the controls, the complement and the checks",
+    # `--band-scorecard` reads the REAL wall clock (improve.main's one time.time()), so only what
+    # a clock cannot move is asserted of its output: it exits 0 and prints THIS pair's line. The
+    # status word 'pending' is asserted where it belongs — at an injected now_s before the window
+    # opens. The old assertion demanded 'pending' from the CLI against a LITERAL 2027-01-15 start:
+    # a date bomb that would have turned the suite red on both partitions from that date onward.
+    pgw, _ = _pg(book_a, Q_NOW)
+    check("the paper: nomination line is bumped ONCE for a (band, policy, start) — a second evaluation adds nothing; a now_s before "
+          "the window start is 'pending' with the days-to-go in the line; the CLI prints this pair's line and exits 0 (on its own "
+          "wall clock, so no status word is asserted of it); and the renderer prints the open-window table with the policy under "
+          "test, the controls, the complement and the checks",
           _tr_lines("paper:") == [f"paper:{BQ}/{CHQ}@{START}"] and pga2["line"] == pga["line"]
-          and rc_bs == 0 and f"paper gate: {BQ}@{CHQ} window {START} pending" in out_bs
+          and pgw["status"] == "pending" and pgw["line"] == f"{BQ}@{CHQ} window {START} pending (starts in 30.0 d)"
+          and rc_bs == 0 and f"paper gate: {BQ}@{CHQ} window {START} " in out_bs
           and f"window {START} open (" in out_tab and f"*{CHQ}" in out_tab and "net LB" in out_tab
           and "(control)" in out_tab and "complement (in-window, unstamped)" in out_tab and "[x] " in out_tab
-          and "promotes nothing" in out_tab, out_bs[-200:] + out_tab[-400:])
+          and "promotes nothing" in out_tab, f"{pgw['line']} | " + out_bs[-200:] + out_tab[-400:])
     check("every evaluation reports n_armed and flow_dark_share (None for a policy with no flow leg) and n_days with the bound label "
           "when n_days < MIN_BOOTSTRAP_CLUSTERS (7 days here)",
           pga["n_armed"] is None and pga["flow_dark_share"] is None and not pga["has_flow"]
