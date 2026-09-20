@@ -748,6 +748,22 @@ check("the guard FAILS OPEN: gh's stderr is discarded and its failure is not fat
       "unauthorised API leaves PRIOR empty and the ONE weekly message still goes out — a broken guard can never silence it",
       "set +e -o pipefail" in _wsum and "2>/dev/null" in _wsum
       and not re.search(r"PRIOR=.*\|\|\s*exit", _wsum), _wsum[:0])
+# The scan loop's Sunday insurance counted EVERY robinhood-weekly run today, so a same-day dry
+# rehearsal — which succeeds while writing nothing and skipping Publish — made it conclude the day
+# was covered, and the real Sunday pass would never be dispatched if GitHub's cron missed it too.
+# Same selector as the send guard above, because it answers the same question.
+_keep_ins = _read(os.path.join(ROOT, ".github", "keeper.sh"))
+_ins_fn = _keep_ins[_keep_ins.index("sunday_insurance() {"):]
+_ins_fn = _ins_fn[:_ins_fn.index("\n}\n") + 3]
+check("keeper.sh's sunday_insurance counts only NON-DRY robinhood-weekly runs: it asks for displayTitle and filters with the same "
+      "`contains(\"dry\") | not` selector weekly.yml's send guard uses, so a `dry=true` rehearsal can never persuade the scan loop "
+      "that the Sunday pass already happened — and the log line says 'non-dry runs today=' so the operator reads what was counted",
+      "--json databaseId,displayTitle" in _ins_fn
+      and 'select((.displayTitle // "") | contains("dry") | not)' in _ins_fn
+      and "--json databaseId --jq length" not in _ins_fn
+      and "non-dry runs today=$n" in _ins_fn
+      and all("non-dry" in _t_ for _t_ in (_read(os.path.join(ROOT, "CLAUDE.md")), _read(os.path.join(ROOT, "docs", "DESIGN.md")))),
+      _ins_fn)
 _res_src0 = _read(os.path.join(ROOT, "selfimprove", "research", "run_research.sh"))
 check("run_research.sh: step 0 ff-syncs the Mac tree to origin/main (never forced — the deleted run_improve.sh's job) and its "
       "finish() renders the summary with --dry unless RESEARCH_SEND_SUMMARY=1, so exactly ONE weekly message goes out",
@@ -2693,10 +2709,14 @@ def _registration_faults(registry_path: str, trials_path: str) -> list:
     `register.py --scan` ran, taking the repo's primary safety signal and run_research.sh's own
     merge gate down with it. The rule is:
       · unregistered ⇒ shipping the file registered nothing — the name is live in no loader;
-      · registered   ⇒ the entry IS the module (kind, module `candidates.<name>`, not retired,
-        the POLICY dict after the loader's ladder retupling / the module's declared REQUIRES), it
-        resolves through the loader the runtime actually uses, and the name is ALREADY in its
-        family's trials list, so the DSR denominator can never lag the family.
+      · registered   ⇒ the entry IS the module (kind, module `candidates.<name>`, the POLICY dict
+        after the loader's ladder retupling / the module's declared REQUIRES), it resolves through
+        the loader the runtime actually uses, and the name is ALREADY in its family's trials list,
+        so the DSR denominator can never lag the family;
+      · RETIRED      ⇒ a valid terminal state, not a fault: the loaders honour `status ==
+        "retired"` by skipping it, its module may be deleted (`load_candidates` and
+        `Registry.names()` never look for one), and "a deleted candidate is still a trial", so the
+        only things it still owes are that no loader resolves it and that it stays counted.
     """
     raw = REGC.load_registry_raw(registry_path)
     by_name = {c.get("name"): c for c in raw.get("candidates", [])}
@@ -2706,7 +2726,8 @@ def _registration_faults(registry_path: str, trials_path: str) -> list:
     faults = []
     for nm in SHIPPED_POLICY_CANDS + SHIPPED_BAND_CANDS:
         kind = "policy" if nm in SHIPPED_POLICY_CANDS else "band"
-        mod = B.load_candidate_module(os.path.join(CAND_DIR, nm + ".py"), nm)
+        _mpath = os.path.join(CAND_DIR, nm + ".py")
+        mod = B.load_candidate_module(_mpath, nm) if os.path.exists(_mpath) else None
         e = by_name.get(nm)
         live = (nm in live_pol) if kind == "policy" else (nm in reg.names())
         counted = nm in set(tr.get("policies_ever_scored" if kind == "policy"
@@ -2724,12 +2745,22 @@ def _registration_faults(registry_path: str, trials_path: str) -> list:
         if e.get("module") != f"candidates.{nm}":
             why.append(f"module {e.get('module')!r}")
         if e.get("status") == "retired":
-            why.append("retired")
-        elif not live:
+            # a terminal state the loaders honour, with the module possibly deleted
+            if live:
+                why.append("retired but still resolved by the loader")
+            if not counted:
+                why.append("retired but NOT in trials.json (a deleted candidate is still a trial)")
+            if why:
+                faults.append(f"{nm}: " + "; ".join(why))
+            continue
+        if not live:
             why.append("registered but the loader does not resolve it")
-        if kind == "policy" and e.get("status") != "retired" and live_pol.get(nm) != _norm(mod.POLICY):
+        if mod is None:
+            why.append("registered (not retired) with no module file: the loader answers None on "
+                       "every token for as long as it stands")
+        elif kind == "policy" and live_pol.get(nm) != _norm(mod.POLICY):
             why.append(f"the live policy dict is not the module's POLICY ({live_pol.get(nm)!r})")
-        if kind == "band" and list(e.get("requires") or []) != [str(k) for k in getattr(mod, "REQUIRES", ())]:
+        elif kind == "band" and list(e.get("requires") or []) != [str(k) for k in getattr(mod, "REQUIRES", ())]:
             why.append(f"requires {e.get('requires')!r} != the module's "
                        f"{[str(k) for k in getattr(mod, 'REQUIRES', ())]!r}")
         if not counted:
@@ -2786,6 +2817,22 @@ check("the policy key set every author-facing contract publishes IS policies._PO
       "_template.py, research/research_prompt.md and docs/DESIGN.md, generated from the validator and not from a "
       "literal, so a new key cannot be invisible to the research session that is told to propose one",
       not _keyset_faults, "; ".join(_keyset_faults))
+# The prose count of the policy family goes stale the moment a candidate policy is registered —
+# which is a planned operator action, not a defect — so the docs say BUILT-IN and the pin is
+# generated from the built-in count, never from the live len(POLICIES).
+_cnt_builtin = len(POL.POLICIES) - len(POL.load_candidates())
+_cnt_phrase = f"{_cnt_builtin} built-in policies + {len(POL.CONTROLS)} controls"
+_cnt_drift = re.compile(r"\d+ (?:exit )?policies (?:\+|and) \d+ (?:negative )?controls")
+_cnt_faults = []
+for _cnt_rel in ("README.md", "CLAUDE.md", os.path.join("docs", "DESIGN.md")):
+    _cnt_txt = _read(os.path.join(ROOT, _cnt_rel))
+    if _cnt_phrase not in _cnt_txt:
+        _cnt_faults.append(f"{_cnt_rel}: never says {_cnt_phrase!r}")
+    _cnt_faults += [f"{_cnt_rel}: count that registration falsifies: {m_!r}" for m_ in _cnt_drift.findall(_cnt_txt)]
+check(f"README.md, CLAUDE.md and docs/DESIGN.md describe the policy family as '{_cnt_phrase}' — the BUILT-IN count, generated "
+      "here from policies.POLICIES minus load_candidates() — and none of them carries the bare '<n> policies + <n> controls' "
+      "form, which registering a candidate policy (a planned operator action) makes false",
+      not _cnt_faults, "; ".join(_cnt_faults))
 check("and each of those four contracts names the two adaptive keys with their rules (trail_arm needs a trail, "
       "flow needs trail_arm and only the live book runs it — simulate scores it NaN)",
       not [r for r in _KEYSET_DOCS
@@ -5760,6 +5807,41 @@ with tempfile.TemporaryDirectory() as _d_sim:
           and _sim_pol[_SIM_POL] == _norm(_cand_policy(_SIM_POL))
           and _SIM_BAND in set(_sim_tr["bands_ever_scored"]) and _SIM_POL in set(_sim_tr["policies_ever_scored"]),
           f"{_sim_faults} | {[d[:2] for d in _dec_sim]} | {_out_sim[-200:]}")
+    # RETIRED is a valid terminal state, not a fault: the loaders honour it, "a deleted candidate
+    # is still a trial", and the module may be gone. The mirror hazard — an entry that is NOT
+    # retired whose module never landed (DESIGN's own warning: the loader answers None on every
+    # token) — must still be a fault. Both replayed on copies, with CAND_DIR pointed at them.
+    _cdir_ret = os.path.join(_d_sim, "cands_retired")
+    os.makedirs(_cdir_ret)
+    for _nm_r in SHIPPED_POLICY_CANDS + SHIPPED_BAND_CANDS:
+        shutil.copyfile(os.path.join(CAND_DIR, _nm_r + ".py"), os.path.join(_cdir_ret, _nm_r + ".py"))
+    _rp_ret, _tp_ret = os.path.join(_cdir_ret, "registry.json"), os.path.join(_d_sim, "trials_ret.json")
+    shutil.copyfile(_rp_sim, _rp_ret)
+    shutil.copyfile(_tp_sim, _tp_ret)
+    _raw_ret = REGC.load_registry_raw(_rp_ret)
+    for _c_r in _raw_ret["candidates"]:
+        if _c_r.get("name") == _SIM_POL:
+            _c_r["status"] = "retired"
+    REGC._atomic_json(_rp_ret, _raw_ret)
+    os.remove(os.path.join(_cdir_ret, _SIM_POL + ".py"))          # retired AND deleted
+    _cd_saved = CAND_DIR
+    try:
+        CAND_DIR = _cdir_ret
+        _ret_faults = _registration_faults(_rp_ret, _tp_ret)
+        _ret_live = _SIM_POL in REGC.POL.load_candidates(_rp_ret)
+        _ret_counted = _SIM_POL in set(REGC.trials.load(_tp_ret)["policies_ever_scored"])
+        for _c_r in _raw_ret["candidates"]:                       # the mirror: NOT retired, no module
+            if _c_r.get("name") == _SIM_POL:
+                _c_r["status"] = "candidate"
+        REGC._atomic_json(_rp_ret, _raw_ret)
+        _ghost_faults = _registration_faults(_rp_ret, _tp_ret)
+    finally:
+        CAND_DIR = _cd_saved
+    check("SCENARIO retirement: a registry entry with status 'retired' whose module has been DELETED is NOT a fault — the "
+          "loaders skip it, and a deleted candidate is still a counted trial that deflates its family's DSR forever; the mirror "
+          "case, an entry that is not retired with no module file, IS a fault (the loader would answer None on every token)",
+          _ret_faults == [] and not _ret_live and _ret_counted
+          and any("no module file" in f_ for f_ in _ghost_faults), f"{_ret_faults} | {_ghost_faults}")
     _sw_saved_sim = (config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START, config.LIVEBOOK_BAND_UNDER_TEST)
     try:
         with _policies({_SIM_POL: _sim_pol[_SIM_POL]}):        # as load_candidates would at import

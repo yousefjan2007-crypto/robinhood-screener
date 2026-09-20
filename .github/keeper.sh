@@ -141,17 +141,22 @@ maybe_dispatch_successor() {  # idempotent: every lead-window iteration retries 
 
 dispatch_pages() { gh workflow run robinhood-pages --ref main || log "pages dispatch failed (non-fatal)"; }
 
-sunday_insurance() {  # once per run: Sunday >= 10:00 UTC and no robinhood-weekly run today ⇒
-  [ "$SUNDAY_DONE" = 1 ] && return 0   # dispatch it. A no-op until weekly.yml exists (Phase 8).
+sunday_insurance() {  # once per run: Sunday >= 10:00 UTC and no NON-DRY robinhood-weekly run
+  [ "$SUNDAY_DONE" = 1 ] && return 0   # today ⇒ dispatch it. A `dry=true` rehearsal succeeds
   { [ "$(date -u +%u)" = 7 ] && [ $(( 10#$(date -u +%H) )) -ge 10 ]; } || return 0
-  SUNDAY_DONE=1
+  SUNDAY_DONE=1                        # while writing nothing and skipping Publish, so it does
+                                       # NOT cover the day: counting it would let one rehearsal
+                                       # cost the real Sunday pass. Same selector as weekly.yml's
+                                       # own send guard — run-name renders "dry" into exactly the
+                                       # dry dispatches, so displayTitle is the authority.
   gh workflow view robinhood-weekly >/dev/null 2>&1 || { log "sunday insurance: robinhood-weekly absent; skipped"; return 0; }
   local n
-  n=$(gh run list -w robinhood-weekly --created "$(date -u +%F)" --json databaseId --jq length 2>/dev/null || echo x)
+  n=$(gh run list -w robinhood-weekly --created "$(date -u +%F)" --json databaseId,displayTitle \
+        --jq '[.[] | select((.displayTitle // "") | contains("dry") | not)] | length' 2>/dev/null || echo x)
   if [ "$n" = 0 ]; then
     gh workflow run robinhood-weekly --ref main && log "sunday insurance: dispatched robinhood-weekly"
   else
-    log "sunday insurance: robinhood-weekly runs today=$n; nothing to do"
+    log "sunday insurance: robinhood-weekly non-dry runs today=$n; nothing to do"
   fi
 }
 

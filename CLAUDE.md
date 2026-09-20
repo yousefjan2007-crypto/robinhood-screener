@@ -7,7 +7,7 @@ Guidance for Claude Code sessions working in this repository.
 An **alert-only** Robinhood Chain (chainId 4663) memecoin screener, rebuilt 2026-09-12 as an EVM
 port of `solana_screener`: factory-log discovery → hard gates twice → champion entry band sets tier
 A → event-keyed ledger with a silent B control → paper fills at real router quotes → a Mac live book
-running 16 exit policies + 2 controls → Sunday promotion gates for the exit policy and the entry
+running the 16 built-in policies + 2 controls (plus any registered candidate) → Sunday promotion gates for the exit policy and the entry
 band → a weekly headless research session that can only add *candidates*. **It never touches keys
 or funds**; the pre-committed condition in `README.md` and `paper_exec.py` is that real automation
 is justified only if the **paper** scorecard is repeatedly positive. `README.md` carries the honest
@@ -56,7 +56,9 @@ The **Sunday pass runs on GitHub** (`.github/workflows/weekly.yml`, `name: robin
 cron `0 10 * * 0` — 10:00 UTC year-round, not the Mac's two-UTC-hour local 11:00): idempotency →
 both gates `--apply --send` → `--summary-json` → publish as `robinhood-improve[bot]` → the ONE
 weekly message. `keeper.sh`'s `sunday_insurance` dispatches it when a Sunday past 10:00 UTC has
-no run. The cloud pause switch is `champion.json.locked`; `selfimprove/PAUSE` is Mac-local.
+no **non-dry** run — a `dry=true` rehearsal succeeds while writing nothing, so it does not cover
+the day (same `displayTitle`/`contains("dry")` selector as weekly.yml's own send guard). The
+cloud pause switch is `champion.json.locked`; `selfimprove/PAUSE` is Mac-local.
 
 **One Mac launchd job is left** (`launchd/`, label `com.yousefjan.robinhood-research`, exit 0):
 `research` (Sun 12:00, `run_research.sh` — OPTIONAL: it ff-syncs the tree, proposes candidates,

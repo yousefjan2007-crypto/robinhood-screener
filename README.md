@@ -70,7 +70,7 @@ soft-scored, one flat feature dict is built, every registered entry band is eval
 champion band alone sets tier A and alerts. Events become ledger rows with a monotonic `event_seq`;
 every band's verdict is recorded per event; forward returns fill from batched snapshots; A rows
 drive idempotent exit signals and paper fills at router quotes. The cloud commits `data/` and
-publishes `docs/` every run. Inside the keeper a 60 s ticker runs 16 exit policies and 2 controls off
+publishes `docs/` every run. Inside the keeper a 60 s ticker runs the 16 built-in policies + 2 controls (plus any registered candidate) off
 one shared fill per alert (its state rides the scan's commit); on Sundays the improve jobs re-score both arms behind the gate and a headless
 Claude session proposes new candidates that merge only if `verify.py` is green.
 
@@ -89,7 +89,7 @@ Claude session proposes new candidates that merge only if `verify.py` is green.
 | `cloud_secrets.py` | Pipes the alert secrets into `gh secret set` over stdin. The human runs it. |
 | `verify.py` | The invariant suite — the only tests. Offline, fail-fast. |
 | `sources/` | One module per vendor (`rpc`, `blockscout`, `geckoterminal`, `dexscreener`, `scanhood`, `robinx`, `kyber`, `gmgn`) plus `safety.py`, the adapter that fuses them into the one flat safety dict with the pass-through rule. |
-| `selfimprove/` | The exit loop: `policies.py` (16 policies + 2 controls), `livebook.py` (the keeper's live multi-policy book), `paths.py`/`backfill.py`/`evaluate.py` (bar backtest), `improve.py` (the 7-check exit gate), `champion.py` (the sole writer of `champion.json`), `dsr.py` (the Deflated Sharpe, numpy + `statistics.NormalDist`, vendored so the Sunday gates need no scipy and no sibling repo), `publish.py`, `weekly_summary.py`, `trials.json`. `improve.py` also carries `paper_gate` — the ONE pre-registered judge of the paper test (7 days, 20 fills, PASS / FAIL / VOID over one named (band, policy) pair), which promotes nothing. |
+| `selfimprove/` | The exit loop: `policies.py` (16 built-in policies + 2 controls, plus every registered candidate policy), `livebook.py` (the keeper's live multi-policy book), `paths.py`/`backfill.py`/`evaluate.py` (bar backtest), `improve.py` (the 7-check exit gate), `champion.py` (the sole writer of `champion.json`), `dsr.py` (the Deflated Sharpe, numpy + `statistics.NormalDist`, vendored so the Sunday gates need no scipy and no sibling repo), `publish.py`, `weekly_summary.py`, `trials.json`. `improve.py` also carries `paper_gate` — the ONE pre-registered judge of the paper test (7 days, 20 fills, PASS / FAIL / VOID over one named (band, policy) pair), which promotes nothing. |
 | `selfimprove/entry_lab/` | The entry loop: `bands.py` (bands as pure functions + controls + the registry loader), `runtime.py` (feature normalizer, band evaluation, event decisions, watchlist), `store.py` (the verdict sidecar), `scorecard.py`, `improve_bands.py` (the 9-check entry gate). |
 | `selfimprove/candidates/` | The research pool: `registry.json`, `register.py --scan`, `_template.py`, and every candidate module the weekly session has proposed. |
 | `selfimprove/research/` | `run_research.sh` (the Sunday headless Claude session), `research_prompt.md`, `allowlist.py`, `proposals/`. |
@@ -212,7 +212,7 @@ share beside the book's no-route count so the two rules stay auditable against e
 
 Every alert carries the champion exit plan (`cfg_ladder_stop` by default: the take-profit ladder plus
 the hard stop), and the ledger row and paper position freeze that plan at record time. The plan is
-one of 16 policies + 2 negative controls that the live book runs simultaneously, inside the keeper, off **one shared
+one of the 16 built-in policies + 2 controls (and every registered candidate) that the live book runs simultaneously, inside the keeper, off **one shared
 fill per alert**, behind a quote-integrity gate, so any difference between two policies is caused by
 the exit alone.
 
