@@ -725,12 +725,23 @@ def _history(res: dict, verdict: dict, applied: dict | None, P: dict) -> None:
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────────
+def counts_line(res: dict) -> str:
+    """The exclusion counts — printed on the n=0 path TOO. "insufficient (n=0)" on its own says
+    the ledger is empty; in the state Phase 2 created (~1,300 matured rows, every one
+    `lag_unknown`) and in any post-outage state that is false, and the one number that explains
+    it was the number being hidden. write_proposal has always carried these."""
+    return (f"  excluded: {res.get('n_excluded', {})}  |  gapped share "
+            f"{SC._fmt(res.get('gapped_share'), '.3f')} (void above {config.BAND_MAX_GAPPED_SHARE})"
+            f"  |  lag_unknown rows {res.get('lag_unknown', 0)}")
+
+
 def _print(res: dict, verdict: dict, applied: dict | None, path: str | None) -> None:
     print(f"entry gate: champion `{res['champion']}`  |  {res.get('n_events', 0)} matured events across "
           f"{res.get('n_days', 0)} alert-days  |  {res.get('trials_n')} cumulative band trials  |  "
           f"own-bound bar {BAND_OWN_LB_MIN:.3f} (net of cost)")
     if res.get("n_events", 0) == 0:
         print("  insufficient (n=0)")
+        print(counts_line(res))
     elif verdict.get("gate_broken"):
         print("  per-band table suppressed: run is VOID (apparatus fault)")
         for v in verdict.get("void", []):
@@ -779,6 +790,7 @@ def main(argv: list) -> int:
     if res.get("n_events", 0) == 0:
         if not quiet:
             print("insufficient (n=0)")
+            print(counts_line(res))      # what was excluded is what explains an empty sample
         return 0
     verdict = decide(res)
     path = write_proposal(res, verdict)

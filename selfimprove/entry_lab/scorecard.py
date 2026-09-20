@@ -600,6 +600,21 @@ def _fmt(v, spec: str = "+.3f") -> str:
         return "?"
 
 
+def exclusions_line(ex) -> str:
+    """The symmetric-exclusion sentence. Rendered on the n=0 path TOO: "insufficient (n=0): no
+    matured event rows on the ledger yet" is false in exactly the state Phase 2 created (~1,300
+    matured rows, every one `lag_unknown`) and in any post-outage state, and the counts are the
+    one thing that explains an empty sample."""
+    ex = ex if isinstance(ex, dict) else {}
+    return (f"Symmetric exclusions (both arms, applied to the row before any tier or band is read): "
+            f"implausible {int(ex.get('implausible', 0) or 0)} (a recorded multiple above "
+            f"{config.LEDGER_MAX_PLAUSIBLE_MULT:.0f}x — the EDDICE quote artefact), "
+            f"gapped {int(ex.get('gapped', 0) or 0)} (the forward cell was sampled more than "
+            f"{config.LEDGER_MAX_CELL_LAG_S:.0f} s after its horizon), "
+            f"lag_unknown {int(ex.get('lag_unknown', 0) or 0)} (rows written before the lag stamp existed — "
+            f"the honest restart of the evidence, not a bug).")
+
+
 def markdown(rows: list, controls: list, meta: dict | None = None) -> str:
     """The scorecard as markdown. meta: {champion, n_events, n_days, n_excluded, metric,
     n_trials, fp_champion, stamp}. An empty table renders 'insufficient (n=0)'."""
@@ -612,6 +627,7 @@ def markdown(rows: list, controls: list, meta: dict | None = None) -> str:
     n_ev = int(meta.get("n_events", 0) or 0)
     if n_ev == 0 or not rows:
         lines.append("insufficient (n=0): no matured event rows on the ledger yet.")
+        lines += ["", exclusions_line(meta.get("n_excluded"))]
         return "\n".join(lines) + "\n"
     lines.append(f"- champion: `{champ}`; matured events: **{n_ev}** across **{meta.get('n_days', '?')}** "
                  f"alert-days; excluded: {meta.get('n_excluded', {})}; cumulative band trials: "
@@ -635,14 +651,7 @@ def markdown(rows: list, controls: list, meta: dict | None = None) -> str:
     lines.append("")
     ex = meta.get("n_excluded") or {}
     if isinstance(ex, dict):
-        lines.append(
-            f"Symmetric exclusions (both arms, applied to the row before any tier or band is read): "
-            f"implausible {int(ex.get('implausible', 0) or 0)} (a recorded multiple above "
-            f"{config.LEDGER_MAX_PLAUSIBLE_MULT:.0f}x — the EDDICE quote artefact), "
-            f"gapped {int(ex.get('gapped', 0) or 0)} (the forward cell was sampled more than "
-            f"{config.LEDGER_MAX_CELL_LAG_S:.0f} s after its horizon), "
-            f"lag_unknown {int(ex.get('lag_unknown', 0) or 0)} (rows written before the lag stamp existed — "
-            f"the honest restart of the evidence, not a bug).")
+        lines.append(exclusions_line(ex))
         lines.append("")
     lines.append(f"ctl_random_band carries no evidence before {config.BAND_CTL_RANDOM_CHANGED_ON}: until then "
                  f"its unrealisable firing delay made it return 0 on every recorded row.")

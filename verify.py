@@ -3559,6 +3559,32 @@ check("the scorecard footer prints the three exclusion counts and names the date
       "ctl_random_band carries no evidence",
       "implausible 1" in md_x and "gapped 1" in md_x and "lag_unknown 1" in md_x
       and f"ctl_random_band carries no evidence before {config.BAND_CTL_RANDOM_CHANGED_ON}" in md_x, md_x[-500:])
+# L35: the n=0 path said "no matured event rows on the ledger yet" — false in exactly the state
+# Phase 2 created (~1,300 matured rows, every one lag_unknown) and in any post-outage state. The
+# counts that explain an empty sample must be on the empty path too, not only on the full one.
+md_0 = SC.markdown([], [], {"champion": CHAMP, "n_events": 0, "n_days": 0,
+                            "n_excluded": {"implausible": 3, "gapped": 7, "lag_unknown": 1301}, "n_trials": 1})
+md_0b = SC.markdown([], [], {"champion": CHAMP, "n_events": 0})
+check("a scorecard with n=0 still prints WHY it is empty: the same exclusion sentence, with the counts "
+      "(1,301 lag_unknown rows is the difference between 'the ledger is empty' and 'every matured row was "
+      "excluded'); a run with no n_excluded at all renders zeros rather than raising",
+      "insufficient (n=0)" in md_0 and "implausible 3" in md_0 and "gapped 7" in md_0
+      and "lag_unknown 1301" in md_0 and "lag_unknown 0" in md_0b, md_0)
+_res_n0 = {"champion": CHAMP, "n_events": 0, "n_days": 0, "trials_n": 3, "gapped_share": 0.40,
+           "n_excluded": {"implausible": 3, "gapped": 7, "lag_unknown": 1301}, "lag_unknown": 1301}
+_, _out_n0 = _capture(IB._print, _res_n0, {}, None, None)
+_ib_tree = _tree(os.path.join(ROOT, "selfimprove", "entry_lab", "improve_bands.py"))
+_n0_blind = []
+for _fn in [n for n in ast.walk(_ib_tree) if isinstance(n, ast.FunctionDef) and n.name in ("_print", "main")]:
+    _ifs = [n for n in ast.walk(_fn) if isinstance(n, ast.If) and "n_events" in ast.dump(n.test)]
+    if not any(isinstance(c, ast.Call) and getattr(c.func, "id", None) == "counts_line"
+               for _if in _ifs for c in ast.walk(_if)):
+        _n0_blind.append(_fn.name)
+check("the entry gate's console shows the exclusion counts on the n=0 path too — _print emits them, and BOTH "
+      "n=0 branches (_print's and main's early return, which never reaches _print) call counts_line: a Sunday "
+      "whose whole sample was excluded must not read as 'the ledger is empty'",
+      "insufficient (n=0)" in _out_n0 and "lag_unknown rows 1301" in _out_n0 and "'gapped': 7" in _out_n0
+      and "0.400" in _out_n0 and _n0_blind == [], f"{_n0_blind} {_out_n0!r}")
 
 # the entry gate
 _saved_dsr = SC.dsr_day_means
