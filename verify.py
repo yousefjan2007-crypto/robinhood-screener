@@ -609,7 +609,11 @@ check("launchd/ holds EXACTLY com.yousefjan.robinhood-research.plist — one opt
       _launchd_files == ["com.yousefjan.robinhood-research.plist"], str(_launchd_files))
 
 yml = _read(os.path.join(ROOT, ".github", "workflows", "screener.yml"))
-for needle in ("cancel-in-progress: false", 'python-version: "3.11"', "git add data/ docs/",
+# `git add data/ docs/` appears in screener.yml ONLY inside a comment describing what keeper.sh
+# does — so the old needle was satisfied by prose: deleting the executable
+# `bash .github/keeper.sh --commit-push` left verify green. The executable line is pinned instead
+# (keeper.sh's own copy of the staging line stays needled where it IS executable, above).
+for needle in ("cancel-in-progress: false", 'python-version: "3.11"', "bash .github/keeper.sh --commit-push",
                "robinhood-screener[bot]", "dashboard.py --write", "workflow_dispatch", "run-name:",
                "timeout-minutes: 355", "bash .github/keeper.sh", "TRIGGER: keeper", "--keeper-alive",
                "--ensure-keeper", "gh workflow run robinhood-pages --ref main", "upload-artifact@v4",
