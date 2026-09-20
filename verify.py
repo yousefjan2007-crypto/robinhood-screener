@@ -3321,6 +3321,33 @@ for _hp in (HYPE_E, HYPE_A):
           and (_entry_nm is None or list(_entry_nm.get("requires") or []) == list(_info_v.get("requires") or [])),
           f"{_info_v.get('requires')} {None if _entry_nm is None else _entry_nm.get('requires')}")
 
+# L81: the validator's "not inert vs the champion" and "not all-NA" guards are only worth the
+# permanent counted trial they gate if the fixture set DISCRIMINATES. It did not: vol_h1 was never
+# drawn (clean_fixture's constant $9,000, below every volume band's $50k floor) so band_volume_early,
+# band_hype_early and band_hype_attention were False on all 50, and the champion fired 0 times, which
+# made SIX registered bands bit-identical to it — the guard could not have detected inertness for any
+# of them. This check is the harness's own test.
+_fx_champ = [B.BUILTINS[CHAMP].verdict(f) for f in _fx]
+_fx_vecs = {n_: [REG.get(n_).verdict(f) for f in _fx] for n_ in REG.names() if not REG.is_control(n_)}
+_fx_vecs["band_hype_early"] = [B.spec_from_module(B.load_candidate_module(HYPE_E, "band_hype_early")).verdict(f) for f in _fx]
+_fx_vecs["band_hype_attention"] = [B.spec_from_module(B.load_candidate_module(HYPE_A, "band_hype_attention")).verdict(f) for f in _fx]
+_fx_inert = sorted(n_ for n_, v_ in _fx_vecs.items() if n_ != CHAMP and v_ == _fx_champ)
+_fx_dead = sorted(n_ for n_, v_ in _fx_vecs.items() if not any(v is True for v in v_))
+check(f"register.fixtures() DISCRIMINATES: on the {len(_fx)} seeded fixtures the champion {CHAMP} fires at least once and not "
+      "always, no registered non-control band (nor either hype candidate) has a verdict vector identical to it, and every one "
+      "of them fires somewhere — an inert-vs-champion guard evaluated on a set where nothing fires proves nothing, and that "
+      "guard gates a permanent counted trial",
+      any(v is True for v in _fx_champ) and any(v is not True for v in _fx_champ)
+      and _fx_inert == [] and _fx_dead == [],
+      f"champion True x{sum(v is True for v in _fx_champ)}; inert {_fx_inert}; never fires {_fx_dead}")
+check("and the three volume bands — band_volume_early (the live champion band) and the two hype candidates — each fire on "
+      "fixtures the $50k hour-1 volume floor used to make impossible, with the two hype twins no longer answering identically "
+      "(gmgn_visiting_count is drawn, not held at 8)",
+      all(any(v is True for v in _fx_vecs[n_]) for n_ in ("band_volume_early", "band_hype_early", "band_hype_attention"))
+      and _fx_vecs["band_hype_early"] != _fx_vecs["band_hype_attention"]
+      and json.dumps(_fx) and all(set(f) == set(config.FEATURE_FIELDS) for f in _fx),
+      str({n_: sum(v is True for v in _fx_vecs[n_]) for n_ in ("band_volume_early", "band_hype_early", "band_hype_attention")}))
+
 _HE = B.spec_from_module(B.load_candidate_module(HYPE_E, "band_hype_early"))
 _HA = B.spec_from_module(B.load_candidate_module(HYPE_A, "band_hype_attention"))
 # FOMOPAD's own numbers at its 4.07-minute sighting (the one winner the screener ever saw)

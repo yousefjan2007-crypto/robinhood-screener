@@ -52,6 +52,13 @@ SKIP_FILES = {"_template.py", "register.py", "__init__.py"}
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]{2,40}$")
 N_FIXTURES = 50
 SCHEMA = 2
+# The A-tier clauses the MARGINAL fixture archetype breaks, one per row, in this order.
+# "top10_gap" breaks NOTHING: it is a clean A row whose top-10 share sits between the champion's
+# ceiling (HC_TOP10_MAX_PCT) and a stricter band's — the only shape on which a band that TIGHTENS
+# one clause can differ from the champion, exactly as a broken clause is the only shape on which
+# one that relaxes a clause can.
+_MARGINAL_BREAKS = ("score", "holders", "age", "top10", "roundtrip", "dev_pct",
+                    "creator_prior", "sniped", "liq", "top10_gap")
 
 # Runs under `python3 -I -S`: only the repo root on sys.path (inserted below), stdlib only.
 _VALIDATOR_SRC = r'''
@@ -148,31 +155,146 @@ def _run_validator(path: str, modname: str, fixtures: list, hashseed: str) -> di
 
 
 def fixtures(n: int = N_FIXTURES) -> list:
-    """n JSON-serialisable feat dicts around the clean fixture, seeded (config.SEED)."""
+    """n JSON-serialisable feat dicts around the clean fixture, seeded (config.SEED).
+
+    The set has to DISCRIMINATE. It is the whole evidence the registration validator has that a
+    candidate is deterministic, is not all-NA and is NOT INERT against the champion, and a
+    permanent counted trial rests on that proof — which is empty if every band answers the same
+    thing on all n. Independent uniform draws over a dozen clauses never align: measured on the
+    old set, band_a_strict fired 0 times in 50, so SIX registered bands were bit-identical to it
+    (the inert guard could not have detected anything), and band_volume_early, band_hype_early
+    and band_hype_attention were False on all 50 because `vol_h1` was never drawn at all — it
+    stayed clean_fixture's constant $9,000, below their $50k floor.
+
+    So the draw is a MIXTURE of four coherent archetypes rather than one uniform cloud:
+      * CLEAN SURVIVOR — mature, deep, well-held: the shape band_a_strict exists for;
+      * HOT YOUNG LAUNCH — minutes old, five/six-figure hour-1 volume, buy-heavy, thin holders:
+        the shape the volume bands exist for, and a definite NO for the A band's age/holders;
+      * WIDE — the old independent uniforms, which keep the awkward corners in the set;
+      * MARGINAL — the clean fixture with EXACTLY ONE A-clause broken. A band that relaxes one
+        clause (band_score60, band_holders500, band_no_age, band_launchpad_lenient) can differ
+        from the champion ONLY on a row where that clause is the only failure, and independent
+        draws essentially never produce one.
+    Every FEATURE_FIELDS key is still present on every fixture; only the distribution changed.
+    """
     import numpy as np
     rng = np.random.default_rng(config.SEED)
     base = B.clean_fixture()
+
+    def _lu(lo, hi):
+        """Log-uniform: a volume or market cap is a scale, not an offset."""
+        return float(np.exp(rng.uniform(np.log(lo), np.log(hi))))
     out = []
     for i in range(n):
         f = dict(base)
+        kind = ("clean", "hot", "wide", "marginal")[i % 4]
+        if kind == "clean":
+            f.update({
+                "score": float(rng.uniform(60, 95)), "top10_pct": float(rng.uniform(4, 22)),
+                "top10_pct_gt": float(rng.uniform(4, 22)),
+                "total_holders": int(rng.integers(900, 3000)),
+                "pair_age_min": float(rng.uniform(150, 2000)),
+                "liq_usd": float(rng.uniform(30_000, 200_000)),
+                "mcap": _lu(200_000, 5_000_000), "vol_h1": _lu(2_000, 120_000),
+                "vol_h24": float(rng.uniform(100_000, 900_000)),
+                "creator_score": float(rng.uniform(50, 100)),
+                "creator_prior_tokens": int(rng.integers(0, 2)),
+                "launchpad_completed": True, "gmgn_progress": 1.0,
+                "launchpad_completed_age_s": float(rng.uniform(1_000, 20_000)),
+                "roundtrip_loss_pct": float(rng.uniform(0.5, 9)),
+                "dev_pct": float(rng.uniform(0, 2.5)), "dev_sniped": bool(rng.uniform() < 0.10),
+                "holders_source": "blockscout",
+                "holders_updated_age_s": float(rng.uniform(0, 3_600)),
+                "buys_h1": int(rng.integers(50, 1200)), "sells_h1": int(rng.integers(50, 1200)),
+            })
+        elif kind == "hot":
+            f.update({
+                "score": float(rng.uniform(40, 90)), "top10_pct": float(rng.uniform(4, 24)),
+                "top10_pct_gt": float(rng.uniform(4, 24)),
+                "total_holders": int(rng.integers(30, 800)),
+                "pair_age_min": float(rng.uniform(1, 20)),
+                "liq_usd": float(rng.uniform(12_000, 120_000)),
+                "mcap": _lu(80_000, 2_500_000), "vol_h1": _lu(30_000, 600_000),
+                "vol_h24": float(rng.uniform(20_000, 900_000)),
+                "creator_score": float(rng.uniform(0, 100)),
+                "creator_prior_tokens": int(rng.integers(0, 3)),
+                "launchpad_completed": bool(rng.uniform() < 0.5),
+                "gmgn_progress": float(rng.uniform(0.3, 1.0)),
+                "launchpad_completed_age_s": float(rng.uniform(0, 3_000)),
+                "roundtrip_loss_pct": float(rng.uniform(0.5, 9)),
+                "dev_pct": float(rng.uniform(0, 5)), "dev_sniped": bool(rng.uniform() < 0.3),
+                "holders_source": str(rng.choice(["blockscout", "gt"])),
+                "holders_updated_age_s": float(rng.uniform(0, 1_800)),
+                "buys_h1": int(rng.integers(200, 3000)), "sells_h1": int(rng.integers(20, 900)),
+            })
+        elif kind == "marginal":
+            # clean_fixture passes every A clause; break exactly ONE of them. The break is
+            # CYCLED, not drawn: a random break leaves whole clauses unvisited in a 50-row set,
+            # and the band that relaxes an unvisited clause is inert again by luck.
+            f.update({"score": float(rng.uniform(72, 95)), "gmgn_progress": 1.0})
+            which = _MARGINAL_BREAKS[(i // 4) % len(_MARGINAL_BREAKS)]
+            f.update({
+                # 60-69: below HC_MIN_SCORE (70) and above band_score60's floor, which is the
+                # only place that band can differ from the champion at all
+                "score": float(rng.uniform(60, 69)) if which == "score" else f["score"],
+                "total_holders": int(rng.integers(500, 999)) if which == "holders" else 1400,
+                "pair_age_min": float(rng.uniform(30, 89)) if which == "age" else 240.0,
+                "top10_pct": (float(rng.uniform(21, 34)) if which == "top10"
+                              else float(rng.uniform(15.5, 19.5)) if which == "top10_gap" else 18.0),
+                "top10_pct_gt": float(rng.uniform(4, 22)),
+                "roundtrip_loss_pct": float(rng.uniform(9, 14)) if which == "roundtrip" else 4.8,
+                "dev_pct": float(rng.uniform(2.1, 5)) if which == "dev_pct" else 1.2,
+                "creator_prior_tokens": int(rng.integers(2, 5)) if which == "creator_prior" else 0,
+                "dev_sniped": which == "sniped",
+                "liq_usd": float(rng.uniform(5_000, 24_000)) if which == "liq"
+                else float(rng.uniform(30_000, 200_000)),
+                "mcap": _lu(200_000, 5_000_000), "vol_h1": _lu(2_000, 200_000),
+                "vol_h24": float(rng.uniform(100_000, 900_000)),
+                "creator_score": float(rng.uniform(50, 100)),
+                "launchpad_completed": True,
+                "launchpad_completed_age_s": float(rng.uniform(1_000, 20_000)),
+                "holders_source": "blockscout",
+                "holders_updated_age_s": float(rng.uniform(0, 3_600)),
+                "buys_h1": int(rng.integers(50, 1200)), "sells_h1": int(rng.integers(50, 1200)),
+            })
+        else:
+            f.update({
+                "score": float(rng.uniform(30, 95)), "top10_pct": float(rng.uniform(3, 35)),
+                "top10_pct_gt": float(rng.uniform(3, 35)),
+                "total_holders": int(rng.integers(100, 3000)),
+                "pair_age_min": float(rng.uniform(5, 2000)),
+                "liq_usd": float(rng.uniform(10_000, 200_000)),
+                "mcap": _lu(50_000, 20_000_000), "vol_h1": _lu(500, 900_000),
+                "vol_h24": float(rng.uniform(20_000, 900_000)),
+                "creator_score": float(rng.uniform(0, 100)),
+                "creator_prior_tokens": int(rng.integers(0, 4)),
+                "launchpad_completed": bool(rng.uniform() < 0.6),
+                "gmgn_progress": float(rng.uniform(0.2, 1.0)),
+                "launchpad_completed_age_s": float(rng.uniform(0, 20_000)),
+                "roundtrip_loss_pct": float(rng.uniform(0.5, 14)),
+                "dev_pct": float(rng.uniform(0, 5)), "dev_sniped": bool(rng.uniform() < 0.2),
+                "holders_source": str(rng.choice(["blockscout", "gt"])),
+                "holders_updated_age_s": float(rng.uniform(0, 20_000)),
+                "buys_h1": int(rng.integers(10, 2000)), "sells_h1": int(rng.integers(10, 2000)),
+            })
+        # the chain's winners come off a V4 launchpad, where the hook holds the liquidity and
+        # there is no %: lp_locked_pct is None and lp_check_source carries the source. Held
+        # constant ("rpc_v2", 100%), band_launchpad_lenient could not differ from the champion
+        # on any fixture — it relaxes exactly the three checks a launchpad row cannot answer,
+        # which is why a marginal row broken on one of those three IS a launchpad row here.
+        launchpad = (which in ("dev_pct", "creator_prior", "sniped") if kind == "marginal"
+                     else bool(rng.uniform() < 0.35))
         f.update({
-            "score": float(rng.uniform(30, 95)), "top10_pct": float(rng.uniform(3, 35)),
-            "top10_pct_gt": float(rng.uniform(3, 35)),
-            "total_holders": int(rng.integers(100, 3000)),
-            "pair_age_min": float(rng.uniform(5, 2000)),
-            "liq_usd": float(rng.uniform(10_000, 200_000)),
-            "vol_h24": float(rng.uniform(20_000, 900_000)),
-            "creator_score": float(rng.uniform(0, 100)),
-            "creator_prior_tokens": int(rng.integers(0, 4)),
-            "launchpad_completed": bool(rng.uniform() < 0.6),
-            "launchpad_completed_age_s": float(rng.uniform(0, 20_000)),
-            "roundtrip_loss_pct": float(rng.uniform(0.5, 14)),
-            "lp_locked_pct": float(rng.choice([100.0, 96.0, 92.0])),
+            "fdv": f["mcap"],                      # the two move together on a real pair
+            # observed 0-5 on Almost-bonded, 0-51 on Migrated: constant 8 made every viewer-floor
+            # clause True, so band_hype_attention could not differ from band_hype_early anywhere
+            "gmgn_visiting_count": int(rng.integers(0, 12)),
+            # constant (0.01, False) made band_gmgn_clean an alias of the champion
+            "gmgn_bundler_ratio": float(rng.uniform(0.0, 0.25)),
+            "gmgn_is_wash_trading": bool(rng.uniform() < 0.15),
+            "lp_check_source": "v4_launchpad:bankr" if launchpad else "rpc_v2",
+            "lp_locked_pct": None if launchpad else float(rng.choice([100.0, 96.0, 92.0])),
             "owner_renounced": bool(rng.uniform() < 0.9),
-            "dev_pct": float(rng.uniform(0, 5)), "dev_sniped": bool(rng.uniform() < 0.2),
-            "holders_source": str(rng.choice(["blockscout", "gt"])),
-            "holders_updated_age_s": float(rng.uniform(0, 20_000)),
-            "buys_h1": int(rng.integers(10, 2000)), "sells_h1": int(rng.integers(10, 2000)),
             "sighting_age_s": float(rng.uniform(0, config.BAND_WATCH_WINDOW_S)),
             "token": "0x" + "".join(rng.choice(list("0123456789abcdef"), 40)),
             "first_sighting": bool(i == 0),
