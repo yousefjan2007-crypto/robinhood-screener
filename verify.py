@@ -248,10 +248,13 @@ CAND_DIR = os.path.join(config.SELFIMPROVE_DIR, "candidates")
 cand_paths = [os.path.join(CAND_DIR, e["module"].split(".", 1)[1] + ".py")
               for e in REG_RAW.get("candidates", []) if str(e.get("module", "")).startswith("candidates.")]
 cand_paths.append(os.path.join(CAND_DIR, "_template.py"))
-# Written but NOT registered (registration is a counted trial, and the operator's move): the two
-# adaptive-exit modules still face every check a registered candidate faces.
-UNREGISTERED_CANDS = ["tp15_half_armtrail30_stop50_6h", "tp15_half_flowtrail_stop50_6h"]
-cand_paths.extend(os.path.join(CAND_DIR, n + ".py") for n in UNREGISTERED_CANDS)
+# The two adaptive-exit POLICY modules that ship in candidates/. Registration is a permanent
+# counted trial and the operator's own step, so it may land on any day without a verify edit:
+# every check below must hold whether they are registered yet or not. They face the full
+# candidate hygiene either way, and the path list is deduped so a registered one is walked once.
+SHIPPED_POLICY_CANDS = ["tp15_half_armtrail30_stop50_6h", "tp15_half_flowtrail_stop50_6h"]
+cand_paths.extend(os.path.join(CAND_DIR, n + ".py") for n in SHIPPED_POLICY_CANDS)
+cand_paths = list(dict.fromkeys(cand_paths))
 
 for p in (os.path.join(ROOT, "screen.py"),):
     bi, ba, bc = _hygiene(p)
@@ -267,7 +270,7 @@ for p in cand_paths:
           f"{bi} {ba} {bc}")
     ok, why = B.static_ok(p)
     check(f"bands.static_ok accepts {_rel(p)}", ok, why)
-for _n in UNREGISTERED_CANDS:
+for _n in SHIPPED_POLICY_CANDS:
     _r = REGC._run_validator(os.path.join(CAND_DIR, _n + ".py"), _n, [], "1")
     check(f"candidate {_n} imports cleanly under `python3 -I -S` exactly the way register.py validates one "
           "(stdlib only, no site-packages, no env) and declares NAME == the file name, KIND 'policy', a "
@@ -277,8 +280,8 @@ for _n in UNREGISTERED_CANDS:
           and REGC.POL.validate_policy("zz_probe", _r.get("policy")) is None, str(_r)[:200])
 _reg_pols = [c for c in REG_RAW.get("candidates", []) if c.get("kind") == "policy" and c.get("status") != "retired"]
 check("every non-retired kind == 'policy' registry entry still validates under the CURRENT validate_policy "
-      "(shape checked under a probe name, since a registered candidate is already in POLICIES); none is "
-      "registered today, so the extended arm/flow schema cannot have orphaned one",
+      "(shape checked under a probe name, since a registered candidate is already in POLICIES), so the "
+      "extended arm/flow schema can never orphan one that is already registered",
       not [c.get("name") for c in _reg_pols
            if REGC.POL.validate_policy("zz_probe", c.get("policy")) is not None],
       str([c.get("name") for c in _reg_pols]))
@@ -995,20 +998,22 @@ MK = {"price_usd": 1.0, "mcap": 1e6, "liq_usd": 5e4}
 
 @contextlib.contextmanager
 def _policies(pols: dict):
-    """Temporarily add exit policies to POL.POLICIES, then remove them.
+    """Temporarily add exit policies to POL.POLICIES, then restore the family exactly.
 
-    The two adaptive-exit candidates are WRITTEN but deliberately NOT registered: registration is
-    a permanent counted trial that deflates every later Deflated Sharpe, so it is the operator's
-    move, not a side effect of a test. Every section that needs them injects them for the length
-    of one block — `len(POL.POLICIES)` must still be the pre-declared 16 when section H checks
-    what improve.py deflates by.
+    Registration is a permanent counted trial that deflates every later Deflated Sharpe, so it is
+    the operator's move, not a side effect of a test: a section that needs a candidate policy
+    injects it for the length of one block rather than registering it. The restore puts back the
+    PRIOR value of every injected name — popping unconditionally would silently evict a candidate
+    the operator has since registered, and every later section would score a shrunken family.
     """
+    prior = {k: POL.POLICIES[k] for k in pols if k in POL.POLICIES}
     POL.POLICIES.update(pols)
     try:
         yield
     finally:
         for k in pols:
             POL.POLICIES.pop(k, None)
+        POL.POLICIES.update(prior)
 
 
 def _ev(token, tier="B", kind="first_sighting", price=1.0, fired=None, prior=None, mcap=None):
@@ -2116,10 +2121,12 @@ try:
         check("an absent m5 window is None on all three — NEVER 0.0 (unknown flow is not zero flow); the h1 window keeps its "
               "0.0 absence value", _nom5["vol_m5"] is None and _nom5["buys_m5"] is None and _nom5["sells_m5"] is None
               and _nom5["sells_h1"] == 0 and _nom5["vol_h6"] == 0.0)
-        check("with no flow policy registered, flow_fn was never called across the whole G harness (call counter 0) and "
-              "POL.flow_policy_names() is []",
-              flow_calls["n"] == 0 and POL.flow_policy_names() == []
-              and not any(isinstance(p_.get("flow"), dict) for p_ in POL.POLICIES.values()))
+        check("the 5-minute feature read is GATED on POL.flow_policy_names(): with no flow policy live the book never called "
+              "flow_fn once across the whole G harness (call counter 0), and flow_policy_names() names exactly the live "
+              "policies carrying a flow dict — the gate, not a snapshot of today's family, is what keeps the read off",
+              (POL.flow_policy_names() != [] or flow_calls["n"] == 0)
+              and set(POL.flow_policy_names()) == {n_ for n_, p_ in POL.POLICIES.items() if isinstance(p_.get("flow"), dict)},
+              f"{POL.flow_policy_names()} calls={flow_calls['n']}")
         check("POL.flow_from_market: None for a non-dict or any None m5 field; else exactly FLOW_FEATURES copied",
               POL.FLOW_FEATURES == ("vol_m5", "buys_m5", "sells_m5", "vol_h1", "buys_h1", "sells_h1", "liq_usd")
               and POL.flow_from_market(None) is None and POL.flow_from_market(NOT_FOUND) is None
@@ -2568,6 +2575,65 @@ def _norm(pol: dict) -> dict:
     return dict(pol, ladder=[(float(m), float(f)) for m, f in pol["ladder"]])
 
 
+SHIPPED_BAND_CANDS = ["band_hype_early", "band_hype_attention"]
+
+
+def _registration_faults(registry_path: str, trials_path: str) -> list:
+    """Registration-consistency faults for the four shipped candidate modules against ONE
+    (registry, trials) pair — the single implementation, run on the REAL tree below and on a
+    SIMULATED post-registration tree in section Q.
+
+    Registration is the operator's own step and a permanent counted trial, so the rule is never
+    "the module must be absent": that pin was true the day it was written and red the instant
+    `register.py --scan` ran, taking the repo's primary safety signal and run_research.sh's own
+    merge gate down with it. The rule is:
+      · unregistered ⇒ shipping the file registered nothing — the name is live in no loader;
+      · registered   ⇒ the entry IS the module (kind, module `candidates.<name>`, not retired,
+        the POLICY dict after the loader's ladder retupling / the module's declared REQUIRES), it
+        resolves through the loader the runtime actually uses, and the name is ALREADY in its
+        family's trials list, so the DSR denominator can never lag the family.
+    """
+    raw = REGC.load_registry_raw(registry_path)
+    by_name = {c.get("name"): c for c in raw.get("candidates", [])}
+    tr = REGC.trials.load(trials_path)
+    live_pol = REGC.POL.load_candidates(registry_path)
+    reg = B.load_registry(registry_path)
+    faults = []
+    for nm in SHIPPED_POLICY_CANDS + SHIPPED_BAND_CANDS:
+        kind = "policy" if nm in SHIPPED_POLICY_CANDS else "band"
+        mod = B.load_candidate_module(os.path.join(CAND_DIR, nm + ".py"), nm)
+        e = by_name.get(nm)
+        live = (nm in live_pol) if kind == "policy" else (nm in reg.names())
+        counted = nm in set(tr.get("policies_ever_scored" if kind == "policy"
+                                   else "bands_ever_scored") or [])
+        if nm in B.BUILTINS:
+            faults.append(f"{nm}: shadows a built-in band")
+        if e is None:
+            if live:
+                faults.append(f"{nm}: live in a loader with no registry entry "
+                              "(shipping the file registered it)")
+            continue
+        why = []
+        if e.get("kind") != kind:
+            why.append(f"kind {e.get('kind')!r} != {kind!r}")
+        if e.get("module") != f"candidates.{nm}":
+            why.append(f"module {e.get('module')!r}")
+        if e.get("status") == "retired":
+            why.append("retired")
+        elif not live:
+            why.append("registered but the loader does not resolve it")
+        if kind == "policy" and e.get("status") != "retired" and live_pol.get(nm) != _norm(mod.POLICY):
+            why.append(f"the live policy dict is not the module's POLICY ({live_pol.get(nm)!r})")
+        if kind == "band" and list(e.get("requires") or []) != [str(k) for k in getattr(mod, "REQUIRES", ())]:
+            why.append(f"requires {e.get('requires')!r} != the module's "
+                       f"{[str(k) for k in getattr(mod, 'REQUIRES', ())]!r}")
+        if not counted:
+            why.append("registered but NOT in trials.json (the DSR denominator lags the family)")
+        if why:
+            faults.append(f"{nm}: " + "; ".join(why))
+    return faults
+
+
 CAND_RAW = {n: _cand_policy(n) for n in (CAND_BENCH, CAND_FLOW)}
 CAND_POL = {n: _norm(p) for n, p in CAND_RAW.items()}
 FLOW_OK = dict(CAND_RAW[CAND_FLOW]["flow"])
@@ -2839,12 +2905,26 @@ try:
 finally:
     for k, v in _saved_lb2.items():
         _g[k] = v
-check("the two adaptive-exit candidates are WRITTEN but NOT registered: registration is a permanent counted "
-      "trial (2026-09-20 at the earliest, by the operator), so POLICIES is still the pre-declared 16",
-      len(POL.POLICIES) == 16 and CAND_BENCH not in POL.POLICIES and CAND_FLOW not in POL.POLICIES
-      and not [c for c in REG_RAW["candidates"] if c.get("name") in (CAND_BENCH, CAND_FLOW)]
-      and not (set(json.load(open(config.TRIALS_PATH)).get("policies_ever_scored") or []) & {CAND_BENCH, CAND_FLOW}),
-      str(len(POL.POLICIES)))
+# Registration is the operator's step and a PERMANENT counted trial, so what verify pins is the
+# consistency that protects the DSR denominator, never a snapshot of who is registered today:
+# a name that is live in POLICIES came from the registry and is already counted in trials.json.
+# (The old check asserted the two modules were ABSENT — true on the day it was written, and red
+# the instant the operator ran `register.py --scan`, taking the repo's primary safety signal and
+# run_research.sh's merge gate down with it.)
+_reg_pol_live = POL.load_candidates()                       # the registry's own non-retired policy rows
+_trial_pols = set(json.load(open(config.TRIALS_PATH)).get("policies_ever_scored") or [])
+check("the exit-policy family grows ONLY by registration: POLICIES is the 16 pre-declared rows plus exactly the "
+      "non-retired kind == 'policy' registry entries, and every one of those is ALREADY a counted trial in "
+      "trials.json — a registered policy that escaped policies_ever_scored would under-deflate every later DSR",
+      len(POL.POLICIES) == 16 + len(_reg_pol_live)
+      and set(_reg_pol_live) <= set(POL.POLICIES) and set(_reg_pol_live) <= _trial_pols,
+      f"{len(POL.POLICIES)} = 16 + {sorted(_reg_pol_live)}; uncounted {sorted(set(_reg_pol_live) - _trial_pols)}")
+_reg_faults_now = _registration_faults(config.REGISTRY_PATH, config.TRIALS_PATH)
+check("shipping a candidate file registers NOTHING, and a registered one is fully consistent: for each of the four shipped "
+      "modules (two adaptive-exit policies, two band-under-test bands) an unregistered name is live in no loader, and a "
+      "registered one's entry IS the module — kind, module candidates.<name>, not retired, its POLICY dict after the loader's "
+      "ladder retupling / its declared REQUIRES — resolves through that loader and is already a counted trial in trials.json",
+      not _reg_faults_now, str(_reg_faults_now))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════
@@ -3074,10 +3154,14 @@ check("tier_for(False, {champ: True}) == 'B' and tier_for(True, {champ: None}) =
       B.tier_for(False, {CHAMP: True}, CHAMP) == "B" and B.tier_for(True, {CHAMP: None}, CHAMP) == "B"
       and B.tier_for(True, {CHAMP: True}, CHAMP) == "A")
 
-# ── the band-under-test modules: written and VALIDATED here, registered by the operator ───────
-# Registration is a counted trial (trials.json only grows and deflates every later DSR), so the
-# modules ship validated and unregistered: verify runs register.py's own validator functions
-# WITHOUT calling scan(), and proves the registry and the trial list are untouched.
+# ── the band-under-test modules: VALIDATED here, registered by the operator ───────────────────
+# Registration is a counted trial (trials.json only grows and deflates every later DSR), so it is
+# the operator's step and may land on any day: verify runs register.py's own validator functions
+# WITHOUT calling scan(), and pins the CONSISTENCY between module, registry and trial list rather
+# than a snapshot of who is registered today. The validator is handed the registry MINUS this
+# module's own entry, which is exactly the view register.py had the instant before it registered
+# it (validate_module refuses a name already taken — that rule is about collisions, not about the
+# module still being valid).
 from selfimprove.candidates import register as REGM   # noqa: E402
 import selfimprove.trials as TRIALS_MOD                # noqa: E402
 
@@ -3091,16 +3175,19 @@ for _hp in (HYPE_E, HYPE_A):
     check(f"candidate {_rel(_hp)} is clock/network/RNG/open-free and passes bands.static_ok (the import allowlist and the "
           "forbidden attribute chains)", not bi_ and not ba_ and not bc_ and B.static_ok(_hp)[0],
           f"{bi_} {ba_} {bc_} {B.static_ok(_hp)[1]}")
-    _ok_v, _why_v, _info_v = REGM.validate_module(_hp, _raw_reg, REG, CHAMP, _fx)
-    check(f"{_nm} passes register.py's FULL validator without being registered: NAME == the file name, RATIONALE and CONSUMED_DATA "
+    _entry_nm = next((c_ for c_ in _raw_reg.get("candidates", []) if c_.get("name") == _nm), None)
+    _raw_pre = dict(_raw_reg, candidates=[c_ for c_ in _raw_reg.get("candidates", []) if c_.get("name") != _nm])
+    _ok_v, _why_v, _info_v = REGM.validate_module(_hp, _raw_pre, REG, CHAMP, _fx)
+    check(f"{_nm} passes register.py's FULL validator: NAME == the file name, RATIONALE and CONSUMED_DATA "
           f"declared, REQUIRES a non-empty subset of FEATURE_FIELDS, deterministic across two PYTHONHASHSEEDs on {len(_fx)} fixtures, "
           "NA whenever a REQUIRES field is None, no undeclared dependency, not all-NA and not inert vs the champion",
           _ok_v and _info_v.get("kind") == "band" and _info_v.get("name") == _nm, _why_v)
-    check(f"{_nm} is NOT registered: absent from registry.json and from trials.json's bands_ever_scored — registering it is a "
-          "counted trial and the operator's step, not a side effect of shipping the file",
-          _nm not in {c_.get("name") for c_ in _raw_reg.get("candidates", [])}
-          and _nm not in set(TRIALS_MOD.load().get("bands_ever_scored") or [])
-          and _nm not in REG.names() and _nm not in B.BUILTINS)
+    check(f"{_nm}'s declared REQUIRES is exactly what register.py's validator read out of the module, so the `requires` the "
+          "registry entry carries (and _registration_faults compares against) is the module's own — and the validator was run "
+          "against the registry MINUS this entry, the view register.py had the instant before it registered it",
+          list(_info_v.get("requires") or []) == [str(k) for k in B.load_candidate_module(_hp, _nm).REQUIRES]
+          and (_entry_nm is None or list(_entry_nm.get("requires") or []) == list(_info_v.get("requires") or [])),
+          f"{_info_v.get('requires')} {None if _entry_nm is None else _entry_nm.get('requires')}")
 
 _HE = B.spec_from_module(B.load_candidate_module(HYPE_E, "band_hype_early"))
 _HA = B.spec_from_module(B.load_candidate_module(HYPE_A, "band_hype_attention"))
@@ -4386,12 +4473,38 @@ check("band_volume_early fires on FRONTIER at sighting (age 4 min, $63k hour-1 v
       and VE.verdict(dict(_FRONT, vol_h1=None)) is None and "buys below" in VE.explain(_MORTY)
       and any(e_["name"] == "band_volume_early" and e_["status"] == "candidate" for e_ in json.load(open(config.REGISTRY_PATH))["candidates"])
       and "band_volume_early" in (TRIALS_MOD.load().get("bands_ever_scored") or []))
+# The live champion is the OPERATOR's, changed by `champion.py --set entry_band=… --publish`
+# (GO_LIVE_CHECKLIST item 10), so naming it here would turn the repo's own go-live procedure red.
+# What is pinned is what protects the operator: the champion is a band the registry can actually
+# resolve and is never a control, DEFAULT_ENTRY_BAND stays the fallback and demotion target, and
+# each provenance branch is internally consistent — a hand-set champion records who it replaced
+# and why and leaves promoted_at_event_seq None (a manual set does NOT arm the demotion test),
+# while a gate promotion carries the forward-only event_seq it was judged at.
+def _entry_champion_faults(arm: dict, reg) -> list:
+    """The entry-champion arm's faults against a band registry — the single implementation, run on
+    the LIVE champion.json here and on a simulated hand-set champion in section Q."""
+    ev = arm.get("evidence") or {}
+    manual = ev.get("manual") is True
+    faults = []
+    if arm["champion"] != config.DEFAULT_ENTRY_BAND and (
+            arm["champion"] not in reg.names() or reg.is_control(arm["champion"])):
+        faults.append(f"champion {arm['champion']!r} is not a registered non-control band")
+    if config.DEFAULT_ENTRY_BAND != "band_a_strict":
+        faults.append(f"DEFAULT_ENTRY_BAND is {config.DEFAULT_ENTRY_BAND!r}, not the fallback/demotion target")
+    if manual and not (ev.get("previous") and arm.get("previous") and ev.get("reason")
+                       and arm.get("promoted_at_event_seq") is None):
+        faults.append("a manual --set must record previous + reason and leave promoted_at_event_seq None")
+    if not manual and arm["champion"] != config.DEFAULT_ENTRY_BAND and arm.get("promoted_at_event_seq") is None:
+        faults.append("a non-manual champion carries no promoted_at_event_seq (the forward-only key)")
+    return faults
+
+
 _live = CH.state()["entry_band"]
-check("the LIVE champion is band_volume_early by a manual --set (evidence.manual, previous band_a_strict, reason recorded) while "
-      "DEFAULT_ENTRY_BAND stays band_a_strict as the fallback and demotion target",
-      _live["champion"] == "band_volume_early" and _live["previous"] == "band_a_strict"
-      and (_live.get("evidence") or {}).get("manual") is True and (_live.get("evidence") or {}).get("reason")
-      and config.DEFAULT_ENTRY_BAND == "band_a_strict", str(_live)[:200])
+_champ_faults = _entry_champion_faults(_live, REG)
+check("the LIVE entry champion is a REGISTERED non-control band (or DEFAULT_ENTRY_BAND itself), DEFAULT_ENTRY_BAND stays "
+      "band_a_strict as the fallback and demotion target, and its provenance is consistent: a manual --set records `previous` "
+      "and a reason and leaves promoted_at_event_seq None; a gate promotion carries a non-None promoted_at_event_seq",
+      not _champ_faults, f"{_champ_faults} {str(_live)[:160]}")
 _rs = _read(os.path.join(ROOT, "run.py"))
 check("early alerts: run.py sends the champion-band alert for pass-1-selected tokens BEFORE the remaining pass 2, the watchlist "
       "refresh and the forward update; the later alert block never re-sends them; stage_seconds is written to the scan",
@@ -4888,7 +5001,7 @@ _champ_row = [w for w in ("What the champion decision changes", "band_hype_early
                           "it does not arm the Sunday demotion test", "promoted_at_event_seq: None",
                           "judges **gate promotions only**",
                           '**"NO CHANGE" for months is the expected outcome**') if w not in _design]
-check("DESIGN.md carries the champion-decision row — both branches of `champion.py --set`, the four written-but-unregistered "
+check("DESIGN.md carries the champion-decision row — both branches of `champion.py --set`, the four shipped candidate "
       "modules by name, the TWO switches (register.py --scan first), tier_for's composition, the registry-status rule, the fact "
       "that a manual set does NOT arm the demotion test (promoted_at_event_seq stays None) and the unset branch ending in "
       "'NO CHANGE for months'",
@@ -5373,10 +5486,92 @@ check("selfimprove/entry_lab/scorecard.py imports scipy / statsmodels / sklearn 
       "cross-check in the smoke test is mac_only by construction)", not (_imps & {"scipy", "statsmodels", "sklearn"}), str(sorted(_imps)))
 
 # ── 2. the paper gate — the ONE judge of the paper test (pre-registered; no new statistics) ──
-check("config carries the paper gate at the operator's values: policy None (⇒ the exit champion), window start None (⇒ none "
-      "registered), 7 days, 20 fills, refused share 0.05",
-      (config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START, config.PAPER_GATE_WINDOW_DAYS, config.PAPER_GATE_MIN_FILLS,
-       config.PAPER_GATE_MAX_REFUSED_SHARE) == (None, None, 7, 20, 0.05))
+# The three pre-registration constants are the OPERATOR's switch (Phase 8 "start the window" sets
+# two of them), so pinning them to None would make the repo's own procedure turn verify red. What
+# is pinned is the property that protects the window: the pre-registered numbers are the declared
+# ones, and each switch either is unset or names something the gate can actually resolve — the
+# same shape as LIVEBOOK_BAND_UNDER_TEST's "None or a REGISTERED non-control band" above.
+def _switch_faults(reg, policies) -> list:
+    """The three pre-registration switches read out of config, against a (band registry, policy
+    family) pair — the single implementation, run on the real config here and on the simulated
+    Phase-8 "start the window" values in the scenario block below."""
+    faults = []
+    if (config.PAPER_GATE_WINDOW_DAYS, config.PAPER_GATE_MIN_FILLS,
+            config.PAPER_GATE_MAX_REFUSED_SHARE) != (7, 20, 0.05):
+        faults.append("the pre-registered numbers are not 7 days / 20 fills / refused share 0.05")
+    p_ = config.PAPER_GATE_POLICY
+    if p_ is not None and (p_ not in policies or p_ in POL.CONTROLS):
+        faults.append(f"PAPER_GATE_POLICY {p_!r} is not a live non-control policy")
+    w_ = config.PAPER_GATE_WINDOW_START
+    if w_ is not None and _capture(IM._parse_window_start, w_)[0] is None:
+        faults.append(f"PAPER_GATE_WINDOW_START {w_!r} does not parse as ISO-8601 UTC")
+    b_ = config.LIVEBOOK_BAND_UNDER_TEST
+    if b_ is not None and (b_ not in reg.names() or reg.is_control(b_)):
+        faults.append(f"LIVEBOOK_BAND_UNDER_TEST {b_!r} is not a registered non-control band")
+    return faults
+
+
+_sw_faults_now = _switch_faults(REG, POL.POLICIES)
+check("the paper gate's pre-registered numbers are the declared ones (7 days, 20 fills, refused share 0.05) and each operator "
+      "switch is None or RESOLVABLE: PAPER_GATE_POLICY names a live non-control policy (None ⇒ the exit champion's plan), "
+      "PAPER_GATE_WINDOW_START parses as ISO-8601 UTC through improve._parse_window_start (None ⇒ none registered) and "
+      "LIVEBOOK_BAND_UNDER_TEST is a registered non-control band",
+      not _sw_faults_now, f"{_sw_faults_now} "
+      f"{config.PAPER_GATE_POLICY!r} {config.PAPER_GATE_WINDOW_START!r} {config.LIVEBOOK_BAND_UNDER_TEST!r}")
+
+# ── the operator's next two moves, SIMULATED: registration, then "start the window" ───────────
+# Every check above that reads registry.json / trials.json / champion.json or the three switches
+# states an INVARIANT, not a snapshot of today's tree — and that is PROVED here, not asserted:
+# the moves are replayed against COPIES in a temp dir with register.py's own scan() (never
+# --scan on the real files), and the same three predicate functions are re-evaluated on the
+# result. The pins this replaces asserted the four modules were ABSENT and the switches None;
+# they would have gone red on both partitions, on every push, at the exact moment the operator
+# made a permanent counted trial — and inside run_research.sh's own merge gate with it.
+with tempfile.TemporaryDirectory() as _d_sim:
+    _cdir_sim = os.path.join(_d_sim, "candidates")
+    os.makedirs(_cdir_sim)
+    _SIM_BAND, _SIM_POL = "band_hype_early", CAND_FLOW
+    for _nm_s in (_SIM_BAND, _SIM_POL):
+        shutil.copyfile(os.path.join(CAND_DIR, _nm_s + ".py"), os.path.join(_cdir_sim, _nm_s + ".py"))
+    _rp_sim, _tp_sim = os.path.join(_cdir_sim, "registry.json"), os.path.join(_d_sim, "trials.json")
+    shutil.copyfile(config.REGISTRY_PATH, _rp_sim)
+    shutil.copyfile(config.TRIALS_PATH, _tp_sim)
+    _lp_sim = os.path.join(_d_sim, "ledger.csv")
+    with open(_lp_sim, "w") as _fh_sim:
+        _fh_sim.write("token,event_seq,tier\n0xaa,11,B\n")
+    _dec_sim, _out_sim = _capture(REGC.scan, _rp_sim, _lp_sim, 2, 1_800_000_000.0,
+                                  candidates_dir=_cdir_sim, trials_path=_tp_sim, use_git=False, champion=CHAMP)
+    _sim_pol, _sim_reg = REGC.POL.load_candidates(_rp_sim), B.load_registry(_rp_sim)
+    _sim_tr = REGC.trials.load(_tp_sim)
+    _sim_faults = _registration_faults(_rp_sim, _tp_sim)
+    check("SCENARIO registration (the operator's step, today): register.py's own scan() mints the entries for a band and a "
+          "policy against COPIES in a temp dir, and _registration_faults — the SAME predicate the real tree is held to — is "
+          "still empty: both names resolve through the loaders the runtime uses, the policy dict is the module's own, and both "
+          "are already counted in trials.json",
+          not _sim_faults and _SIM_BAND in _sim_reg.names() and _SIM_POL in _sim_pol
+          and _sim_pol[_SIM_POL] == _norm(_cand_policy(_SIM_POL))
+          and _SIM_BAND in set(_sim_tr["bands_ever_scored"]) and _SIM_POL in set(_sim_tr["policies_ever_scored"]),
+          f"{_sim_faults} | {[d[:2] for d in _dec_sim]} | {_out_sim[-200:]}")
+    _sw_saved_sim = (config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START, config.LIVEBOOK_BAND_UNDER_TEST)
+    try:
+        with _policies({_SIM_POL: _sim_pol[_SIM_POL]}):        # as load_candidates would at import
+            config.PAPER_GATE_POLICY = _SIM_POL
+            config.PAPER_GATE_WINDOW_START = "2026-09-21T00:00:00Z"
+            config.LIVEBOOK_BAND_UNDER_TEST = _SIM_BAND
+            _sw_faults_sim = _switch_faults(_sim_reg, POL.POLICIES)
+            _champ_sim = dict(_live, champion=_SIM_BAND, previous=_live["champion"],
+                              promoted_at_event_seq=None,
+                              evidence={"manual": True, "previous": _live["champion"],
+                                        "reason": "operator decision: the band under test becomes the champion"})
+            _champ_faults_sim = _entry_champion_faults(_champ_sim, _sim_reg)
+            check("SCENARIO start-the-window + a hand-set champion (the next two operator moves): PAPER_GATE_POLICY set to the "
+                  "freshly registered adaptive policy, PAPER_GATE_WINDOW_START to an ISO-8601 UTC date, LIVEBOOK_BAND_UNDER_TEST "
+                  "and champion.json's entry arm to the freshly registered band — _switch_faults and _entry_champion_faults, the "
+                  "SAME predicates the live config and champion.json are held to, stay empty",
+                  not _sw_faults_sim and not _champ_faults_sim, f"{_sw_faults_sim} | {_champ_faults_sim}")
+    finally:
+        (config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START,
+         config.LIVEBOOK_BAND_UNDER_TEST) = _sw_saved_sim
 _q_t0 = float(calendar.timegm((2027, 1, 15, 0, 0, 0)))
 check("_parse_window_start: ISO-8601 UTC (Z and +00:00) → epoch seconds with the stdlib; None / malformed → None (never 'today')",
       IM._parse_window_start("2027-01-15T00:00:00Z") == _q_t0 == IM._parse_window_start("2027-01-15T00:00:00+00:00")
