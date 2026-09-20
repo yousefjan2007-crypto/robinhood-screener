@@ -182,13 +182,20 @@ jobs:
           # account is measured at 13.7 fires/day, i.e. routinely late — a fire delayed past the
           # keeper's ~4-minute check produces two runs. So ask the API whether another
           # robinhood-weekly run has ALREADY SUCCEEDED today (this run excluded) and render the
-          # message with --dry if one has. FAILS OPEN: any gh error leaves PRIOR empty and the
-          # message goes out, because a broken guard must never silence the one weekly message.
+          # message with --dry if one has. A DRY REHEARSAL NEVER COUNTS: `dry=true` also ends in
+          # success (it skips Publish and exits 0), so a bare --status success list let a rehearsal
+          # run before 10:00 UTC silence the one real send — the silent Sunday this comment
+          # forbids. The select drops every run whose title carries "dry"; run-name renders
+          # `weekly · dry (writes nothing)` for a dry dispatch and `weekly · apply` otherwise (a
+          # scheduled run carries no inputs, so it is `apply`), so only a NON-DRY success suppresses.
+          # FAILS OPEN: any gh error leaves PRIOR empty and the message goes out, because a broken
+          # guard must never silence the one weekly message.
           PRIOR="$(gh run list --workflow robinhood-weekly --created "$(date -u +%F)" --status success \
-                     --json databaseId --jq '.[].databaseId' 2>/dev/null \
+                     --json databaseId,displayTitle \
+                     --jq '.[] | select((.displayTitle // "") | contains("dry") | not) | .databaseId' 2>/dev/null \
                    | grep -vx "${GITHUB_RUN_ID:-0}" | head -1)"
           if [ -n "$PRIOR" ]; then
-            echo "robinhood-weekly run $PRIOR already succeeded today: rendering --dry, the ONE weekly message is already out"
+            echo "robinhood-weekly run $PRIOR already succeeded today (non-dry): rendering --dry, the ONE weekly message is already out"
           fi
           if [ "$DRY" = "true" ] || [ -n "$PRIOR" ]; then
             python selfimprove/weekly_summary.py --dry --research "$REASON"

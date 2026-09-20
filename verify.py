@@ -728,14 +728,25 @@ check("weekly.yml's summary step keeps `if: ${{ always() }}` and carries an idem
       "excludes $GITHUB_RUN_ID, renders --dry when one is found, and is wired with GH_TOKEN and the `actions: read` permission",
       "actions: read" in wyml and "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" in _wsum
       and "gh run list --workflow robinhood-weekly --created" in _wsum and "--status success" in _wsum
-      and '--jq \'.[].databaseId\'' in _wsum and 'grep -vx "${GITHUB_RUN_ID:-0}"' in _wsum
+      and '--json databaseId,displayTitle' in _wsum and 'grep -vx "${GITHUB_RUN_ID:-0}"' in _wsum
       and 'if [ "$DRY" = "true" ] || [ -n "$PRIOR" ]; then' in _wsum
       and _wsum.index("PRIOR=") < _wsum.index("weekly_summary.py --dry --research")
       < _wsum.index("weekly_summary.py --send --research")
       and "if: ${{ always() }}" in _wsum, _wsum[:0])
+# A `dry=true` rehearsal SUCCEEDS too — it skips Publish and exits 0 — so a bare `--status success`
+# list let a same-day rehearsal suppress the real 10:00 UTC send: the exact silent Sunday this step
+# forbids. The guard selects on displayTitle instead, which run-name renders as
+# `weekly · dry (writes nothing)` for a dry dispatch and `weekly · apply` otherwise (a scheduled run
+# carries no inputs, so it is `apply`). Only a NON-dry success counts as the day's message.
+check("the idempotency guard EXCLUDES dry rehearsals from the suppression set: it asks for displayTitle and keeps only the "
+      "non-dry successes (`select((.displayTitle // \"\") | contains(\"dry\") | not)`), and weekly.yml's run-name renders 'dry' "
+      "into the title of exactly the dry dispatches — so a rehearsal can never silence the ONE weekly send",
+      'select((.displayTitle // "") | contains("dry") | not) | .databaseId' in _wsum
+      and ".[].databaseId" not in _wsum
+      and "run-name: weekly · ${{ (inputs.dry == 'true') && 'dry (writes nothing)' || 'apply' }}" in wyml, _wsum[:0])
 check("the guard FAILS OPEN: gh's stderr is discarded and its failure is not fatal (`set +e`, no `|| exit`), so an unreachable or "
       "unauthorised API leaves PRIOR empty and the ONE weekly message still goes out — a broken guard can never silence it",
-      "set +e -o pipefail" in _wsum and "2>/dev/null" in _wsum and "FAILS OPEN" in _wsum
+      "set +e -o pipefail" in _wsum and "2>/dev/null" in _wsum
       and not re.search(r"PRIOR=.*\|\|\s*exit", _wsum), _wsum[:0])
 _res_src0 = _read(os.path.join(ROOT, "selfimprove", "research", "run_research.sh"))
 check("run_research.sh: step 0 ff-syncs the Mac tree to origin/main (never forced — the deleted run_improve.sh's job) and its "
