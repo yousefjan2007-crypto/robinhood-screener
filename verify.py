@@ -686,6 +686,25 @@ check("weekly.yml sends the ONE weekly message itself (--send, or --dry under th
       "merged proposals and the unmerged research branches — it no longer depends on the Mac's research session",
       "--research" in wyml and "PROPOSAL_*.md" in wyml and "refs/heads/research/*" in wyml
       and "python selfimprove/weekly_summary.py --dry --research" in wyml)
+# The summary step is `always()` BY DESIGN (a Sunday whose gates crashed must still say so), so it
+# is the one step a duplicate run reaches with nothing new to report — and keeper.sh's Sunday
+# insurance plus a late cron fire make duplicates machine-made rather than an operator slip. The
+# guard asks the API, excludes this run, and FAILS OPEN: gh erroring leaves PRIOR empty.
+_wsum = wyml[wyml.index("name: Weekly summary"):]
+check("weekly.yml's summary step keeps `if: ${{ always() }}` and carries an idempotency guard so at most ONE --send happens per "
+      "Sunday: it queries `gh run list --workflow robinhood-weekly --created <today> --status success` for another run's id, "
+      "excludes $GITHUB_RUN_ID, renders --dry when one is found, and is wired with GH_TOKEN and the `actions: read` permission",
+      "actions: read" in wyml and "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" in _wsum
+      and "gh run list --workflow robinhood-weekly --created" in _wsum and "--status success" in _wsum
+      and '--jq \'.[].databaseId\'' in _wsum and 'grep -vx "${GITHUB_RUN_ID:-0}"' in _wsum
+      and 'if [ "$DRY" = "true" ] || [ -n "$PRIOR" ]; then' in _wsum
+      and _wsum.index("PRIOR=") < _wsum.index("weekly_summary.py --dry --research")
+      < _wsum.index("weekly_summary.py --send --research")
+      and "if: ${{ always() }}" in _wsum, _wsum[:0])
+check("the guard FAILS OPEN: gh's stderr is discarded and its failure is not fatal (`set +e`, no `|| exit`), so an unreachable or "
+      "unauthorised API leaves PRIOR empty and the ONE weekly message still goes out — a broken guard can never silence it",
+      "set +e -o pipefail" in _wsum and "2>/dev/null" in _wsum and "FAILS OPEN" in _wsum
+      and not re.search(r"PRIOR=.*\|\|\s*exit", _wsum), _wsum[:0])
 _res_src0 = _read(os.path.join(ROOT, "selfimprove", "research", "run_research.sh"))
 check("run_research.sh: step 0 ff-syncs the Mac tree to origin/main (never forced — the deleted run_improve.sh's job) and its "
       "finish() renders the summary with --dry unless RESEARCH_SEND_SUMMARY=1, so exactly ONE weekly message goes out",

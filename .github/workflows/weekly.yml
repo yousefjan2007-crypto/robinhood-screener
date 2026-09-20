@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: write                 # commit the Sunday state back to main
+  actions: read                   # the summary step asks whether another run today already sent
 
 jobs:
   weekly:
@@ -154,6 +155,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DRY: ${{ inputs.dry || 'false' }}
         run: |
           # As in run_research.sh: no set -e here — silence from a Sunday job is indistinguishable
@@ -161,7 +163,23 @@ jobs:
           set +e -o pipefail
           REASON="research: newest merged proposal $(ls selfimprove/research/proposals/PROPOSAL_*.md 2>/dev/null | sort | tail -1 | xargs -n1 basename 2>/dev/null || echo none); unmerged research branches: $(git ls-remote --heads origin 'refs/heads/research/*' | wc -l | tr -d ' ')"
           echo "$REASON"
-          if [ "$DRY" = "true" ]; then
+          # AT MOST ONE --send per Sunday. This step is always() on purpose — a run whose gates
+          # crashed must still say so — but that also means a DUPLICATE run reaches it with the
+          # gates skipped as already-applied and sends a SECOND weekly message. Duplicates are
+          # machine-made, not an operator choice: keeper.sh's sunday_insurance dispatches this
+          # workflow when a Sunday past 10:00 UTC has no run yet, and GitHub's cron on this
+          # account is measured at 13.7 fires/day, i.e. routinely late — a fire delayed past the
+          # keeper's ~4-minute check produces two runs. So ask the API whether another
+          # robinhood-weekly run has ALREADY SUCCEEDED today (this run excluded) and render the
+          # message with --dry if one has. FAILS OPEN: any gh error leaves PRIOR empty and the
+          # message goes out, because a broken guard must never silence the one weekly message.
+          PRIOR="$(gh run list --workflow robinhood-weekly --created "$(date -u +%F)" --status success \
+                     --json databaseId --jq '.[].databaseId' 2>/dev/null \
+                   | grep -vx "${GITHUB_RUN_ID:-0}" | head -1)"
+          if [ -n "$PRIOR" ]; then
+            echo "robinhood-weekly run $PRIOR already succeeded today: rendering --dry, the ONE weekly message is already out"
+          fi
+          if [ "$DRY" = "true" ] || [ -n "$PRIOR" ]; then
             python selfimprove/weekly_summary.py --dry --research "$REASON"
           else
             python selfimprove/weekly_summary.py --send --research "$REASON"
