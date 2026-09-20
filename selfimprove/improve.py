@@ -670,6 +670,13 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
     BAND_RENOMINATE_COOLDOWN_DAYS is refused. A verdict promotes nothing — champion.json,
     registry.json and the Sunday gates never read it.
 
+    The VERDICT line needs two more things than `record`. It is not minted while the system is
+    PAUSED (main passes record_paper=False under champion.paused(): "evaluate and report, write
+    nothing" must cost nothing permanent), and it is not minted when the sample it judges does
+    not exist — with no eligible closed fill an empty or unreadable data/livebook.json cannot be
+    told from a window that produced none, and this verdict is judged once. Both states still
+    compute and print the would-be line, marked NOT RECORDED with the reason.
+
     `record` is what makes that bookkeeping ONE-SHOT ACROSS CHECKOUTS, and only the APPLY path
     passes it: weekly.yml's Gates step runs `improve.py --apply --send` on the runner, whose
     Publish step is the only thing that stages the TRACKED selfimprove/trials.json. Every other
@@ -910,13 +917,21 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
         else:
             status = "VOID" if void else ("PASS" if all(ok for _, ok, _, _q in checks) else "FAIL")
             vline = f"{vprefix}{status.lower()}"
-            if record:
+            # The one-shot is withheld unless the sample it judges EXISTS. With no eligible
+            # closed fill at all, an empty or unreadable data/livebook.json is indistinguishable
+            # from a window that produced nothing — and this verdict is permanent, so a book that
+            # failed to load at 10:00 UTC would record FAIL for a window with real fills. Report
+            # it, never record it; the next run judges the window for real.
+            if record and n > 0:
                 TR.bump("nominations", [vline])
                 out["recorded_now"].append(vline)
                 suffix = ""
             else:
                 out["would_record"].append(vline)
-                suffix = " (not recorded: dry)"
+                suffix = (" (not recorded: dry)" if not record else
+                          " (NOT RECORDED: no eligible closed fill — an empty or unreadable "
+                          "livebook.json cannot be told from a window that produced none, and "
+                          "the verdict is one-shot)")
         if status == "VOID":
             # No number from a void window may be quoted: the apparatus facts stay, the table
             # goes — and so does every performance number in `checks`, which is built BEFORE this
@@ -1570,10 +1585,16 @@ def main(argv=None) -> int:
         if not quiet:
             _print_paper_gate(pg)
         return 0
-    # the paper gate's one-shot lines are minted on the APPLY path alone — the runner's Sunday
-    # Gates step, whose trials.json the Publish step stages. --summary-json never applies.
+    # The paper gate's one-shot lines are minted on the APPLY path alone — the runner's Sunday
+    # Gates step, whose trials.json the Publish step stages. --summary-json never applies. And
+    # not while PAUSED: champion.json.locked (the cloud switch) and selfimprove/PAUSE mean
+    # "evaluate and report, write nothing", which apply() honours — but record_paper was read
+    # before apply() ran, so a paused Sunday still minted a permanent paper_verdict line, which
+    # is exactly what a pause exists to prevent (two windows per pair inside 97 days, judged
+    # once). The gate still evaluates and prints its would-be lines.
     try:
-        res = evaluate_all(now_s, record_paper=do_apply and "--summary-json" not in argv)
+        res = evaluate_all(now_s, record_paper=(do_apply and not champion.paused()
+                                                and "--summary-json" not in argv))
     except Exception as exc:
         print(f"  [improve] evaluate_all failed: {type(exc).__name__}: {exc}")
         return 0

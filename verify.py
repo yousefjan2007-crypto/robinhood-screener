@@ -6140,16 +6140,46 @@ try:
           and pg_c1["would_record"] == [f"paper:{BQ}/{C1P}@{C1S}", f"paper_verdict:{BQ}/{C1P}@{C1S}={pg_c1['status'].lower()}"]
           and pg_c1["line"].endswith(" (not recorded: dry)") and "(not recorded: dry)" in out_c1
           and f"would record: paper:{BQ}/{C1P}@{C1S}" in out_c1, f"{pg_c1['line']} | {pg_c1['would_record']}")
+    # L102, the EMPTY-BOOK half: an --apply at 10:00 UTC with an empty or unreadable
+    # data/livebook.json used to mint a PERMANENT `=fail` for a window that produced real fills —
+    # this very fixture demonstrated it. With no eligible closed fill the sample the verdict
+    # judges does not exist, and an unreadable book cannot be told from a window with no fills.
+    _t_c1 = _q_c1 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0
     LB._save_atomic({}, LB.BOOK_PATH)          # n=0: main's early return never reaches apply() / champion.json
     _capture(IM.main, ["--apply"])
+    _c1_empty = (_tr_lines(f"paper:{BQ}/{C1P}@"), _tr_lines(f"paper_verdict:{BQ}/{C1P}@"))
+    pg_c1e, _ = _capture(IM.paper_gate, _t_c1, book={}, record=True)
+    check("an --apply on an EMPTY or unreadable book mints NO verdict: the window's `paper:` line is minted (the window is "
+          "pre-registered by config, not by the book) but `paper_verdict:` is withheld, the line says NOT RECORDED and why, "
+          "and the would-be verdict is still computed and printed — a book that failed to load must never spend the one-shot",
+          _c1_empty == ([f"paper:{BQ}/{C1P}@{C1S}"], []) and pg_c1e["recorded_now"] == []
+          and pg_c1e["would_record"] == [f"paper_verdict:{BQ}/{C1P}@{C1S}={pg_c1e['status'].lower()}"]
+          and "NOT RECORDED: no eligible closed fill" in pg_c1e["line"] and pg_c1e["n"] == 0,
+          f"{_c1_empty} | {pg_c1e['line']}")
+    # L102, the PAUSE half: record_paper was read from do_apply alone and apply() consulted
+    # champion.paused() only afterwards, so a Sunday under the documented cloud pause
+    # (champion.json.locked / selfimprove/PAUSE — "evaluate and report, write nothing") still
+    # minted a permanent verdict. Two windows per pair inside 97 days: a pause must cost nothing.
+    LB._save_atomic(book_c1, LB.BOOK_PATH)     # a REAL sample: only the pause can withhold it now
+    open(config.PAUSE_PATH, "w").close()
+    _tr_paused = _read(config.TRIALS_PATH)
+    _rc_pause, _out_pause = _capture(IM.main, ["--apply"])
+    _paused_clean = (_read(config.TRIALS_PATH) == _tr_paused and not _tr_lines(f"paper_verdict:{BQ}/{C1P}@"))
+    os.remove(config.PAUSE_PATH)
+    check("a PAUSED --apply mints nothing either: with selfimprove/PAUSE present (champion.json.locked is the same switch) an "
+          "--apply over a REAL sample leaves the tracked trials.json byte-identical — the gate evaluates and reports, which is "
+          "what a pause means, and the permanent one-shot is not spent while the operator has the system stopped",
+          _paused_clean and _rc_pause == 0, _out_pause[-400:])
+    _capture(IM.main, ["--apply"])             # not paused, real book: NOW it mints
     _c1_after = (_tr_lines(f"paper:{BQ}/{C1P}@"), _tr_lines(f"paper_verdict:{BQ}/{C1P}@"))
     _c1_bytes = _read(config.TRIALS_PATH)
     _capture(IM.main, ["--apply"])
-    pg_c1b, _ = _capture(IM.paper_gate, _q_c1 + W * 86400 + config.LIVEBOOK_MAX_TRACK_S + 1.0, book={})
+    pg_c1b, _ = _capture(IM.paper_gate, _t_c1, book={})
+    _c1_v = f"paper_verdict:{BQ}/{C1P}@{C1S}={pg_c1['status'].lower()}"
     check("the apply path mints each line exactly ONCE: `improve.py --apply` bumps the paper: and paper_verdict: lines, a second "
           "--apply adds nothing (byte-identical) and every later read prints them '(recorded)' from nominations_ever",
-          _c1_after == ([f"paper:{BQ}/{C1P}@{C1S}"], [f"paper_verdict:{BQ}/{C1P}@{C1S}=fail"])
-          and _read(config.TRIALS_PATH) == _c1_bytes and pg_c1b["recorded"] == f"paper_verdict:{BQ}/{C1P}@{C1S}=fail"
+          _c1_after == ([f"paper:{BQ}/{C1P}@{C1S}"], [_c1_v])
+          and _read(config.TRIALS_PATH) == _c1_bytes and pg_c1b["recorded"] == _c1_v
           and pg_c1b["would_record"] == [] and pg_c1b["line"].endswith(" (recorded)"), f"{_c1_after} | {pg_c1b['line']}")
     config.PAPER_GATE_POLICY, config.PAPER_GATE_WINDOW_START = CHQ, START
 
