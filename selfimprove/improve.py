@@ -889,8 +889,18 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
         line = f"{head} pending (starts in {(start - now_s) / 86400.0:.1f} d)"
     elif not closed or n_open_elig > 0:
         status = "open"
+        # A CLOSED window with an eligible position still open stays "open" on purpose: an
+        # unclosed position has no return yet, and minting the one-shot verdict without it would
+        # judge a truncated sample — permanently, since the verdict is judged once. It is not a
+        # silent state: the line below says which of the two conditions holds and what it means.
+        # livebook drops every position at LIVEBOOK_MAX_TRACK_S, and `closed_at` already includes
+        # that, so a position still open here means the BOOK stopped ticking — an apparatus fact
+        # the operator has to act on, not a trade that is merely running long.
         line = (f"{head} open ({n} fills, {days_elapsed:.1f} of {W} days"
-                + (f", {n_open_elig} eligible still open" if closed else "") + f"; {tail})")
+                + (f", {n_open_elig} eligible STILL OPEN past the close (the book drops every "
+                   f"position at LIVEBOOK_MAX_TRACK_S, so this means the book stopped ticking): "
+                   f"no verdict is minted until they close — the one-shot would judge a "
+                   f"truncated sample" if closed else "") + f"; {tail})")
         if void:
             line += " — would VOID if judged now: " + void[0]
         out["reasons"] = [f"{lbl} — {det}" for lbl, ok, det, _q in checks if not ok]

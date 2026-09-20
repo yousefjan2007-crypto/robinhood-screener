@@ -5905,9 +5905,22 @@ try:
     book_open = json.loads(json.dumps(book_a))
     k_first = next(k for k, p in book_open.items() if BQ in p["sidecar_true"] and _q_t0 <= p["opened_ts"] < _q_t0 + W * 86400)
     book_open[k_first]["done"] = False
+    _tr_before_open = _tr_lines("paper_verdict:")
     pgo, _ = _pg(book_open, t_closed)
     check("an eligible position still open past the window keeps the status 'open' (no verdict is minted while a fill can change)",
-          pgo["status"] == "open" and pgo["n_open_eligible"] == 1 and "still open" in pgo["line"], pgo["line"])
+          pgo["status"] == "open" and pgo["n_open_eligible"] == 1 and "still open" in pgo["line"].lower(), pgo["line"])
+    # L95: "open" past the close is deliberate and fail-safe — but it must not read as a window
+    # that is merely still running. The line states the condition, what it implies (the book
+    # stopped ticking: livebook drops every position at LIVEBOOK_MAX_TRACK_S, which closed_at
+    # already includes) and the consequence, the failing check is listed, and nothing is minted.
+    check("...and it says WHY in the one line the weekly message relays: which condition holds, that a position open past "
+          "LIVEBOOK_MAX_TRACK_S means the BOOK stopped ticking, and that the one-shot is withheld rather than judging a "
+          "truncated sample — with the failing check named and trials.json untouched (an 'open' window mints no verdict)",
+          "STILL OPEN past the close" in pgo["line"] and "LIVEBOOK_MAX_TRACK_S" in pgo["line"]
+          and "no verdict is minted" in pgo["line"] and "truncated sample" in pgo["line"]
+          and any(r.startswith("no eligible position still open") for r in pgo["reasons"])
+          and pgo["recorded_now"] == [] and _tr_lines("paper_verdict:") == _tr_before_open,
+          f"{pgo['line']} | {pgo['reasons']}")
 
     # FAIL: a new pair (policy without the edge) ⇒ net LB <= 0; and too few fills
     config.PAPER_GATE_POLICY = "sell_1h"
