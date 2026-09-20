@@ -44,6 +44,7 @@ import time
 import pandas as pd
 
 import config
+from selfimprove import policies as POL   # the ONE arming predicate (trail_active); no I/O, no clock
 
 HORIZ = config.LEDGER_HORIZONS  # {"1h": 3600, "6h": 21600, "24h": 86400, "7d": 604800}
 
@@ -364,12 +365,12 @@ def update_forward(now_s: float, snapshot_many_fn, path: str | None = None) -> t
                 # An ARMED trail is not live until the high-water mark reaches entry x trail_arm.
                 # Without that test a 30% trail sits at 0.70 x entry from the first snapshot,
                 # ABOVE the -50% stop, so the stop could never fire — the opposite of the "stop
-                # always" the plan promises. `flow` is ignored here by design: the cloud leg has
-                # no 5-minute feed, so a flow policy runs its PRICE legs here and its flow leg is
-                # scored only by the paper book.
-                arm = plan.get("trail_arm")
-                armed = arm is None or 1.0 + max(mx, 0.0) >= float(arm)
-                if armed and cur_price <= peak_px * (1.0 - trail):
+                # always" the plan promises. policies.trail_active is the ONE implementation of
+                # that predicate: the bar simulator, the live book and this cloud leg all call it,
+                # which is what makes "the three can never disagree" true rather than a claim.
+                # `flow` is ignored here by design: the cloud leg has no 5-minute feed, so a flow
+                # policy runs its PRICE legs here and its flow leg is scored only by the paper book.
+                if POL.trail_active(plan, peak_px, entry) and cur_price <= peak_px * (1.0 - trail):
                     led.at[i, "trail_alerted"] = True; touched = True
                     events.append(dict(base, kind="trail"))
             ladder = plan.get("ladder") or []

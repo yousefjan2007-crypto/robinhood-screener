@@ -39,7 +39,13 @@ kill condition), copy it verbatim into the proposal's first section.
 - **AT MOST 2** new modules under `selfimprove/candidates/`, each following `_template.py`
   exactly: a **band** reads only `config.FEATURE_FIELDS` keys via `verdict(feat) -> True |
   False | None` with a non-empty `REQUIRES`; a **policy** is a `POLICY = {ladder?, stop?,
-  trail?, max_hold_s?}` dict. File name == `NAME`. Thresholds you need live as module
+  trail?, trail_arm?, flow?, max_hold_s?}` dict — `selfimprove/policies.py:_POLICY_KEYS` is the
+  authority and `validate_policy` the shape check. `trail_arm` (a number > 1, requires `trail`)
+  is the multiple of entry the high-water mark must reach before the trail is live at all;
+  `flow` (a dict with exactly `policies.FLOW_KEYS`, requires `trail_arm`) is the post-arm
+  5-minute flow rule, which **only the live book runs** — `policies.simulate` has no 5-minute
+  feed and scores a flow policy NaN, so propose one only if a live-book trial is what you want.
+  File name == `NAME`. Thresholds you need live as module
   constants (you may not edit `config.py`) and are named in `RATIONALE`.
 
 ## Hard rules

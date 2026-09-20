@@ -2,7 +2,12 @@
 
 **A candidate is a hypothesis and a trial.** A band (`kind: band`) is a pure function
 `verdict(feat) -> True | False | None` over the flat feature dict `config.FEATURE_FIELDS`; a
-policy (`kind: policy`) is an exit plan `{ladder?, stop?, trail?, max_hold_s?}`. Every
+policy (`kind: policy`) is an exit plan `{ladder?, stop?, trail?, trail_arm?, flow?,
+max_hold_s?}` — `selfimprove/policies.py:_POLICY_KEYS` is the authority, `validate_policy` the
+shape check. `trail_arm` is the multiple of entry the high-water mark must reach before `trail`
+is live at all (a number > 1; it needs a `trail` to arm), and `flow` is the post-arm 5-minute
+flow rule (a dict with exactly `policies.FLOW_KEYS`; it needs `trail_arm`) that only the **live
+book** can run — `policies.simulate` has no 5-minute feed and scores a flow policy NaN. Every
 registration writes the name into `selfimprove/trials.json`, which only grows — you cannot
 un-look at a result — and the count deflates every later Deflated-Sharpe gate for the whole
 family (`bands_ever_scored` for entry, `policies_ever_scored` for exit). A candidate therefore

@@ -1177,6 +1177,22 @@ with tempfile.TemporaryDirectory() as d:
               "trail at 0.84 — the arm suppresses it); 1.6x then 1.1x emits exactly one 'trail'; 0.45x "
               "emits 'stop' from the -50% leg that was live the whole time",
               arm_ev == [[], [], [], ["trail"], [], ["stop"]], str(arm_ev))
+    # ...and it is the SAME predicate the bar simulator and the live book read. policies.trail_active's
+    # docstring claims the three can never disagree; ledger.py used to re-derive the test instead
+    # (`arm is None or 1.0 + max(mx, 0.0) >= float(arm)`), which made that claim a coincidence on the
+    # one leg that fires the operator's real exit alerts. ONE call, and no second arming expression.
+    _led_ast = _tree(os.path.join(ROOT, "ledger.py"))
+    _ta_calls = [n for n in ast.walk(_led_ast) if isinstance(n, ast.Call)
+                 and _attr_chain(n.func) == ["POL", "trail_active"]]
+    _arm_reads = [n for n in ast.walk(_led_ast)
+                  if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "get"
+                      and n.args and isinstance(n.args[0], ast.Constant) and n.args[0].value == "trail_arm")
+                  or (isinstance(n, ast.Subscript) and isinstance(n.slice, ast.Constant)
+                      and n.slice.value == "trail_arm")]
+    check("ledger.py's cloud exit leg CALLS policies.trail_active (exactly once) and re-derives the arming "
+          "predicate nowhere — no `plan.get(\"trail_arm\")` and no `plan[\"trail_arm\"]` anywhere in the file, "
+          "so the simulator, the live book and the cloud leg cannot drift apart",
+          len(_ta_calls) == 1 and _arm_reads == [], f"{len(_ta_calls)} calls, {len(_arm_reads)} raw reads")
     check("forward return math: 100 -> 250 == +150%",
           abs([e for e in e1 if e["token"] == "0xtrail"] == [] and 0) == 0 and
           abs(LED.update_forward(T0 + 20950, _snap(price=2.5), path=LP)[1][0]["ret"] - 1.5) < 1e-9
@@ -2722,6 +2738,33 @@ check("validate_policy rejects every malformed arm/flow shape — in particular 
       "which would be laxer than the stop-only regime the operator asked for before 1.5x", not _slipped, str(_slipped))
 check("the extended schema leaves every pre-declared policy validating unchanged",
       not [n for n, p in POL.POLICIES.items() if p and POL.validate_policy("zz_probe", p) is not None])
+# F5: the key set is published in four AUTHOR-FACING contracts — one of them research_prompt.md,
+# the spec the Sunday headless session is handed. They said {ladder?, stop?, trail?, max_hold_s?}
+# for the whole of this branch, so the two adaptive keys were invisible to the system built to
+# propose them. The set is now GENERATED from _POLICY_KEYS here rather than compared to a literal:
+# every optional-key brace group in those files must parse to exactly the validator's set.
+_KEYSET_DOCS = ("selfimprove/candidates/README.md", "selfimprove/candidates/_template.py",
+                "selfimprove/research/research_prompt.md", "docs/DESIGN.md")
+_keyset_re = re.compile(r"\{((?:[a-z_]+\?(?:,\s*)?)+)\}")
+_keyset_faults = []
+for _ks_rel in _KEYSET_DOCS:
+    _ks_groups = _keyset_re.findall(_read(os.path.join(ROOT, _ks_rel)))
+    if not _ks_groups:
+        _keyset_faults.append(f"{_ks_rel}: publishes no policy key set at all")
+    for _ks_grp in _ks_groups:
+        _ks_got = {x.strip().rstrip("?") for x in _ks_grp.split(",") if x.strip()}
+        if _ks_got != POL._POLICY_KEYS:
+            _keyset_faults.append(f"{_ks_rel}: {sorted(_ks_got)} != {sorted(POL._POLICY_KEYS)}")
+check("the policy key set every author-facing contract publishes IS policies._POLICY_KEYS — candidates/README.md, "
+      "_template.py, research/research_prompt.md and docs/DESIGN.md, generated from the validator and not from a "
+      "literal, so a new key cannot be invisible to the research session that is told to propose one",
+      not _keyset_faults, "; ".join(_keyset_faults))
+check("and each of those four contracts names the two adaptive keys with their rules (trail_arm needs a trail, "
+      "flow needs trail_arm and only the live book runs it — simulate scores it NaN)",
+      not [r for r in _KEYSET_DOCS
+           if not all(s in _read(os.path.join(ROOT, r)) for s in ("trail_arm", "flow", "FLOW_KEYS", "NaN"))],
+      str([r for r in _KEYSET_DOCS
+           if not all(s in _read(os.path.join(ROOT, r)) for s in ("trail_arm", "flow", "FLOW_KEYS", "NaN"))]))
 with tempfile.TemporaryDirectory() as _rd:
     _rp = os.path.join(_rd, "registry.json")
     with open(_rp, "w") as _fh:

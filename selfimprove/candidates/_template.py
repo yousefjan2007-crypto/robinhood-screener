@@ -8,13 +8,17 @@ A candidate module is ONE of two kinds:
 
   KIND = "band"    — an entry hypothesis: verdict(feat) -> True | False | None over the flat
                      feature dict (config.FEATURE_FIELDS; None when unknown). None = NA.
-  KIND = "policy"  — an exit hypothesis: POLICY = {ladder?, stop?, trail?, max_hold_s?}
-                     (selfimprove/policies.py validate_policy is the shape check).
+  KIND = "policy"  — an exit hypothesis: POLICY = {ladder?, stop?, trail?, trail_arm?, flow?,
+                     max_hold_s?} (selfimprove/policies.py:_POLICY_KEYS is the authority and
+                     validate_policy is the shape check).
 
 FORBIDDEN (bands.static_ok rejects the module and it is never imported):
   * any import whose top-level module is not in
         math, json, config, clf_runtime, selfimprove, typing, __future__, hashlib
     (so: no os, sys, time, datetime, random, numpy, pandas, sklearn, urllib, requests, ...)
+    `clf_runtime` is RESERVED for a later plan and does not exist in this repo yet: importing
+    it passes the static check and is then refused by register.py's `python3 -I -S` validator,
+    so it fails closed — but do not write one.
   * any attribute chain touching os.environ, time, datetime, random, numpy.random,
     subprocess, urllib, http_client, requests, socket, pathlib
   * any call to open(), __import__(), exec(), eval()
@@ -70,5 +74,16 @@ def explain(feat: dict) -> str:
 # KIND = "policy"
 # RATIONALE = "..."
 # CONSUMED_DATA = ("data/livebook_summary.json", "data/proposals/")
-# POLICY = {"max_hold_s": 45 * 60}            # keys ⊆ {ladder, stop, trail, max_hold_s};
+# POLICY = {"max_hold_s": 45 * 60}            # keys ⊆ {ladder?, stop?, trail?, trail_arm?,
+#                                             #          flow?, max_hold_s?}
 #                                             # ladder = [[multiple, fraction], ...]
+#
+# trail_arm: a number > 1 — the multiple of entry the HIGH-WATER MARK must reach before `trail`
+#   is live at all. It requires `trail` (there is nothing to arm without one). Below the arm the
+#   position runs on `stop` alone, which is the point: an unarmed 30% trail sits above a -50%
+#   stop from entry and the stop could never fire.
+# flow: a dict with EXACTLY policies.FLOW_KEYS — {"buy_share_max": 0<x<1, "weak_ticks": int >= 1,
+#   "vol_floor_frac": 0<x<1, "min_txns_m5": int >= 0} — the post-arm 5-minute flow rule. It
+#   requires `trail_arm` (a flow rule from entry is LAXER than the pre-arm stop-only regime).
+#   LIVE BOOK ONLY: policies.simulate has no 5-minute feed and returns NaN for a flow policy, so
+#   a flow candidate is scored by the live book and the paper gate, never by the bar simulator.
