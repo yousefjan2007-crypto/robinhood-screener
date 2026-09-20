@@ -626,12 +626,13 @@ def load_credentials() -> dict:
       2. robinhood_screener/config.local.json (gitignored local override).
       3. the shared Mac secrets file (telegram + ntfy only), and the sibling solana_screener's
          config.local.json for the GMGN key only (the same key serves both chains).
-    Returns {ntfy_topic, telegram:{bot_token,chat_id}, gmgn_api_key}. Values are never printed."""
-    creds = {"ntfy_topic": os.environ.get("NTFY_TOPIC"), "telegram": {},
+    Returns {ntfy_topic, telegram:{bot_token,chat_id}, gmgn_api_key, telegram_source}. Values are never printed."""
+    creds = {"ntfy_topic": os.environ.get("NTFY_TOPIC"), "telegram": {}, "telegram_source": "none",
              "gmgn_api_key": os.environ.get("GMGN_API_KEY") or None}
     bt, cid = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if bt and cid:
         creds["telegram"] = {"bot_token": bt, "chat_id": cid}
+        creds["telegram_source"] = "env"
 
     local = os.path.join(ROOT, "config.local.json")
     if os.path.exists(local):
@@ -641,6 +642,8 @@ def load_credentials() -> dict:
             for k, v in loc.items():
                 if v and not creds.get(k):
                     creds[k] = v
+                    if k == "telegram":
+                        creds["telegram_source"] = "config.local.json"
         except Exception:
             pass
 
@@ -651,6 +654,8 @@ def load_credentials() -> dict:
             try:
                 m = json.load(open(mon))
                 creds["telegram"] = m.get("telegram", {})
+                if creds["telegram"]:
+                    creds["telegram_source"] = "shared_mac_secrets"
                 creds["ntfy_topic"] = creds["ntfy_topic"] or m.get("ntfy_topic")
             except Exception:
                 pass
@@ -681,3 +686,4 @@ if __name__ == "__main__":
     print("  creds present:", {"ntfy_topic": bool(c.get("ntfy_topic")),
                                "telegram": bool(c.get("telegram")),
                                "gmgn_api_key": bool(c.get("gmgn_api_key"))})
+    print(f"  telegram source: {c.get('telegram_source')}")

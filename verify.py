@@ -4824,6 +4824,25 @@ finally:
         os.environ.pop("GMGN_API_KEY", None)
     else:
         os.environ["GMGN_API_KEY"] = _env0
+_tg_env0 = {k: os.environ.pop(k, None) for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID")}
+try:
+    os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_CHAT_ID"] = "verify-bot", "verify-chat"
+    _ctg = config.load_credentials()
+    check("load_credentials names WHICH source answered for telegram without revealing it — env wins, reports 'env'",
+          _ctg.get("telegram_source") == "env" and _ctg["telegram"]["bot_token"] == "verify-bot")
+    _cfg_tg = _read(os.path.join(ROOT, "config.py"))
+    check("all four telegram_source branches are wired, and config's smoke test prints the source NAME (never the value)",
+          all(s in _cfg_tg for s in ('"telegram_source": "none"',
+                                     '"telegram_source"] = "env"',
+                                     '"telegram_source"] = "config.local.json"',
+                                     '"telegram_source"] = "shared_mac_secrets"'))
+          and "telegram source:" in _cfg_tg)
+finally:
+    for _k, _v in _tg_env0.items():
+        if _v is None:
+            os.environ.pop(_k, None)
+        else:
+            os.environ[_k] = _v
 _body = GM.build_trenches_body(("completed",), {"min_liquidity": 25000})
 check("build_trenches_body is GMGN's own client shape — version v2, one section per column with filters / launchpad_platform_v2 / "
       "limit / quote_address_type, min_*/max_* merged in (without version + quote_address_type the server answers code 0 with EMPTY columns)",
