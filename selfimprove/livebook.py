@@ -101,7 +101,8 @@ WHAT THIS PORT CHANGES, AND THE INCIDENTS BEHIND EACH CHANGE.
   * THE BAND UNDER TEST: every new row is stamped `sidecar_true` (the bands whose verdict at
     that event_seq is 1, from data/band_verdicts.csv); when config.LIVEBOOK_BAND_UNDER_TEST
     names a registered non-control band, its picks are admitted at the cap under their own
-    sub-cap, so a candidate's rows reach the book beside the champion's. None = inert. In
+    sub-cap, so a candidate's rows reach the book beside the champion's; each position records
+    `admitted_via` and only the sub-cap admissions count against that sub-cap. None = inert. In
     worktree mode a row with NO sidecar line at all is not yet stamped (the append had not
     landed): it waits in feed.pending (`sidecar_pending`) and is re-stamped on the next feed
     call, for at most LIVEBOOK_SIDECAR_WAIT_TICKS calls, then stamped [] — a row whose lines
@@ -353,6 +354,10 @@ def _prepare_open(row: dict, now_s: float, book: dict, *, quote_buy_fn=quotes.qu
            "ledger_plan_name": str(row.get("plan_name") or ""),
            "fired_band": str(row.get("fired_band") or ""),
            "sidecar_true": sorted({str(b) for b in (row.get("sidecar_true") or [])}),
+           # how this position got in — set by the ADMITTING caller (feed_from_ledger), because
+           # the quote phase does not know the rule that let the row through. Only
+           # "band_under_test" consumes a band-under-test sub-cap slot.
+           "admitted_via": None,
            "alert_ts": alert_ts, "entry_lag_s": round(now_s - alert_ts, 1),
            "opened_ts": now_s, "alert_seq": aseq,
            "cost_usd": cost, "tokens_raw": tokens, "entry_px": entry_px, "decimals": dec,
@@ -665,7 +670,9 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
     and the pending rows still waiting on a stamp, none when there are neither. When
     config.LIVEBOOK_BAND_UNDER_TEST names a band, a row it selected is admitted at the cap
     too, under LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN open such positions; past that sub-cap it is
-    refused 'band_under_test_full'. A pending (deferred-buy) row keeps its stamp. Unreadable
+    refused 'band_under_test_full'. The sub-cap counts positions ADMITTED BY THAT RULE
+    (`admitted_via == "band_under_test"`) — an A or promotion row the band also selected is
+    admitted unconditionally and never consumes a slot. A pending (deferred-buy) row keeps its stamp. Unreadable
     sidecar ⇒ empty stamps at once ⇒ plain B rules (fail closed). In worktree mode a row with
     NO sidecar line at all is not yet stamped — the scan appends the sidecar after the ledger's
     os.replace — so it waits in feed.pending (`sidecar_pending`, counted in `stamp_wait`) and
@@ -699,7 +706,15 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
         return stats
     open_count = sum(1 for p in book.values() if isinstance(p, dict) and not p.get("done"))
     but = config.LIVEBOOK_BAND_UNDER_TEST or None
-    under_test_open = sum(1 for p in book.values() if isinstance(p, dict) and not p.get("done")
+    # The sub-cap counts positions ADMITTED BY THE RULE, not every open position the band also
+    # selected. Counting the latter had A and promotion rows — admitted unconditionally, outside
+    # LIVEBOOK_MAX_OPEN, needing no sub-cap slot — eat the band's test capacity and manufacture
+    # `band_under_test_full` refusals, which then feed the paper gate's refused-share VOID: the
+    # bug would corrupt the very window it exists to measure. A position with no `admitted_via`
+    # predates the rule being switched on and was, by construction, not admitted by it.
+    under_test_open = sum(1 for p in book.values()
+                          if isinstance(p, dict) and not p.get("done")
+                          and p.get("admitted_via") == "band_under_test"
                           and but is not None and but in (p.get("sidecar_true") or []))
     pending_fills: list = []                    # every write waits for the one hold at the end
     pending_missed: list = []
@@ -727,8 +742,10 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
             stats["stamp_wait"] += 1
             return False
         under_test = but is not None and but in (item.get("sidecar_true") or [])
-        always = item["tier"] == "A" or item["event_kind"] == "promotion" or (
-            under_test and under_test_open < config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN)
+        unconditional = item["tier"] == "A" or item["event_kind"] == "promotion"
+        sub_cap = (under_test and not unconditional
+                   and under_test_open < config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN)
+        always = unconditional or sub_cap
         if not always and open_count >= config.LIVEBOOK_MAX_OPEN:
             _miss(item, lag, "band_under_test_full" if under_test else "book_full")
             return True
@@ -737,7 +754,12 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
         if status == "opened":
             stats["opened"] += 1
             open_count += 1
-            if under_test:
+            # Only a sub-cap admission consumes a sub-cap slot: an A/promotion row is admitted
+            # outside LIVEBOOK_MAX_OPEN whatever any band says about it, and a B row taken below
+            # the cap needed no rule either.
+            pos["admitted_via"] = ("band_under_test" if sub_cap
+                                   else ("unconditional" if unconditional else "b_cap"))
+            if sub_cap:
                 under_test_open += 1
             book[key] = pos
             book_dirty = True

@@ -2400,6 +2400,33 @@ try:
                   and stf2["stamp_wait"] == 0 and stf2["missed"] == 1 and len(m91) == 1 and m91[0]["reason"] == "book_full"
                   and _sc_calls["n"] == n_sc + 2 and LB._load(LB.FEED_STATE_PATH, {})["pending"] == [], str((stf, stf2, m91)))
 
+            # L64: the sub-cap counts positions ADMITTED BY THE RULE, not every open position the
+            # band happens to have selected. 87 is an A/promotion row stamped band_x: admitted
+            # unconditionally, outside LIVEBOOK_MAX_OPEN, needing no slot — yet the old counter
+            # gave it one, shrinking the band's real test capacity and manufacturing
+            # band_under_test_full refusals that feed the paper gate's refused-share VOID.
+            _open_now = [p for p in book().values() if not p.get("done")]
+            _old_ct = sum(1 for p in _open_now if "band_x" in (p.get("sidecar_true") or []))
+            _new_ct = sum(1 for p in _open_now if p.get("admitted_via") == "band_under_test"
+                          and "band_x" in (p.get("sidecar_true") or []))
+            _via = {int(p["event_seq"]): p.get("admitted_via") for p in _open_now}
+            config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN = _old_ct      # the OLD counter is already AT this cap
+            TD1 = "0x" + "d" * 39 + "1"
+            _write_sidecar([(92, TD1, tu + 295, "band_x", 1)])
+            stf92 = _feed([lrow(TD1, 92, tier="B", kind="first_sighting", ats=tu + 295)], tu + 298)
+            p92 = book().get(LB._pos_key(TD1, 92))
+            check("the band-under-test sub-cap counts ADMISSIONS BY THE RULE: every position records admitted_via "
+                  "('band_under_test' | 'unconditional' | 'b_cap'), the A/promotion row the band also selected is "
+                  "'unconditional' and consumes no slot, and a stamped B row is admitted at a sub-cap the old "
+                  "stamped-open count had already filled — the sub-cap can no longer be eaten by rows that never "
+                  "needed it, nor invent the refusals the paper gate reads as lost capacity",
+                  _via.get(87) == "unconditional" and _via.get(81) == "band_under_test" and _old_ct > _new_ct
+                  and stf92["opened"] == 1 and stf92["missed"] == 0
+                  and p92 is not None and p92["admitted_via"] == "band_under_test"
+                  and not any(m["event_seq"] == 92 for m in _missed()),
+                  f"old {_old_ct} new {_new_ct} via {_via} {stf92}")
+            config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN = 20
+
             def _stamped(mode, stamps, n=0):
                 it = {"event_seq": 5, "sidecar_true": [], "sidecar_pending": n}
                 config.LIVEBOOK_FEED_SOURCE = mode
