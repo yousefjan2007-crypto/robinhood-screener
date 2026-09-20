@@ -98,6 +98,7 @@ Claude session proposes new candidates that merge only if `verify.py` is green.
 | `docs/DESIGN.md` | The reconciled design: resolved decisions and module contracts. |
 | `docs/GO_LIVE_CHECKLIST.md` | The eleven things that must be true before a paper scorecard may be read as evidence — one command and one binary pass condition each, then the sizing paragraph. |
 | `docs/RETRO_2026-09-16_hype_runners.md` | What three 2026-09-16 runners did minute by minute on ordered 1-minute paths — descriptive, n = 3, chosen on the outcome; no rule is derived from it. |
+| `docs/RETRO_2026-09-19_RKST.md` | What $RKST did over its 13.7-day life, asked because it was believed to have run — descriptive, n = 1, chosen on the outcome; the token predates the ledger and no rule is derived from it. |
 
 ## Tiers, the control group and the event model
 

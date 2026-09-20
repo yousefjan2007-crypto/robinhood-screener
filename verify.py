@@ -5282,7 +5282,6 @@ check("README's file table carries the retrospective with its one honest bullet"
       and "descriptive, n = 3, chosen on the outcome" in _readme
       and "no rule is derived from it" in _readme)
 
-
 # ═══════════════════════════════════════════════════════════════════════════════════
 section("Q. the vendored Deflated Sharpe, the paper gate, the Sunday job on GitHub")
 # ═══════════════════════════════════════════════════════════════════════════════════
@@ -5770,5 +5769,33 @@ check("README's file table names selfimprove/dsr.py and weekly.yml, and its depe
       "`dsr.py`" in _readme_q and "weekly.yml" in _readme_q and "13.7×/day" in _readme_q
       and "the Sunday statistics\nadditionally use numpy, on the Mac and on the runner alike" in _readme_q
       and "`run_improve.sh`" not in _readme_q)
+
+# ── 8b. the RKST retrospective is descriptive, and is honest that the token was never screened ────
+# n = 1, chosen because someone believed it had run. The shape that turns this into a claim is a
+# later edit quietly dropping the "it is down on 24h/7d" correction or the "never ledgered" section
+# and leaving only the +103% life-to-date number. These checks make that edit fail.
+_rkst_path = os.path.join(ROOT, "docs", "RETRO_2026-09-19_RKST.md")
+check("docs/RETRO_2026-09-19_RKST.md exists", os.path.isfile(_rkst_path))
+_rkst = _read(_rkst_path)
+check("the RKST retrospective's FIRST section is 'What this cannot tell you' — the disclaimer leads",
+      _rkst.split("\n## ")[1].startswith("What this cannot tell you"), _rkst.split("\n## ")[1][:80])
+check("the RKST retrospective says no rule is derived, says nothing here is causal, and pins its numbers to an origin/main SHA",
+      "no rule is derived" in _rkst and "Nothing here is causal" in _rkst and "7942a6f" in _rkst)
+check("the RKST retrospective pins the data-quality columns ('`res`' / '`pages`') it rests on",
+      "`res`" in _rkst and "`pages`" in _rkst)
+check("the RKST retrospective states the token was NEVER screened and predates the ledger — the gate reading is post-hoc, not point-in-time",
+      "predates the system by 6.6 days" in _rkst and "post-hoc" in _rkst)
+check("the RKST retrospective corrects the premise rather than confirming it (the 24h/7d drawdown is stated, not only the life-to-date gain)",
+      "-21.2" in _rkst.replace("\u2212", "-") and "-33.8" in _rkst.replace("\u2212", "-"))
+check("the RKST retrospective claims no hit rate, lift, threshold or cause from n = 1",
+      "n = 1" in _rkst and "Refuses to claim" in _rkst and "no cause" in _rkst)
+check("the RKST retrospective reports the co-movement test as a lead, with its BY correction and post-hoc peer selection named",
+      "Benjamini" in _rkst and "lead, not a finding" in _rkst)
+check("the RKST retrospective carries no home path and never names the shared secrets file (public repo)",
+      "/Users/" not in _rkst and "monitor_config" not in _rkst and "vrp_backtest" not in _rkst)
+check("README's file table carries the RKST retrospective with its one honest bullet",
+      "RETRO_2026-09-19_RKST.md" in _readme
+      and "descriptive, n = 1, chosen on the outcome" in _readme
+      and "predates the ledger and no rule is derived from it" in _readme)
 
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")
