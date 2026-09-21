@@ -1922,9 +1922,9 @@
   "0x1e8ea63576dd7b7c29a69b328156553af7922892:1576": {
    "alert_ts": 1789930763.255446,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790017794.1555655,
    "cost_usd": 10.0,
    "entry_px_usd": 7.824283311731465e-23,
    "event_seq": 1576,
@@ -1960,7 +1960,7 @@
    "tier": "A",
    "token": "0x1e8ea63576dd7b7c29a69b328156553af7922892",
    "tokens_raw": 127807232964153258803200,
-   "tokens_remaining_raw": 127807232964153258803200,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2626.24
   },
   "0x1ebcd9462501c9348588371b6b65da5988615b12:799": {
@@ -2876,9 +2876,9 @@
   "0x2b61cf2b8542bc6ba40e0717ec444afa00d2cd23:1577": {
    "alert_ts": 1789931003.0840294,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790017794.1555655,
    "cost_usd": 10.0,
    "entry_px_usd": 9.364486656845383e-25,
    "event_seq": 1577,
@@ -2914,7 +2914,7 @@
    "tier": "A",
    "token": "0x2b61cf2b8542bc6ba40e0717ec444afa00d2cd23",
    "tokens_raw": 10678641944233067958763520,
-   "tokens_remaining_raw": 10678641944233067958763520,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2627.74
   },
   "0x2bf4d200a7e185a1e19555ca09ffca87fc552304:1618": {
@@ -9062,6 +9062,50 @@
    "tokens_raw": 92582412805596860383232,
    "tokens_remaining_raw": 92582412805596860383232,
    "weth_px_usd_open": 2738.39
+  },
+  "0xb6f91a67e325c99c00f99f1acc84b121cc1e4b11:1722": {
+   "alert_ts": 1790017794.1555655,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.3518482826774558e-22,
+   "event_seq": 1722,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.7365,
+   "opened_ts": 1790017794.1555655,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "ZUCK",
+   "tier": "A",
+   "token": "0xb6f91a67e325c99c00f99f1acc84b121cc1e4b11",
+   "tokens_raw": 73972798043535699869696,
+   "tokens_remaining_raw": 73972798043535699869696,
+   "weth_px_usd_open": 2756.49
   },
   "0xb7f5e5ee8231720b63bb29c39b598892fea53f27:1509": {
    "alert_ts": 1789885417.3462183,
