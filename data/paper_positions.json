@@ -6776,9 +6776,9 @@
   "0x553aaf39210bbac7d6283f9232d534be929b6add:1748": {
    "alert_ts": 1790025879.1476662,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790113663.185545,
    "cost_usd": 10.0,
    "entry_px_usd": 9.306252009400974e-23,
    "event_seq": 1748,
@@ -6814,7 +6814,7 @@
    "tier": "A",
    "token": "0x553aaf39210bbac7d6283f9232d534be929b6add",
    "tokens_raw": 107454644360567679090688,
-   "tokens_remaining_raw": 107454644360567679090688,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2766.93
   },
   "0x55683371036401f8cae676c260efcde9be36a7f4:1818": {
@@ -13418,7 +13418,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.7969543550020262e-21,
    "event_seq": 1862,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 8.8582,
    "opened_ts": 1790113423.0352736,
    "pending_exits": [],
@@ -13445,12 +13445,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 6.852600156897402,
    "symbol": "TTV",
    "tier": "A",
    "token": "0xd79e23da4d8e8df3eb740bc04a10601a9886a44e",
    "tokens_raw": 5564971626665900769280,
-   "tokens_remaining_raw": 5564971626665900769280,
+   "tokens_remaining_raw": 2782485813332950384640,
    "weth_px_usd_open": 2748.022
   },
   "0xd96085ac54cf0e6402fd6939f0a5fd72ab655d3a:1261": {
@@ -14582,6 +14582,50 @@
    "tokens_raw": 119045597807751129464832,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2632.049
+  },
+  "0xed251c19d517c4f17b12b66e2ea154ed6a2dac7a:1863": {
+   "alert_ts": 1790113663.185545,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 9.541388493657444e-23,
+   "event_seq": 1863,
+   "gas_usd": 0.07,
+   "impact_pct_open": 3.2547,
+   "opened_ts": 1790113663.185545,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "HSTR",
+   "tier": "A",
+   "token": "0xed251c19d517c4f17b12b66e2ea154ed6a2dac7a",
+   "tokens_raw": 104806548927835967324160,
+   "tokens_remaining_raw": 104806548927835967324160,
+   "weth_px_usd_open": 2750.39
   },
   "0xedd0033f059258643a846bfe2647412868d5d68c:1549": {
    "alert_ts": 1789917670.5645218,
