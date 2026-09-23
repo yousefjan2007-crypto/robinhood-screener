@@ -11082,7 +11082,7 @@
       "token": "0x8e1e135d8465de22c908e08b30b87999c1739d22"
      },
      "first_seen_ts": 1790188683.718542,
-     "tries": 2
+     "tries": 3
     }
    ],
    "plan": {
@@ -14572,6 +14572,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2630.059
   },
+  "0xc34b9d3d13c63baba49e5c020b4462a1dcfde149:1992": {
+   "alert_ts": 1790189403.8423104,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 2.370078085435493e-22,
+   "event_seq": 1992,
+   "gas_usd": 0.07,
+   "impact_pct_open": 4.6907,
+   "opened_ts": 1790189403.8423104,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "KENYA",
+   "tier": "A",
+   "token": "0xc34b9d3d13c63baba49e5c020b4462a1dcfde149",
+   "tokens_raw": 42192702685416104394752,
+   "tokens_remaining_raw": 42192702685416104394752,
+   "weth_px_usd_open": 2668.032
+  },
   "0xc3ba8a6f8d011881ceca8ad6e2b524232a40aa26:1950": {
    "alert_ts": 1790174343.705459,
    "champion_at_open": "cfg_ladder_stop",
@@ -17602,7 +17646,28 @@
    "gas_usd": 0.07,
    "impact_pct_open": 7.7074,
    "opened_ts": 1790188923.9444325,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 1990,
+      "gap_s": 479.89787793159485,
+      "kind": "tp",
+      "levels": [
+       [
+        2.0,
+        0.5
+       ]
+      ],
+      "mult": 2.4957683741648107,
+      "price": 0.0005603,
+      "ret": 1.4957683741648107,
+      "symbol": "KENYA",
+      "token": "0xf620686a41e8008c54e1364d7d15bcdadd938a56"
+     },
+     "first_seen_ts": 1790189403.8423104,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
