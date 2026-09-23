@@ -16638,7 +16638,7 @@
       "token": "0xe3d9133c05aab2f6b24919f71e6bbf0b87cc54cc"
      },
      "first_seen_ts": 1790196603.9976819,
-     "tries": 1
+     "tries": 2
     }
    ],
    "plan": {
@@ -18427,31 +18427,16 @@
   "0xfd2852b9cf7b98ed73f90fd2902b07e7da08c1d8:1855": {
    "alert_ts": 1790109342.81577,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790197083.5164387,
    "cost_usd": 10.0,
    "entry_px_usd": 9.725657265053916e-23,
    "event_seq": 1855,
    "gas_usd": 0.07,
    "impact_pct_open": 100.0,
    "opened_ts": 1790109342.81577,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1855,
-      "gap_s": 480.04111433029175,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "CPU",
-      "token": "0xfd2852b9cf7b98ed73f90fd2902b07e7da08c1d8"
-     },
-     "first_seen_ts": 1790196363.763075,
-     "tries": 2
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -18480,7 +18465,7 @@
    "tier": "A",
    "token": "0xfd2852b9cf7b98ed73f90fd2902b07e7da08c1d8",
    "tokens_raw": 102820814341585405739008,
-   "tokens_remaining_raw": 102820814341585405739008,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2754.79
   },
   "0xfe7bcf9d853a7fc28d43c5c9ccbfd25004c382a5:1650": {
