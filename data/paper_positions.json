@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790193243.666453,
+   "event_seq": 1996,
+   "first_seen_ts": 1790193243.666453,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "jev",
+   "tier": "A",
+   "token": "0x2637f8731e1e1599fe8ab8a290ea5cc3938eeb5e",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -1016,35 +1048,10 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.3802076700137828e-22,
    "event_seq": 1850,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": 1.4739,
    "opened_ts": 1790105502.5398567,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1850,
-      "gap_s": 719.7829086780548,
-      "kind": "tp",
-      "levels": [
-       [
-        5.0,
-        0.25
-       ],
-       [
-        10.0,
-        0.15
-       ]
-      ],
-      "mult": 33.79603399433428,
-      "price": 0.004772,
-      "ret": 32.79603399433428,
-      "symbol": "WALV",
-      "token": "0x094acda7dd127700f75e42d964933b9887307ebc"
-     },
-     "first_seen_ts": 1790193003.9582543,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -1068,12 +1075,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 10.501246610436496,
+   "realized_usd": 10.438061157143654,
    "symbol": "WALV",
    "tier": "A",
    "token": "0x094acda7dd127700f75e42d964933b9887307ebc",
    "tokens_raw": 72452865009076058193920,
-   "tokens_remaining_raw": 36226432504538029096960,
+   "tokens_remaining_raw": 7245286500907605819392,
    "weth_px_usd_open": 2758.1
   },
   "0x09925ee9d150d7428e46c16a81d6c2835fffe216:1314": {
@@ -13359,13 +13366,13 @@
   "0xb29c596af277d1928d0d08f8e28f4a81146da5e0:1976": {
    "alert_ts": 1790183403.5411804,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790193243.666453,
    "cost_usd": 10.0,
    "entry_px_usd": 1.4663951086063974e-22,
    "event_seq": 1976,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": -34.3819,
    "opened_ts": 1790183403.5411804,
    "pending_exits": [],
@@ -13392,12 +13399,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 23.097979621765585,
+   "realized_usd": 24.34067199864071,
    "symbol": "AGI",
    "tier": "A",
    "token": "0xb29c596af277d1928d0d08f8e28f4a81146da5e0",
    "tokens_raw": 68194444603021049462784,
-   "tokens_remaining_raw": 34097222301510524731392,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2650.035
   },
   "0xb53c075f9de06fa28f28a863200600028dcdd0fa:1785": {
