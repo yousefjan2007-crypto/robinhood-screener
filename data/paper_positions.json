@@ -29,7 +29,7 @@
    "symbol": "Bitgold",
    "tier": "A",
    "token": "0xcbd1581238796ad87d976adac86378d96fe63977",
-   "tries": 3
+   "tries": 4
   }
  ],
  "positions": {
@@ -5625,6 +5625,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2757.099
   },
+  "0x3a6e075e10dad998fc1a11d4ac1bc8cc80d9ac32:1987": {
+   "alert_ts": 1790187724.1285985,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 9.206647070716072e-23,
+   "event_seq": 1987,
+   "gas_usd": 0.07,
+   "impact_pct_open": null,
+   "opened_ts": 1790187724.1285985,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "scanhood",
+   "realized_usd": 0.0,
+   "symbol": "dec0ded",
+   "tier": "A",
+   "token": "0x3a6e075e10dad998fc1a11d4ac1bc8cc80d9ac32",
+   "tokens_raw": 108617175429775895695788,
+   "tokens_remaining_raw": 108617175429775895695788,
+   "weth_px_usd_open": 2659.26
+  },
   "0x3acd60bd6bf2870521a2d3f36a1eb0e9603fd1eb:1956": {
    "alert_ts": 1790176263.4200242,
    "champion_at_open": "cfg_ladder_stop",
@@ -11010,31 +11054,10 @@
    "cost_usd": 10.0,
    "entry_px_usd": 3.5412800370335517e-22,
    "event_seq": 1983,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 1.3467,
    "opened_ts": 1790186284.174996,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1983,
-      "gap_s": 240.23842692375183,
-      "kind": "tp",
-      "levels": [
-       [
-        2.0,
-        0.5
-       ]
-      ],
-      "mult": 2.4880823401950165,
-      "price": 0.0009186,
-      "ret": 1.4880823401950165,
-      "symbol": "PRLSTR",
-      "token": "0x8e1e135d8465de22c908e08b30b87999c1739d22"
-     },
-     "first_seen_ts": 1790187483.8140523,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -11058,12 +11081,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 8.633136970245062,
    "symbol": "PRLSTR",
    "tier": "A",
    "token": "0x8e1e135d8465de22c908e08b30b87999c1739d22",
    "tokens_raw": 28238376788684491980800,
-   "tokens_remaining_raw": 28238376788684491980800,
+   "tokens_remaining_raw": 14119188394342245990400,
    "weth_px_usd_open": 2665.52
   },
   "0x90614d3f0160844dc219fe9e33c7c7b394c4e243:1666": {
@@ -16273,31 +16296,16 @@
   "0xe34f03f4f36e842c8817ac635162a2cc67e03c8a:1979": {
    "alert_ts": 1790184603.5873077,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790187724.1285985,
    "cost_usd": 10.0,
    "entry_px_usd": 6.173416561269176e-23,
    "event_seq": 1979,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": 0.2425,
    "opened_ts": 1790184603.5873077,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1979,
-      "gap_s": 960.0897424221039,
-      "kind": "stop",
-      "mult": 0.29604195280309653,
-      "price": 2.371e-05,
-      "ret": -0.7039580471969035,
-      "symbol": "CDS",
-      "token": "0xe34f03f4f36e842c8817ac635162a2cc67e03c8a"
-     },
-     "first_seen_ts": 1790187483.8140523,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -16321,12 +16329,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 14.987125920590616,
+   "realized_usd": 15.157459379771693,
    "symbol": "CDS",
    "tier": "A",
    "token": "0xe34f03f4f36e842c8817ac635162a2cc67e03c8a",
    "tokens_raw": 161984857181646690975744,
-   "tokens_remaining_raw": 80992428590823345487872,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2662.18
   },
   "0xe4c1a3d65728a17b688fc93cd4d1cc974c5c4581:803": {
