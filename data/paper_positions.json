@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790196363.763075,
-   "event_seq": 2003,
-   "first_seen_ts": 1790196363.763075,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "hyENA",
-   "tier": "A",
-   "token": "0xc3251bfc470db80b2405ef7feb3d4403ebd19f39",
-   "tries": 0
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -14721,6 +14689,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2630.059
   },
+  "0xc3251bfc470db80b2405ef7feb3d4403ebd19f39:2003": {
+   "alert_ts": 1790196363.763075,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.1099158600201374e-22,
+   "event_seq": 2003,
+   "gas_usd": 0.07,
+   "impact_pct_open": 37.0892,
+   "opened_ts": 1790196603.9976819,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "hyENA",
+   "tier": "A",
+   "token": "0xc3251bfc470db80b2405ef7feb3d4403ebd19f39",
+   "tokens_raw": 90096919597297841471488,
+   "tokens_remaining_raw": 90096919597297841471488,
+   "weth_px_usd_open": 2671.82
+  },
   "0xc34b9d3d13c63baba49e5c020b4462a1dcfde149:1992": {
    "alert_ts": 1790189403.8423104,
    "champion_at_open": "cfg_ladder_stop",
@@ -16613,7 +16625,22 @@
    "gas_usd": 0.07,
    "impact_pct_open": 1.8744,
    "opened_ts": 1790196123.884174,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 2001,
+      "gap_s": 480.11350774765015,
+      "kind": "stop",
+      "mult": 0.0583739837398374,
+      "price": 2.154e-06,
+      "ret": -0.9416260162601626,
+      "symbol": "hyENA",
+      "token": "0xe3d9133c05aab2f6b24919f71e6bbf0b87cc54cc"
+     },
+     "first_seen_ts": 1790196603.9976819,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -18312,13 +18339,13 @@
   "0xfc81c7a362c646d83064607d7687a8b12ac2d8ef:1973": {
    "alert_ts": 1790182684.2651107,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790196603.9976819,
    "cost_usd": 10.0,
    "entry_px_usd": 9.313497176612796e-22,
    "event_seq": 1973,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": 1.3718,
    "opened_ts": 1790182684.2651107,
    "pending_exits": [],
@@ -18345,12 +18372,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 8.605425829096337,
+   "realized_usd": 11.282435681981214,
    "symbol": "LOAN",
    "tier": "A",
    "token": "0xfc81c7a362c646d83064607d7687a8b12ac2d8ef",
    "tokens_raw": 10737105311108148756480,
-   "tokens_remaining_raw": 5368552655554074378240,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2660.1
   },
   "0xfcb154d959543b457cb5b1d53f413a3f8bd15bb1:1851": {
@@ -18422,7 +18449,7 @@
       "token": "0xfd2852b9cf7b98ed73f90fd2902b07e7da08c1d8"
      },
      "first_seen_ts": 1790196363.763075,
-     "tries": 0
+     "tries": 1
     }
    ],
    "plan": {
