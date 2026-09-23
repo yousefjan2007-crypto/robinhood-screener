@@ -3457,6 +3457,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2646.74
   },
+  "0x23f0f0d4b5b6c68ab43421f439177bfa5dc61f24:2015": {
+   "alert_ts": 1790203070.1074717,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.6613659968770435e-13,
+   "event_seq": 2015,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.3465,
+   "opened_ts": 1790203070.1074717,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "router",
+   "realized_usd": 0.0,
+   "symbol": "IMDSTRTGY",
+   "tier": "A",
+   "token": "0x23f0f0d4b5b6c68ab43421f439177bfa5dc61f24",
+   "tokens_raw": 60191432946127,
+   "tokens_remaining_raw": 60191432946127,
+   "weth_px_usd_open": 2684.052
+  },
   "0x242125612f5524949ce1adf4af7ee39075f76462:1647": {
    "alert_ts": 1789981107.2550066,
    "champion_at_open": "cfg_ladder_stop",
@@ -5668,7 +5712,7 @@
       "token": "0x397397667be18fc535d2cd628552c9ff8391c118"
      },
      "first_seen_ts": 1790202829.5976071,
-     "tries": 0
+     "tries": 1
     }
    ],
    "plan": {
