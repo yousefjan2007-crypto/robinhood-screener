@@ -5210,39 +5210,10 @@
    "cost_usd": 10.0,
    "entry_px_usd": 8.884807642603601e-21,
    "event_seq": 1842,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 100.0,
    "opened_ts": 1790103302.8424196,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1842,
-      "gap_s": 64572.41589164734,
-      "kind": "tp",
-      "levels": [
-       [
-        2.0,
-        0.5
-       ],
-       [
-        5.0,
-        0.25
-       ],
-       [
-        10.0,
-        0.15
-       ]
-      ],
-      "mult": 29.600945129955367,
-      "price": 0.002255,
-      "ret": 28.600945129955367,
-      "symbol": "ARGONAUTS",
-      "token": "0x359a358ecfcd66c9fe67645f42f27c3dc029b831"
-     },
-     "first_seen_ts": 1790189643.3669846,
-     "tries": 2
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -5266,12 +5237,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": -0.06656936587338845,
    "symbol": "ARGONAUTS",
    "tier": "A",
    "token": "0x359a358ecfcd66c9fe67645f42f27c3dc029b831",
    "tokens_raw": 1125516770002867847168,
-   "tokens_remaining_raw": 1125516770002867847168,
+   "tokens_remaining_raw": 112551677000286784717,
    "weth_px_usd_open": 2752.28
   },
   "0x35fac68d9b2145fb11763895d69a030d4aa7210d:1613": {
@@ -10787,13 +10758,13 @@
   "0x8b1cacf3bfa11e0d438c7756cd5167216cbb46fd:1963": {
    "alert_ts": 1790180343.8181317,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790190363.3920367,
    "cost_usd": 10.0,
    "entry_px_usd": 9.591138501961526e-22,
    "event_seq": 1963,
-   "gas_usd": 0.21000000000000002,
+   "gas_usd": 0.28,
    "impact_pct_open": 5.3701,
    "opened_ts": 1790180343.8181317,
    "pending_exits": [],
@@ -10820,12 +10791,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 13.54905476991361,
+   "realized_usd": 14.059609751772891,
    "symbol": "USELESS",
    "tier": "A",
    "token": "0x8b1cacf3bfa11e0d438c7756cd5167216cbb46fd",
    "tokens_raw": 10426290891279336210432,
-   "tokens_remaining_raw": 2606572722819834052608,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2661.25
   },
   "0x8c08ff1cc49744abe906d7a69ccf4c70da4b2712:672": {
@@ -11335,7 +11306,7 @@
       "token": "0x9314c9eb17c7b15315dab95aa880f6afbcfe03a0"
      },
      "first_seen_ts": 1790189883.9302378,
-     "tries": 1
+     "tries": 2
     }
    ],
    "plan": {
@@ -17700,7 +17671,7 @@
       "token": "0xf620686a41e8008c54e1364d7d15bcdadd938a56"
      },
      "first_seen_ts": 1790189403.8423104,
-     "tries": 3
+     "tries": 4
     }
    ],
    "plan": {
