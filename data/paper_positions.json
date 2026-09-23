@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790194204.002493,
-   "event_seq": 1998,
-   "first_seen_ts": 1790194204.002493,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "PokeDollar",
-   "tier": "A",
-   "token": "0xdb3439ee2d636e32f70af20241a78447fc7b1b8d",
-   "tries": 1
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -5372,7 +5340,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.384764709562712e-22,
    "event_seq": 1997,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 1.1271,
    "opened_ts": 1790193483.8558176,
    "pending_exits": [],
@@ -5399,12 +5367,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 10.482410705358046,
    "symbol": "UNREAL",
    "tier": "A",
    "token": "0x3657acebdf06949d649bebeb2c4bfcfc14fa5f02",
    "tokens_raw": 72214434199134462279680,
-   "tokens_remaining_raw": 72214434199134462279680,
+   "tokens_remaining_raw": 36107217099567231139840,
    "weth_px_usd_open": 2676.47
   },
   "0x373a133a085a4f73a57eb419d76c0da85db84e1c:1008": {
@@ -15989,6 +15957,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2570.84
   },
+  "0xdb3439ee2d636e32f70af20241a78447fc7b1b8d:1998": {
+   "alert_ts": 1790194204.002493,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.2465804492840832e-22,
+   "event_seq": 1998,
+   "gas_usd": 0.07,
+   "impact_pct_open": null,
+   "opened_ts": 1790194683.8899276,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "PokeDollar",
+   "tier": "A",
+   "token": "0xdb3439ee2d636e32f70af20241a78447fc7b1b8d",
+   "tokens_raw": 80219451586482410618880,
+   "tokens_remaining_raw": 80219451586482410618880,
+   "weth_px_usd_open": 2674.16
+  },
   "0xdbe27d5eaa24d53884d6f538db5f8b1e65b9ffd1:1980": {
    "alert_ts": 1790184603.5873077,
    "champion_at_open": "cfg_ladder_stop",
@@ -18224,13 +18236,13 @@
   "0xfcb154d959543b457cb5b1d53f413a3f8bd15bb1:1851": {
    "alert_ts": 1790106462.563749,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790194683.8899276,
    "cost_usd": 10.0,
    "entry_px_usd": 1.2311826348469527e-22,
    "event_seq": 1851,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 63.9777,
    "opened_ts": 1790106462.563749,
    "pending_exits": [],
@@ -18257,12 +18269,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": -0.01759526702254261,
    "symbol": "URAT",
    "tier": "A",
    "token": "0xfcb154d959543b457cb5b1d53f413a3f8bd15bb1",
    "tokens_raw": 81222718035192977555456,
-   "tokens_remaining_raw": 81222718035192977555456,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2751.62
   },
   "0xfd2852b9cf7b98ed73f90fd2902b07e7da08c1d8:1855": {
