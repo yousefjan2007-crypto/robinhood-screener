@@ -6740,31 +6740,16 @@
   "0x46b1d8c61dfc0f653f8c27e2b1f02a3746c254ba:1988": {
    "alert_ts": 1790188203.7787194,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790188923.9444325,
    "cost_usd": 10.0,
    "entry_px_usd": 1.3138084805281996e-22,
    "event_seq": 1988,
    "gas_usd": 0.07,
    "impact_pct_open": 0.2023,
    "opened_ts": 1790188203.7787194,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1988,
-      "gap_s": 239.9308819770813,
-      "kind": "stop",
-      "mult": 0.231794425087108,
-      "price": 2.661e-05,
-      "ret": -0.768205574912892,
-      "symbol": "TRION",
-      "token": "0x46b1d8c61dfc0f653f8c27e2b1f02a3746c254ba"
-     },
-     "first_seen_ts": 1790188683.718542,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -6793,7 +6778,7 @@
    "tier": "A",
    "token": "0x46b1d8c61dfc0f653f8c27e2b1f02a3746c254ba",
    "tokens_raw": 76114594693281547812864,
-   "tokens_remaining_raw": 76114594693281547812864,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2661.35
   },
   "0x46cfdc62cf23fd2eda894856b6c76b2d76cfc598:392": {
@@ -11097,7 +11082,7 @@
       "token": "0x8e1e135d8465de22c908e08b30b87999c1739d22"
      },
      "first_seen_ts": 1790188683.718542,
-     "tries": 0
+     "tries": 1
     }
    ],
    "plan": {
@@ -17604,6 +17589,50 @@
    "tokens_raw": 141295417752668914843648,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2739.84
+  },
+  "0xf620686a41e8008c54e1364d7d15bcdadd938a56:1990": {
+   "alert_ts": 1790188923.9444325,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 5.520290432585029e-22,
+   "event_seq": 1990,
+   "gas_usd": 0.07,
+   "impact_pct_open": 7.7074,
+   "opened_ts": 1790188923.9444325,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "KENYA",
+   "tier": "A",
+   "token": "0xf620686a41e8008c54e1364d7d15bcdadd938a56",
+   "tokens_raw": 18114988916112558653440,
+   "tokens_remaining_raw": 18114988916112558653440,
+   "weth_px_usd_open": 2663.075
   },
   "0xf7c92451cd775ccee0a193e4c04ea5733207510e:1479": {
    "alert_ts": 1789858244.725516,
