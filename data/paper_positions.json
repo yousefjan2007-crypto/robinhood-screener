@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790190844.0916677,
+   "event_seq": 1993,
+   "first_seen_ts": 1790190844.0916677,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "MESSINATOR",
+   "tier": "A",
+   "token": "0x95d51e28d34fab185b4e05c3996006dcc5968014",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -17631,28 +17663,7 @@
    "gas_usd": 0.07,
    "impact_pct_open": 7.7074,
    "opened_ts": 1790188923.9444325,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1990,
-      "gap_s": 479.89787793159485,
-      "kind": "tp",
-      "levels": [
-       [
-        2.0,
-        0.5
-       ]
-      ],
-      "mult": 2.4957683741648107,
-      "price": 0.0005603,
-      "ret": 1.4957683741648107,
-      "symbol": "KENYA",
-      "token": "0xf620686a41e8008c54e1364d7d15bcdadd938a56"
-     },
-     "first_seen_ts": 1790189403.8423104,
-     "tries": 5
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
