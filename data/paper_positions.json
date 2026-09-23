@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790195643.9189029,
+   "event_seq": 2001,
+   "first_seen_ts": 1790195643.9189029,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "hyENA",
+   "tier": "A",
+   "token": "0xe3d9133c05aab2f6b24919f71e6bbf0b87cc54cc",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -6914,13 +6946,13 @@
   "0x489da2d63dfc00bb7b5a033366673ed0a60f93db:2000": {
    "alert_ts": 1790195163.5560129,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790195643.9189029,
    "cost_usd": 10.0,
    "entry_px_usd": 1.5773680460345492e-22,
    "event_seq": 2000,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": null,
    "opened_ts": 1790195163.5560129,
    "pending_exits": [],
@@ -6947,12 +6979,12 @@
     "trail_arm": null
    },
    "quote_source_open": "scanhood",
-   "realized_usd": 0.0,
+   "realized_usd": 2.727003465244687,
    "symbol": "UNREAL",
    "tier": "A",
    "token": "0x489da2d63dfc00bb7b5a033366673ed0a60f93db",
    "tokens_raw": 63396745135922259393122,
-   "tokens_remaining_raw": 63396745135922259393122,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2670.54
   },
   "0x4934b74780cf7b9f8999be3c4e973f7ad9d7c182:1468": {
