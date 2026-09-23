@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790200444.0750308,
+   "event_seq": 2011,
+   "first_seen_ts": 1790200444.0750308,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "C\ud835\udd4f",
+   "tier": "A",
+   "token": "0x397397667be18fc535d2cd628552c9ff8391c118",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -12064,31 +12096,16 @@
   "0x9ea0779ffdf84f4fec825d2878384fb5b6e65de8:1844": {
    "alert_ts": 1790103543.3153193,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790200444.0750308,
    "cost_usd": 10.0,
    "entry_px_usd": 1.8989803380093836e-22,
    "event_seq": 1844,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": 0.5487,
    "opened_ts": 1790103543.3153193,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1844,
-      "gap_s": 5280.230573415756,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "ARGONAUTS",
-      "token": "0x9ea0779ffdf84f4fec825d2878384fb5b6e65de8"
-     },
-     "first_seen_ts": 1790199484.2330663,
-     "tries": 3
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -12112,12 +12129,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": -0.06203907083776821,
+   "realized_usd": -0.12539400838671644,
    "symbol": "ARGONAUTS",
    "tier": "A",
    "token": "0x9ea0779ffdf84f4fec825d2878384fb5b6e65de8",
    "tokens_raw": 52659839598352840785920,
-   "tokens_remaining_raw": 5265983959835284078592,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2752.33
   },
   "0x9fa4398f6af8bd5b7ace3a4a176faacaeb9942e6:1135": {
