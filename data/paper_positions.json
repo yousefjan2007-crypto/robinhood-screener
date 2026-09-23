@@ -1019,7 +1019,32 @@
    "gas_usd": 0.14,
    "impact_pct_open": 1.4739,
    "opened_ts": 1790105502.5398567,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 1850,
+      "gap_s": 719.7829086780548,
+      "kind": "tp",
+      "levels": [
+       [
+        5.0,
+        0.25
+       ],
+       [
+        10.0,
+        0.15
+       ]
+      ],
+      "mult": 33.79603399433428,
+      "price": 0.004772,
+      "ret": 32.79603399433428,
+      "symbol": "WALV",
+      "token": "0x094acda7dd127700f75e42d964933b9887307ebc"
+     },
+     "first_seen_ts": 1790193003.9582543,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -11546,31 +11571,10 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.0323087362101249e-22,
    "event_seq": 1993,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": -2.4573,
    "opened_ts": 1790191084.0892682,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1993,
-      "gap_s": 239.45185661315918,
-      "kind": "tp",
-      "levels": [
-       [
-        2.0,
-        0.5
-       ]
-      ],
-      "mult": 2.4435847840103158,
-      "price": 0.0001895,
-      "ret": 1.4435847840103158,
-      "symbol": "MESSINATOR",
-      "token": "0x95d51e28d34fab185b4e05c3996006dcc5968014"
-     },
-     "first_seen_ts": 1790192043.3644478,
-     "tries": 3
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -11594,12 +11598,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 5.5834825851722405,
    "symbol": "MESSINATOR",
    "tier": "A",
    "token": "0x95d51e28d34fab185b4e05c3996006dcc5968014",
    "tokens_raw": 96870244813703816937472,
-   "tokens_remaining_raw": 96870244813703816937472,
+   "tokens_remaining_raw": 48435122406851908468736,
    "weth_px_usd_open": 2666.6
   },
   "0x95e7b9b1bdb96748cdfdc2efe1234f849b6136ed:1816": {
