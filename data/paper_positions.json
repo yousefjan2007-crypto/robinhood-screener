@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790196363.763075,
+   "event_seq": 2003,
+   "first_seen_ts": 1790196363.763075,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "hyENA",
+   "tier": "A",
+   "token": "0xc3251bfc470db80b2405ef7feb3d4403ebd19f39",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -18377,7 +18409,22 @@
    "gas_usd": 0.07,
    "impact_pct_open": 100.0,
    "opened_ts": 1790109342.81577,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 1855,
+      "gap_s": 480.04111433029175,
+      "kind": "stop",
+      "mult": 0.0,
+      "price": 0.0,
+      "ret": -1.0,
+      "symbol": "CPU",
+      "token": "0xfd2852b9cf7b98ed73f90fd2902b07e7da08c1d8"
+     },
+     "first_seen_ts": 1790196363.763075,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
