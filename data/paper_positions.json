@@ -5649,7 +5649,28 @@
    "gas_usd": 0.07,
    "impact_pct_open": 45.928,
    "opened_ts": 1790200909.5300353,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 2011,
+      "gap_s": 719.741950750351,
+      "kind": "tp",
+      "levels": [
+       [
+        2.0,
+        0.5
+       ]
+      ],
+      "mult": 2.3114107619895687,
+      "price": 0.0001817,
+      "ret": 1.3114107619895687,
+      "symbol": "C\ud835\udd4f",
+      "token": "0x397397667be18fc535d2cd628552c9ff8391c118"
+     },
+     "first_seen_ts": 1790202829.5976071,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -10842,6 +10863,50 @@
    "tokens_raw": 101846212634848796868608,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2772.21
+  },
+  "0x8a915485d3da96f316c1004d0155c24df9c7ae7c:2014": {
+   "alert_ts": 1790202829.5976071,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 2.369286621141934e-21,
+   "event_seq": 2014,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1790202829.5976071,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "SCANNY",
+   "tier": "A",
+   "token": "0x8a915485d3da96f316c1004d0155c24df9c7ae7c",
+   "tokens_raw": 4220679723072197492736,
+   "tokens_remaining_raw": 4220679723072197492736,
+   "weth_px_usd_open": 2683.64
   },
   "0x8af36f328dda56ee8764e4a808197761dd1cdc5d:1917": {
    "alert_ts": 1790150147.644275,
