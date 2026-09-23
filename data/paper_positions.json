@@ -29,7 +29,7 @@
    "symbol": "Bitgold",
    "tier": "A",
    "token": "0xcbd1581238796ad87d976adac86378d96fe63977",
-   "tries": 2
+   "tries": 3
   }
  ],
  "positions": {
@@ -11013,7 +11013,28 @@
    "gas_usd": 0.07,
    "impact_pct_open": 1.3467,
    "opened_ts": 1790186284.174996,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 1983,
+      "gap_s": 240.23842692375183,
+      "kind": "tp",
+      "levels": [
+       [
+        2.0,
+        0.5
+       ]
+      ],
+      "mult": 2.4880823401950165,
+      "price": 0.0009186,
+      "ret": 1.4880823401950165,
+      "symbol": "PRLSTR",
+      "token": "0x8e1e135d8465de22c908e08b30b87999c1739d22"
+     },
+     "first_seen_ts": 1790187483.8140523,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -16261,7 +16282,22 @@
    "gas_usd": 0.14,
    "impact_pct_open": 0.2425,
    "opened_ts": 1790184603.5873077,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 1979,
+      "gap_s": 960.0897424221039,
+      "kind": "stop",
+      "mult": 0.29604195280309653,
+      "price": 2.371e-05,
+      "ret": -0.7039580471969035,
+      "symbol": "CDS",
+      "token": "0xe34f03f4f36e842c8817ac635162a2cc67e03c8a"
+     },
+     "first_seen_ts": 1790187483.8140523,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
