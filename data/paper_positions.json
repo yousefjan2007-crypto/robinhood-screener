@@ -10231,6 +10231,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2438.98
   },
+  "0x70a9570a1ddb0a7312848aaf3f84cd61e610284a:2088": {
+   "alert_ts": 1790269252.3735778,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 8.801545859555287e-23,
+   "event_seq": 2088,
+   "gas_usd": 0.07,
+   "impact_pct_open": -42.7512,
+   "opened_ts": 1790269252.3735778,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "OPENMUSE",
+   "tier": "A",
+   "token": "0x70a9570a1ddb0a7312848aaf3f84cd61e610284a",
+   "tokens_raw": 113616405113013486485504,
+   "tokens_remaining_raw": 113616405113013486485504,
+   "weth_px_usd_open": 2686.36
+  },
   "0x728a05802e4236f8a34217af82ee68c269cf3954:489": {
    "alert_ts": 1789318163.6761293,
    "champion_at_open": "cfg_ladder_stop",
@@ -19602,31 +19646,16 @@
   "0xf987474beb4c5b569cfe4d2ccfa81466da125d8b:1972": {
    "alert_ts": 1790182443.4798381,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790269252.3735778,
    "cost_usd": 10.0,
    "entry_px_usd": 2.6701990481908335e-20,
    "event_seq": 1972,
    "gas_usd": 0.07,
    "impact_pct_open": 100.0,
    "opened_ts": 1790182443.4798381,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1972,
-      "gap_s": 64501.36294960976,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "SGO",
-      "token": "0xf987474beb4c5b569cfe4d2ccfa81466da125d8b"
-     },
-     "first_seen_ts": 1790268771.4746103,
-     "tries": 1
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -19655,7 +19684,7 @@
    "tier": "A",
    "token": "0xf987474beb4c5b569cfe4d2ccfa81466da125d8b",
    "tokens_raw": 374503915982420836352,
-   "tokens_remaining_raw": 374503915982420836352,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2657.11
   },
   "0xf99a8228f9f4000cf501c9cb1ab8d3534485cad9:1619": {
