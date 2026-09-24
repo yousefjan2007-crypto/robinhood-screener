@@ -9625,7 +9625,22 @@
    "gas_usd": 0.14,
    "impact_pct_open": 7.3534,
    "opened_ts": 1790024918.8509524,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 1743,
+      "gap_s": 81358.6207511425,
+      "kind": "stop",
+      "mult": 0.0,
+      "price": 0.0,
+      "ret": -1.0,
+      "symbol": "AGE",
+      "token": "0x72a1ac10599b8b191caf76f5cadf63b61994f6c8"
+     },
+     "first_seen_ts": 1790209069.8222032,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -15270,7 +15285,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 3.3353156465434963e-22,
    "event_seq": 2019,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 19.4749,
    "opened_ts": 1790206189.8593442,
    "pending_exits": [],
@@ -15297,12 +15312,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 12.453312520938772,
    "symbol": "JOLLY",
    "tier": "A",
    "token": "0xc7683aefab6042bae9c21d6bf1305e9ba2ec266b",
    "tokens_raw": 29982169784629971648512,
-   "tokens_remaining_raw": 29982169784629971648512,
+   "tokens_remaining_raw": 14991084892314985824256,
    "weth_px_usd_open": 2685.15
   },
   "0xc9ae6bd749ca04efe081299d9e9c575c40346bce:1521": {
