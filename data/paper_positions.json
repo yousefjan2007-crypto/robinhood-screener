@@ -9796,31 +9796,16 @@
   "0x697bff8792f8a2b4afa40778780b4cd30ccead9b:1947": {
    "alert_ts": 1790171223.9432,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790260351.652071,
    "cost_usd": 10.0,
    "entry_px_usd": 1.2018910942427048e-22,
    "event_seq": 1947,
    "gas_usd": 0.07,
    "impact_pct_open": -0.1776,
    "opened_ts": 1790171223.9432,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1947,
-      "gap_s": 1919.835979938507,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "MEMETAG",
-      "token": "0x697bff8792f8a2b4afa40778780b4cd30ccead9b"
-     },
-     "first_seen_ts": 1790259631.7958865,
-     "tries": 2
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -9849,7 +9834,7 @@
    "tier": "A",
    "token": "0x697bff8792f8a2b4afa40778780b4cd30ccead9b",
    "tokens_raw": 83202213976806795509760,
-   "tokens_remaining_raw": 83202213976806795509760,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2712.28
   },
   "0x6b1d43306d0335ebf8618650c4bc153f9b5c9ab0:1460": {
@@ -14477,7 +14462,7 @@
       "token": "0xb203e758d9c4bbcac34c1ce924595274e0d3678f"
      },
      "first_seen_ts": 1790260112.0017343,
-     "tries": 0
+     "tries": 1
     }
    ],
    "plan": {
@@ -19906,31 +19891,10 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.698055534596753e-22,
    "event_seq": 2078,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": -1.2981,
    "opened_ts": 1790258672.3710012,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 2078,
-      "gap_s": 240.22649359703064,
-      "kind": "tp",
-      "levels": [
-       [
-        2.0,
-        0.5
-       ]
-      ],
-      "mult": 3.0555114988104677,
-      "price": 0.0003853,
-      "ret": 2.0555114988104677,
-      "symbol": "WageFlow",
-      "token": "0xfdf47351ea575a3e9a59ecb2d7a26407c342524e"
-     },
-     "first_seen_ts": 1790259631.7958865,
-     "tries": 2
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -19954,12 +19918,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 13.442930361042393,
    "symbol": "WageFlow",
    "tier": "A",
    "token": "0xfdf47351ea575a3e9a59ecb2d7a26407c342524e",
    "tokens_raw": 58890888997778021679104,
-   "tokens_remaining_raw": 58890888997778021679104,
+   "tokens_remaining_raw": 29445444498889010839552,
    "weth_px_usd_open": 2667.95
   },
   "0xfe7bcf9d853a7fc28d43c5c9ccbfd25004c382a5:1650": {
