@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790273091.5847352,
-   "event_seq": 2096,
-   "first_seen_ts": 1790273091.5847352,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "DRIPSTER",
-   "tier": "A",
-   "token": "0x5337d8bc7cb11d2d4d5d15b928b34e5a0a181ef3",
-   "tries": 1
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -8432,6 +8400,50 @@
    "tokens_raw": 20918584984869317640192,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2776.83
+  },
+  "0x5337d8bc7cb11d2d4d5d15b928b34e5a0a181ef3:2096": {
+   "alert_ts": 1790273091.5847352,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.7731372711577443e-22,
+   "event_seq": 2096,
+   "gas_usd": 0.07,
+   "impact_pct_open": -3.9635,
+   "opened_ts": 1790273572.2594385,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "DRIPSTER",
+   "tier": "A",
+   "token": "0x5337d8bc7cb11d2d4d5d15b928b34e5a0a181ef3",
+   "tokens_raw": 56397212797126779600896,
+   "tokens_remaining_raw": 56397212797126779600896,
+   "weth_px_usd_open": 2671.76
   },
   "0x53c76eaf152772e254feaa5e49edcace84803f15:1815": {
    "alert_ts": 1790084214.6783519,
