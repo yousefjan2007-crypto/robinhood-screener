@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790283936.3570948,
+   "event_seq": 2119,
+   "first_seen_ts": 1790283936.3570948,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "Pumpies",
+   "tier": "A",
+   "token": "0x92c7d4423d5cb587f08a8ebb71d7057faa25edbb",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -16364,13 +16396,13 @@
   "0xc3251bfc470db80b2405ef7feb3d4403ebd19f39:2003": {
    "alert_ts": 1790196363.763075,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790283936.3570948,
    "cost_usd": 10.0,
    "entry_px_usd": 1.1099158600201374e-22,
    "event_seq": 2003,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 37.0892,
    "opened_ts": 1790196603.9976819,
    "pending_exits": [],
@@ -16397,12 +16429,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 0.23108237213739896,
    "symbol": "hyENA",
    "tier": "A",
    "token": "0xc3251bfc470db80b2405ef7feb3d4403ebd19f39",
    "tokens_raw": 90096919597297841471488,
-   "tokens_remaining_raw": 90096919597297841471488,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2671.82
   },
   "0xc34b9d3d13c63baba49e5c020b4462a1dcfde149:1992": {
