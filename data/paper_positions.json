@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790255071.6159325,
+   "event_seq": 2068,
+   "first_seen_ts": 1790255071.6159325,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "MCAT",
+   "tier": "A",
+   "token": "0x61aeaa2f336fe12bdf7b9e50da6314a17f6ffc07",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -3394,7 +3426,7 @@
       "token": "0x21dbf8433d08430576bfe07dde1bb7f0bc8da3a0"
      },
      "first_seen_ts": 1790254832.0212715,
-     "tries": 0
+     "tries": 1
     }
    ],
    "plan": {
