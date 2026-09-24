@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790278372.3409965,
+   "event_seq": 2108,
+   "first_seen_ts": 1790278372.3409965,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "RPM",
+   "tier": "A",
+   "token": "0x8782bd84bd48c538274b0a07f2ca4c226e6b448f",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -16584,31 +16616,16 @@
   "0xc71f18f038f19ca1cf78ea2654dc51f7f21a180c:2084": {
    "alert_ts": 1790266612.359941,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790278372.3409965,
    "cost_usd": 10.0,
    "entry_px_usd": 1.058989885899223e-21,
    "event_seq": 2084,
-   "gas_usd": 0.21000000000000002,
+   "gas_usd": 0.28,
    "impact_pct_open": 0.6608,
    "opened_ts": 1790266612.359941,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 2084,
-      "gap_s": 1199.8210394382477,
-      "kind": "stop",
-      "mult": 0.23557692307692307,
-      "price": 0.0001421,
-      "ret": -0.7644230769230769,
-      "symbol": "SHERWOOD",
-      "token": "0xc71f18f038f19ca1cf78ea2654dc51f7f21a180c"
-     },
-     "first_seen_ts": 1790278132.1602805,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -16632,12 +16649,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 19.466330289796485,
+   "realized_usd": 19.75914617631214,
    "symbol": "SHERWOOD",
    "tier": "A",
    "token": "0xc71f18f038f19ca1cf78ea2654dc51f7f21a180c",
    "tokens_raw": 9442960818751042224128,
-   "tokens_remaining_raw": 2360740204687760556032,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2697.34
   },
   "0xc7683aefab6042bae9c21d6bf1305e9ba2ec266b:2019": {
