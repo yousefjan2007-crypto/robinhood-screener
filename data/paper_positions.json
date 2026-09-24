@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790286576.8889856,
-   "event_seq": 2121,
-   "first_seen_ts": 1790286576.8889856,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "Amishcoin",
-   "tier": "A",
-   "token": "0x1315f54aebd4161e6fda8d5204c878b42d40eac5",
-   "tries": 1
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -2002,6 +1970,50 @@
    "tokens_raw": 210986918934644942438400,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2781.38
+  },
+  "0x1315f54aebd4161e6fda8d5204c878b42d40eac5:2121": {
+   "alert_ts": 1790286576.8889856,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.0451086869144794e-22,
+   "event_seq": 2121,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1790287056.7042692,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "Amishcoin",
+   "tier": "A",
+   "token": "0x1315f54aebd4161e6fda8d5204c878b42d40eac5",
+   "tokens_raw": 95683828153064561311744,
+   "tokens_remaining_raw": 95683828153064561311744,
+   "weth_px_usd_open": 2685.77
   },
   "0x13824fa911d6ce38583f3fce2da51fa02fb67ef2:1333": {
    "alert_ts": 1789795983.4647663,
