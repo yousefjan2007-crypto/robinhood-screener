@@ -16593,7 +16593,22 @@
    "gas_usd": 0.21000000000000002,
    "impact_pct_open": 0.6608,
    "opened_ts": 1790266612.359941,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 2084,
+      "gap_s": 1199.8210394382477,
+      "kind": "stop",
+      "mult": 0.23557692307692307,
+      "price": 0.0001421,
+      "ret": -0.7644230769230769,
+      "symbol": "SHERWOOD",
+      "token": "0xc71f18f038f19ca1cf78ea2654dc51f7f21a180c"
+     },
+     "first_seen_ts": 1790278132.1602805,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -19866,9 +19881,9 @@
   "0xf620686a41e8008c54e1364d7d15bcdadd938a56:1990": {
    "alert_ts": 1790188923.9444325,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790278132.1602805,
    "cost_usd": 10.0,
    "entry_px_usd": 5.520290432585029e-22,
    "event_seq": 1990,
@@ -19904,7 +19919,7 @@
    "tier": "A",
    "token": "0xf620686a41e8008c54e1364d7d15bcdadd938a56",
    "tokens_raw": 18114988916112558653440,
-   "tokens_remaining_raw": 18114988916112558653440,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2663.075
   },
   "0xf7c92451cd775ccee0a193e4c04ea5733207510e:1479": {
