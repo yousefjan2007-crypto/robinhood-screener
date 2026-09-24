@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790265891.628229,
-   "event_seq": 2083,
-   "first_seen_ts": 1790265891.628229,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "Leaf",
-   "tier": "A",
-   "token": "0xe5f21ebce9b6fcc88574432cec595e0e2111653d",
-   "tries": 2
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -9709,7 +9677,28 @@
    "gas_usd": 0.14,
    "impact_pct_open": 100.0,
    "opened_ts": 1790265891.628229,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 2082,
+      "gap_s": 240.2031660079956,
+      "kind": "tp",
+      "levels": [
+       [
+        5.0,
+        0.25
+       ]
+      ],
+      "mult": 5.116363636363636,
+      "price": 0.0005628,
+      "ret": 4.116363636363636,
+      "symbol": "F",
+      "token": "0x675a0fa8f846d9ef02f512c9dc3f8faeea342d02"
+     },
+     "first_seen_ts": 1790266612.359941,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -16217,6 +16206,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2632.82
   },
+  "0xc71f18f038f19ca1cf78ea2654dc51f7f21a180c:2084": {
+   "alert_ts": 1790266612.359941,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.058989885899223e-21,
+   "event_seq": 2084,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.6608,
+   "opened_ts": 1790266612.359941,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "SHERWOOD",
+   "tier": "A",
+   "token": "0xc71f18f038f19ca1cf78ea2654dc51f7f21a180c",
+   "tokens_raw": 9442960818751042224128,
+   "tokens_remaining_raw": 9442960818751042224128,
+   "weth_px_usd_open": 2697.34
+  },
   "0xc7683aefab6042bae9c21d6bf1305e9ba2ec266b:2019": {
    "alert_ts": 1790206189.8593442,
    "champion_at_open": "cfg_ladder_stop",
@@ -17750,9 +17783,9 @@
   "0xe003b7d8a2ebf4aa651b83c89a0096af469e2186:1967": {
    "alert_ts": 1790181004.363729,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790266612.359941,
    "cost_usd": 10.0,
    "entry_px_usd": 2.678187412209995e-20,
    "event_seq": 1967,
@@ -17788,7 +17821,7 @@
    "tier": "A",
    "token": "0xe003b7d8a2ebf4aa651b83c89a0096af469e2186",
    "tokens_raw": 373386864354954510336,
-   "tokens_remaining_raw": 373386864354954510336,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2665.06
   },
   "0xe29b14926567d30cab27dc4f50e79670b5092041:1302": {
@@ -18006,6 +18039,50 @@
    "tokens_raw": 135765736744248359780352,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2459.67
+  },
+  "0xe5f21ebce9b6fcc88574432cec595e0e2111653d:2083": {
+   "alert_ts": 1790265891.628229,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.3915847992805663e-22,
+   "event_seq": 2083,
+   "gas_usd": 0.07,
+   "impact_pct_open": 25.1989,
+   "opened_ts": 1790266612.359941,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "Leaf",
+   "tier": "A",
+   "token": "0xe5f21ebce9b6fcc88574432cec595e0e2111653d",
+   "tokens_raw": 71860514753897046212608,
+   "tokens_remaining_raw": 71860514753897046212608,
+   "weth_px_usd_open": 2697.34
   },
   "0xe650c71200ebdf80a63b40a88b3b130aba2ca86a:1419": {
    "alert_ts": 1789830691.9079082,
