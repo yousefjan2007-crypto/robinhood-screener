@@ -3381,7 +3381,22 @@
    "gas_usd": 0.07,
    "impact_pct_open": 0.6984,
    "opened_ts": 1790167383.35881,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 1940,
+      "gap_s": 959.6982390880585,
+      "kind": "stop",
+      "mult": 0.0,
+      "price": 0.0,
+      "ret": -1.0,
+      "symbol": "Mosuu",
+      "token": "0x21dbf8433d08430576bfe07dde1bb7f0bc8da3a0"
+     },
+     "first_seen_ts": 1790254832.0212715,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -11295,36 +11310,7 @@
    "gas_usd": 0.07,
    "impact_pct_open": 100.0,
    "opened_ts": 1790240672.1796808,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 2046,
-      "gap_s": 11039.89313173294,
-      "kind": "tp",
-      "levels": [
-       [
-        2.0,
-        0.5
-       ],
-       [
-        5.0,
-        0.25
-       ],
-       [
-        10.0,
-        0.15
-       ]
-      ],
-      "mult": 194.1133186166299,
-      "price": 0.02638,
-      "ret": 193.1133186166299,
-      "symbol": "SIDEHOE",
-      "token": "0x84fdcd6a7788a8748263fe1016daaca1497c96c4"
-     },
-     "first_seen_ts": 1790254591.9090571,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
