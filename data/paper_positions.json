@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790255071.6159325,
-   "event_seq": 2068,
-   "first_seen_ts": 1790255071.6159325,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "MCAT",
-   "tier": "A",
-   "token": "0x61aeaa2f336fe12bdf7b9e50da6314a17f6ffc07",
-   "tries": 3
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -9302,6 +9270,50 @@
    "tokens_raw": 81386699103793682841600,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2585.27
+  },
+  "0x61aeaa2f336fe12bdf7b9e50da6314a17f6ffc07:2068": {
+   "alert_ts": 1790255071.6159325,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.9650874890016463e-22,
+   "event_seq": 2068,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1790256031.5287971,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "MCAT",
+   "tier": "A",
+   "token": "0x61aeaa2f336fe12bdf7b9e50da6314a17f6ffc07",
+   "tokens_raw": 50888319507242164420608,
+   "tokens_remaining_raw": 50888319507242164420608,
+   "weth_px_usd_open": 2663.91
   },
   "0x621280e000ad10ae1a0afd83810b9c3d197535cb:1482": {
    "alert_ts": 1789862271.1890116,
