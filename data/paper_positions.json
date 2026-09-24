@@ -1,9 +1,9 @@
 {
  "pending_buys": [
   {
-   "alert_ts": 1790265652.2612607,
-   "event_seq": 2082,
-   "first_seen_ts": 1790265652.2612607,
+   "alert_ts": 1790265891.628229,
+   "event_seq": 2083,
+   "first_seen_ts": 1790265891.628229,
    "plan": {
     "flow": null,
     "ladder": [
@@ -26,9 +26,9 @@
     "trail": null,
     "trail_arm": null
    },
-   "symbol": "F",
+   "symbol": "Leaf",
    "tier": "A",
-   "token": "0x675a0fa8f846d9ef02f512c9dc3f8faeea342d02",
+   "token": "0xe5f21ebce9b6fcc88574432cec595e0e2111653d",
    "tries": 0
   }
  ],
@@ -9696,6 +9696,71 @@
    "tokens_raw": 44836224304775035879424,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2625.29
+  },
+  "0x675a0fa8f846d9ef02f512c9dc3f8faeea342d02:2082": {
+   "alert_ts": 1790265652.2612607,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 2.935169996842e-22,
+   "event_seq": 2082,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1790265891.628229,
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 2082,
+      "gap_s": 239.36696815490723,
+      "kind": "tp",
+      "levels": [
+       [
+        2.0,
+        0.5
+       ]
+      ],
+      "mult": 2.2836363636363632,
+      "price": 0.0002512,
+      "ret": 1.2836363636363632,
+      "symbol": "F",
+      "token": "0x675a0fa8f846d9ef02f512c9dc3f8faeea342d02"
+     },
+     "first_seen_ts": 1790265891.628229,
+     "tries": 0
+    }
+   ],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "F",
+   "tier": "A",
+   "token": "0x675a0fa8f846d9ef02f512c9dc3f8faeea342d02",
+   "tokens_raw": 34069576926580652900352,
+   "tokens_remaining_raw": 34069576926580652900352,
+   "weth_px_usd_open": 2674.76
   },
   "0x67b72d4c1b6ce40ace8d1c49ce5326d1caf38390:298": {
    "alert_ts": 1789277922.7821481,
