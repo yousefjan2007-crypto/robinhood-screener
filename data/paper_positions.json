@@ -4425,7 +4425,22 @@
    "gas_usd": 0.14,
    "impact_pct_open": 0.0306,
    "opened_ts": 1790160708.4615803,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 1933,
+      "gap_s": 1200.0358843803406,
+      "kind": "stop",
+      "mult": 0.0,
+      "price": 0.0,
+      "ret": -1.0,
+      "symbol": "GEM",
+      "token": "0x2ca8b2c34aa6d6e1b589ee5b9d44a6091167241a"
+     },
+     "first_seen_ts": 1790248351.6259127,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -18964,7 +18979,7 @@
       "token": "0xf9090f5a92362b10b062fea22bbefea3325eb663"
      },
      "first_seen_ts": 1790248111.7120845,
-     "tries": 0
+     "tries": 1
     }
    ],
    "plan": {
