@@ -4262,7 +4262,7 @@
       "token": "0x286d7dc1406f3219191649daf43b353adebab48a"
      },
      "first_seen_ts": 1790267092.2506623,
-     "tries": 0
+     "tries": 1
     }
    ],
    "plan": {
@@ -9711,7 +9711,7 @@
       "token": "0x675a0fa8f846d9ef02f512c9dc3f8faeea342d02"
      },
      "first_seen_ts": 1790266612.359941,
-     "tries": 2
+     "tries": 3
     }
    ],
    "plan": {
@@ -13810,31 +13810,16 @@
   "0xa6a77bcd1072edae4011feb4f93a3926e607fe26:1964": {
    "alert_ts": 1790180343.8181317,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790267331.922867,
    "cost_usd": 10.0,
    "entry_px_usd": 1.502413030365394e-22,
    "event_seq": 1964,
    "gas_usd": 0.07,
    "impact_pct_open": 1.5861,
    "opened_ts": 1790180343.8181317,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1964,
-      "gap_s": 64982.39500594139,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "BUNDOG",
-      "token": "0xa6a77bcd1072edae4011feb4f93a3926e607fe26"
-     },
-     "first_seen_ts": 1790267092.2506623,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -13863,7 +13848,7 @@
    "tier": "A",
    "token": "0xa6a77bcd1072edae4011feb4f93a3926e607fe26",
    "tokens_raw": 66559593120461368590336,
-   "tokens_remaining_raw": 66559593120461368590336,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2661.25
   },
   "0xa70b9bc19bd72fb4406b0f834e908448e7a19e72:1495": {
@@ -16267,7 +16252,7 @@
       "token": "0xc71f18f038f19ca1cf78ea2654dc51f7f21a180c"
      },
      "first_seen_ts": 1790267092.2506623,
-     "tries": 0
+     "tries": 1
     }
    ],
    "plan": {
