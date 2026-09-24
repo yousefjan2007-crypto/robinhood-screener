@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790287777.2887971,
+   "event_seq": 2125,
+   "first_seen_ts": 1790287777.2887971,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "LOUIS",
+   "tier": "A",
+   "token": "0xe4cfa327aed238127a4f1f0359d10e7d28c7b2ae",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -14051,7 +14083,22 @@
    "gas_usd": 0.07,
    "impact_pct_open": 0.1753,
    "opened_ts": 1790282702.8124115,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 2115,
+      "gap_s": 960.0056354999542,
+      "kind": "stop",
+      "mult": 0.08379506641366223,
+      "price": 8.832e-05,
+      "ret": -0.9162049335863378,
+      "symbol": "FOOMS",
+      "token": "0xa3a1a5e13da06ecde4334ac3013b7da3cbd3246a"
+     },
+     "first_seen_ts": 1790287777.2887971,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
