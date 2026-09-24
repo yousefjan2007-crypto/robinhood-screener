@@ -4240,31 +4240,16 @@
   "0x286d7dc1406f3219191649daf43b353adebab48a:1962": {
    "alert_ts": 1790178903.5370371,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790267811.9971778,
    "cost_usd": 10.0,
    "entry_px_usd": 4.354885021774163e-22,
    "event_seq": 1962,
    "gas_usd": 0.07,
    "impact_pct_open": 1.1813,
    "opened_ts": 1790178903.5370371,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1962,
-      "gap_s": 1679.95001745224,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "SI",
-      "token": "0x286d7dc1406f3219191649daf43b353adebab48a"
-     },
-     "first_seen_ts": 1790267092.2506623,
-     "tries": 2
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -4293,7 +4278,7 @@
    "tier": "A",
    "token": "0x286d7dc1406f3219191649daf43b353adebab48a",
    "tokens_raw": 22962718762953791766528,
-   "tokens_remaining_raw": 22962718762953791766528,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2655.66
   },
   "0x29226c7835924311ac115efbadcd0583e28f556c:1837": {
@@ -10555,9 +10540,9 @@
   "0x767eee1e59defca894a535207c4b482247a5f9a1:1968": {
    "alert_ts": 1790181243.9036841,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790267811.9971778,
    "cost_usd": 10.0,
    "entry_px_usd": 2.6765526991389513e-20,
    "event_seq": 1968,
@@ -10593,7 +10578,7 @@
    "tier": "A",
    "token": "0x767eee1e59defca894a535207c4b482247a5f9a1",
    "tokens_raw": 373614911569535172608,
-   "tokens_remaining_raw": 373614911569535172608,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2663.43
   },
   "0x76b42ab9e901c05bba26b1e780077bdfb89f5715:637": {
@@ -16209,31 +16194,10 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.058989885899223e-21,
    "event_seq": 2084,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 0.6608,
    "opened_ts": 1790266612.359941,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 2084,
-      "gap_s": 240.40412521362305,
-      "kind": "tp",
-      "levels": [
-       [
-        2.0,
-        0.5
-       ]
-      ],
-      "mult": 2.642572944297082,
-      "price": 0.001594,
-      "ret": 1.6425729442970818,
-      "symbol": "SHERWOOD",
-      "token": "0xc71f18f038f19ca1cf78ea2654dc51f7f21a180c"
-     },
-     "first_seen_ts": 1790267092.2506623,
-     "tries": 2
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -16257,12 +16221,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 8.954755315605858,
    "symbol": "SHERWOOD",
    "tier": "A",
    "token": "0xc71f18f038f19ca1cf78ea2654dc51f7f21a180c",
    "tokens_raw": 9442960818751042224128,
-   "tokens_remaining_raw": 9442960818751042224128,
+   "tokens_remaining_raw": 4721480409375521112064,
    "weth_px_usd_open": 2697.34
   },
   "0xc7683aefab6042bae9c21d6bf1305e9ba2ec266b:2019": {
