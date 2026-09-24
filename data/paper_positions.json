@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790256271.7080169,
-   "event_seq": 2071,
-   "first_seen_ts": 1790256271.7080169,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "HUNTINGDON",
-   "tier": "A",
-   "token": "0x24762f8610e24046bba0cbeac9e49c6be96573f6",
-   "tries": 3
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -3580,31 +3548,16 @@
   "0x2301d00d0ee4af1f9e10b65ecc020679bd5c1ea0:1943": {
    "alert_ts": 1790170023.432401,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790257232.1920676,
    "cost_usd": 10.0,
    "entry_px_usd": 1.4303775027228546e-22,
    "event_seq": 1943,
    "gas_usd": 0.07,
    "impact_pct_open": -0.099,
    "opened_ts": 1790170023.432401,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1943,
-      "gap_s": 480.28641533851624,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "MIMI",
-      "token": "0x2301d00d0ee4af1f9e10b65ecc020679bd5c1ea0"
-     },
-     "first_seen_ts": 1790256992.1924465,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -3633,7 +3586,7 @@
    "tier": "A",
    "token": "0x2301d00d0ee4af1f9e10b65ecc020679bd5c1ea0",
    "tokens_raw": 69911614108611777658880,
-   "tokens_remaining_raw": 69911614108611777658880,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2714.95
   },
   "0x23516d76258967a99703691597501e8de07905a6:1455": {
@@ -11515,7 +11468,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.5539530421134548e-21,
    "event_seq": 2072,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 0.4191,
    "opened_ts": 1790256992.1924465,
    "pending_exits": [],
@@ -11542,12 +11495,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 6.576037579850403,
    "symbol": "BONK",
    "tier": "A",
    "token": "0x8556bdb379a586121d2bc843a2d62da3f733b263",
    "tokens_raw": 6435200890240218693632,
-   "tokens_remaining_raw": 6435200890240218693632,
+   "tokens_remaining_raw": 3217600445120109346816,
    "weth_px_usd_open": 2665.46
   },
   "0x8836bb6409ec20f24881da47b3344ea2304dfc01:1527": {
