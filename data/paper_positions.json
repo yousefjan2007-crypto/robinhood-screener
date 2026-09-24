@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790273091.5847352,
+   "event_seq": 2096,
+   "first_seen_ts": 1790273091.5847352,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "DRIPSTER",
+   "tier": "A",
+   "token": "0x5337d8bc7cb11d2d4d5d15b928b34e5a0a181ef3",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -10934,13 +10966,13 @@
   "0x77fc85943744335c93e48b103e8ad84098c874b1:1866": {
    "alert_ts": 1790114862.6339989,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790273091.5847352,
    "cost_usd": 10.0,
    "entry_px_usd": 1.3284059729972495e-22,
    "event_seq": 1866,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": 34.5094,
    "opened_ts": 1790114862.6339989,
    "pending_exits": [],
@@ -10967,12 +10999,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 4.172067084430424,
+   "realized_usd": 4.103577424359855,
    "symbol": "JIZZCOIN",
    "tier": "A",
    "token": "0x77fc85943744335c93e48b103e8ad84098c874b1",
    "tokens_raw": 75278192083382824861696,
-   "tokens_remaining_raw": 37639096041691412430848,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2743.66
   },
   "0x787b9388c0a715b9e2688088de97b2a004d452ed:1329": {
