@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790289457.4554236,
-   "event_seq": 2128,
-   "first_seen_ts": 1790289457.4554236,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "Museify",
-   "tier": "A",
-   "token": "0x21be4fbea231a96300abbbe4f8870f15bbfa8af2",
-   "tries": 0
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -3576,6 +3544,50 @@
    "tokens_raw": 79721709633071606661120,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2579.29
+  },
+  "0x21be4fbea231a96300abbbe4f8870f15bbfa8af2:2128": {
+   "alert_ts": 1790289457.4554236,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 9.413937307037512e-23,
+   "event_seq": 2128,
+   "gas_usd": 0.07,
+   "impact_pct_open": 16.1932,
+   "opened_ts": 1790289697.8018606,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "Museify",
+   "tier": "A",
+   "token": "0x21be4fbea231a96300abbbe4f8870f15bbfa8af2",
+   "tokens_raw": 106225479030164871446528,
+   "tokens_remaining_raw": 106225479030164871446528,
+   "weth_px_usd_open": 2679.77
   },
   "0x21dbf8433d08430576bfe07dde1bb7f0bc8da3a0:1940": {
    "alert_ts": 1790167383.35881,
