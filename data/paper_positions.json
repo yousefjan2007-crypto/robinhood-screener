@@ -29,7 +29,7 @@
    "symbol": "MCAT",
    "tier": "A",
    "token": "0x61aeaa2f336fe12bdf7b9e50da6314a17f6ffc07",
-   "tries": 1
+   "tries": 2
   }
  ],
  "positions": {
@@ -3404,31 +3404,16 @@
   "0x21dbf8433d08430576bfe07dde1bb7f0bc8da3a0:1940": {
    "alert_ts": 1790167383.35881,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790255551.5771487,
    "cost_usd": 10.0,
    "entry_px_usd": 1.149758134354451e-22,
    "event_seq": 1940,
    "gas_usd": 0.07,
    "impact_pct_open": 0.6984,
    "opened_ts": 1790167383.35881,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1940,
-      "gap_s": 959.6982390880585,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "Mosuu",
-      "token": "0x21dbf8433d08430576bfe07dde1bb7f0bc8da3a0"
-     },
-     "first_seen_ts": 1790254832.0212715,
-     "tries": 2
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -3457,7 +3442,7 @@
    "tier": "A",
    "token": "0x21dbf8433d08430576bfe07dde1bb7f0bc8da3a0",
    "tokens_raw": 86974814103965012066304,
-   "tokens_remaining_raw": 86974814103965012066304,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2722.048
   },
   "0x22eab2336fcddf0738bf461e0eadab1c75221114:1125": {
