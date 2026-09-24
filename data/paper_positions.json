@@ -29,38 +29,7 @@
    "symbol": "RPM",
    "tier": "A",
    "token": "0x8782bd84bd48c538274b0a07f2ca4c226e6b448f",
-   "tries": 4
-  },
-  {
-   "alert_ts": 1790279092.1032171,
-   "event_seq": 2111,
-   "first_seen_ts": 1790279092.1032171,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "RPM",
-   "tier": "A",
-   "token": "0xeb7df6b18c5c9a5fa071b9bc24291efe6a41be5d",
-   "tries": 1
+   "tries": 5
   }
  ],
  "positions": {
@@ -19133,6 +19102,71 @@
    "tokens_raw": 90749253898282930798592,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2624.75
+  },
+  "0xeb7df6b18c5c9a5fa071b9bc24291efe6a41be5d:2111": {
+   "alert_ts": 1790279092.1032171,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.7744009766448193e-21,
+   "event_seq": 2111,
+   "gas_usd": 0.07,
+   "impact_pct_open": -10.2982,
+   "opened_ts": 1790279572.264776,
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 2111,
+      "gap_s": 240.0351459980011,
+      "kind": "tp",
+      "levels": [
+       [
+        2.0,
+        0.5
+       ]
+      ],
+      "mult": 2.0878009306089416,
+      "price": 0.002064,
+      "ret": 1.0878009306089416,
+      "symbol": "RPM",
+      "token": "0xeb7df6b18c5c9a5fa071b9bc24291efe6a41be5d"
+     },
+     "first_seen_ts": 1790279572.264776,
+     "tries": 0
+    }
+   ],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "RPM",
+   "tier": "A",
+   "token": "0xeb7df6b18c5c9a5fa071b9bc24291efe6a41be5d",
+   "tokens_raw": 5635704742965599535104,
+   "tokens_remaining_raw": 5635704742965599535104,
+   "weth_px_usd_open": 2696.31
   },
   "0xebe2d8accf5fcd00a56dcea284c898d6b6163a56:2038": {
    "alert_ts": 1790232806.3798676,
