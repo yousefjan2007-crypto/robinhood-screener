@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790289457.4554236,
+   "event_seq": 2128,
+   "first_seen_ts": 1790289457.4554236,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "Museify",
+   "tier": "A",
+   "token": "0x21be4fbea231a96300abbbe4f8870f15bbfa8af2",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -12166,13 +12198,13 @@
   "0x8a915485d3da96f316c1004d0155c24df9c7ae7c:2014": {
    "alert_ts": 1790202829.5976071,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790289457.4554236,
    "cost_usd": 10.0,
    "entry_px_usd": 2.369286621141934e-21,
    "event_seq": 2014,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 100.0,
    "opened_ts": 1790202829.5976071,
    "pending_exits": [],
@@ -12199,12 +12231,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": -0.04573887819800329,
    "symbol": "SCANNY",
    "tier": "A",
    "token": "0x8a915485d3da96f316c1004d0155c24df9c7ae7c",
    "tokens_raw": 4220679723072197492736,
-   "tokens_remaining_raw": 4220679723072197492736,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2683.64
   },
   "0x8af36f328dda56ee8764e4a808197761dd1cdc5d:1917": {
