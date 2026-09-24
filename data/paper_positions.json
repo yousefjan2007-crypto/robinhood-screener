@@ -1,5 +1,37 @@
 {
- "pending_buys": [],
+ "pending_buys": [
+  {
+   "alert_ts": 1790271412.1312954,
+   "event_seq": 2092,
+   "first_seen_ts": 1790271412.1312954,
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "symbol": "0XP",
+   "tier": "A",
+   "token": "0x6949d308391eaaa9fd27b39daff19ad7a5540528",
+   "tries": 0
+  }
+ ],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -13718,7 +13750,7 @@
       "token": "0xa4ed8f9497f755d481adb8c2bb864bad931c0980"
      },
      "first_seen_ts": 1790270451.895672,
-     "tries": 3
+     "tries": 4
     }
    ],
    "plan": {
