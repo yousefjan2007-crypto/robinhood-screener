@@ -1883,6 +1883,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2443.15
   },
+  "0x1250e0958243191f9057983ace4b3e362d8a8f1f:2093": {
+   "alert_ts": 1790272371.5503333,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 7.017485379953156e-24,
+   "event_seq": 2093,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1790272371.5503333,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "FARMDOG",
+   "tier": "A",
+   "token": "0x1250e0958243191f9057983ace4b3e362d8a8f1f",
+   "tokens_raw": 1425011875132221970972672,
+   "tokens_remaining_raw": 1425011875132221970972672,
+   "weth_px_usd_open": 2669.41
+  },
   "0x12f4962e2c1df4af1e797d29310c0bb6176165f2:1907": {
    "alert_ts": 1790139230.8951821,
    "champion_at_open": "cfg_ladder_stop",
@@ -9937,7 +9981,28 @@
    "gas_usd": 0.07,
    "impact_pct_open": 1.4633,
    "opened_ts": 1790271651.9836063,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 2092,
+      "gap_s": 239.43949699401855,
+      "kind": "tp",
+      "levels": [
+       [
+        2.0,
+        0.5
+       ]
+      ],
+      "mult": 2.049367088607595,
+      "price": 0.0004857,
+      "ret": 1.0493670886075952,
+      "symbol": "0XP",
+      "token": "0x6949d308391eaaa9fd27b39daff19ad7a5540528"
+     },
+     "first_seen_ts": 1790272371.5503333,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
