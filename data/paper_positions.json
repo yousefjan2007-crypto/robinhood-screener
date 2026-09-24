@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790294018.47856,
-   "event_seq": 2137,
-   "first_seen_ts": 1790294018.47856,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "FOOMS",
-   "tier": "A",
-   "token": "0x03011a9706d51ba04ab06fda03d7edbbd7544976",
-   "tries": 0
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -380,6 +348,50 @@
    "tokens_raw": 122589225357352892366848,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2642.85
+  },
+  "0x03011a9706d51ba04ab06fda03d7edbbd7544976:2137": {
+   "alert_ts": 1790294018.47856,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.0293938845339206e-22,
+   "event_seq": 2137,
+   "gas_usd": 0.07,
+   "impact_pct_open": 5.0041,
+   "opened_ts": 1790294258.4443665,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "FOOMS",
+   "tier": "A",
+   "token": "0x03011a9706d51ba04ab06fda03d7edbbd7544976",
+   "tokens_raw": 97144544476555802312704,
+   "tokens_remaining_raw": 97144544476555802312704,
+   "weth_px_usd_open": 2687.11
   },
   "0x0333aa41e5464491d941d84b96c4353c4bb1076c:1240": {
    "alert_ts": 1789766694.3600054,
