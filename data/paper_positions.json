@@ -3196,31 +3196,16 @@
   "0x20f2d64e68ceda693e79750133ae75ed24a6d1cf:1974": {
    "alert_ts": 1790182684.2651107,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790270451.895672,
    "cost_usd": 10.0,
    "entry_px_usd": 1.444266157075977e-22,
    "event_seq": 1974,
    "gas_usd": 0.07,
    "impact_pct_open": 0.0541,
    "opened_ts": 1790182684.2651107,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 1974,
-      "gap_s": 959.4110958576202,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "NOOK",
-      "token": "0x20f2d64e68ceda693e79750133ae75ed24a6d1cf"
-     },
-     "first_seen_ts": 1790270211.7846737,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -3249,7 +3234,7 @@
    "tier": "A",
    "token": "0x20f2d64e68ceda693e79750133ae75ed24a6d1cf",
    "tokens_raw": 69239315419851252563968,
-   "tokens_remaining_raw": 69239315419851252563968,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2660.1
   },
   "0x2109582eda6ab5fe5fcc4892f70959e256075d6a:1584": {
@@ -13714,7 +13699,28 @@
    "gas_usd": 0.07,
    "impact_pct_open": 100.0,
    "opened_ts": 1790269971.7396317,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 2089,
+      "gap_s": 240.1109983921051,
+      "kind": "tp",
+      "levels": [
+       [
+        5.0,
+        0.25
+       ]
+      ],
+      "mult": 5.226593948837814,
+      "price": 0.0004025,
+      "ret": 4.226593948837814,
+      "symbol": "AVATARS",
+      "token": "0xa4ed8f9497f755d481adb8c2bb864bad931c0980"
+     },
+     "first_seen_ts": 1790270451.895672,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
