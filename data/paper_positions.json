@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790283936.3570948,
-   "event_seq": 2119,
-   "first_seen_ts": 1790283936.3570948,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "Pumpies",
-   "tier": "A",
-   "token": "0x92c7d4423d5cb587f08a8ebb71d7057faa25edbb",
-   "tries": 0
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -12714,6 +12682,50 @@
    "tokens_raw": 70781121178151801585664,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2399.7
+  },
+  "0x92c7d4423d5cb587f08a8ebb71d7057faa25edbb:2119": {
+   "alert_ts": 1790283936.3570948,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 6.687519406059797e-23,
+   "event_seq": 2119,
+   "gas_usd": 0.07,
+   "impact_pct_open": -25.2577,
+   "opened_ts": 1790284176.4970508,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "Pumpies",
+   "tier": "A",
+   "token": "0x92c7d4423d5cb587f08a8ebb71d7057faa25edbb",
+   "tokens_raw": 149532276361525735718912,
+   "tokens_remaining_raw": 149532276361525735718912,
+   "weth_px_usd_open": 2686.76
   },
   "0x9314c9eb17c7b15315dab95aa880f6afbcfe03a0:1841": {
    "alert_ts": 1790103063.3218143,
