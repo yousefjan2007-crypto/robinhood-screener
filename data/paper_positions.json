@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790239767.0023234,
-   "event_seq": 2046,
-   "first_seen_ts": 1790239767.0023234,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "SIDEHOE",
-   "tier": "A",
-   "token": "0x84fdcd6a7788a8748263fe1016daaca1497c96c4",
-   "tries": 3
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -11006,6 +10974,50 @@
    "tokens_raw": 88764312529527132651520,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2745.058
+  },
+  "0x84fdcd6a7788a8748263fe1016daaca1497c96c4:2046": {
+   "alert_ts": 1790239767.0023234,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 7.928875676203793e-23,
+   "event_seq": 2046,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1790240672.1796808,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "SIDEHOE",
+   "tier": "A",
+   "token": "0x84fdcd6a7788a8748263fe1016daaca1497c96c4",
+   "tokens_raw": 126121286401451368644608,
+   "tokens_remaining_raw": 126121286401451368644608,
+   "weth_px_usd_open": 2666.26
   },
   "0x854113ec599e02c08b1b6b0fb8cdffeca8d957d2:1583": {
    "alert_ts": 1789933882.5268354,
