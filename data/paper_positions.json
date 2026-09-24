@@ -29,38 +29,7 @@
    "symbol": "JOLLY",
    "tier": "A",
    "token": "0x9fcdc0a6ca61cd75fd0572e20d1320137bb7b0d4",
-   "tries": 3
-  },
-  {
-   "alert_ts": 1790275252.232463,
-   "event_seq": 2101,
-   "first_seen_ts": 1790275252.232463,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "FreeBots",
-   "tier": "A",
-   "token": "0xfd6d532112d20d254b71cd05f91f2aeee50d9309",
-   "tries": 0
+   "tries": 4
   }
  ],
  "positions": {
@@ -20407,6 +20376,50 @@
    "tokens_raw": 102820814341585405739008,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2754.79
+  },
+  "0xfd6d532112d20d254b71cd05f91f2aeee50d9309:2101": {
+   "alert_ts": 1790275252.232463,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790275492.1559446,
+   "cost_usd": 10.0,
+   "entry_px_usd": 6.68219942721828e-23,
+   "event_seq": 2101,
+   "gas_usd": 0.14,
+   "impact_pct_open": 72.4544,
+   "opened_ts": 1790275492.1559446,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": -0.0022932883592654413,
+   "symbol": "FreeBots",
+   "tier": "A",
+   "token": "0xfd6d532112d20d254b71cd05f91f2aeee50d9309",
+   "tokens_raw": 149651325269752997216256,
+   "tokens_remaining_raw": 0,
+   "weth_px_usd_open": 2686.83
   },
   "0xfdf47351ea575a3e9a59ecb2d7a26407c342524e:2078": {
    "alert_ts": 1790258672.3710012,
