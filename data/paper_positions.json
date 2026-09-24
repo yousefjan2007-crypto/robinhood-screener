@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790232806.3798676,
-   "event_seq": 2038,
-   "first_seen_ts": 1790232806.3798676,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "OTC",
-   "tier": "A",
-   "token": "0xebe2d8accf5fcd00a56dcea284c898d6b6163a56",
-   "tries": 2
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -17738,6 +17706,50 @@
    "tokens_raw": 90749253898282930798592,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2624.75
+  },
+  "0xebe2d8accf5fcd00a56dcea284c898d6b6163a56:2038": {
+   "alert_ts": 1790232806.3798676,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.8313412727719318e-22,
+   "event_seq": 2038,
+   "gas_usd": 0.07,
+   "impact_pct_open": 3.1235,
+   "opened_ts": 1790233527.2322025,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "OTC",
+   "tier": "A",
+   "token": "0xebe2d8accf5fcd00a56dcea284c898d6b6163a56",
+   "tokens_raw": 54604786932279012229120,
+   "tokens_remaining_raw": 54604786932279012229120,
+   "weth_px_usd_open": 2682.071
   },
   "0xec11ce5dc75c8aec1101955d03967fe914749ec3:1244": {
    "alert_ts": 1789766935.2135055,
