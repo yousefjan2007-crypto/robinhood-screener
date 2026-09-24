@@ -12944,31 +12944,16 @@
   "0x9bc0d5a867d9e4d9e4ce1ffe39669624e995f1d2:2074": {
    "alert_ts": 1790257711.9599066,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1790259151.4928217,
    "cost_usd": 10.0,
    "entry_px_usd": 5.81095406402022e-23,
    "event_seq": 2074,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": 0.1221,
    "opened_ts": 1790257711.9599066,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 2074,
-      "gap_s": 719.6175050735474,
-      "kind": "stop",
-      "mult": 0.1613919586174465,
-      "price": 6.864e-06,
-      "ret": -0.8386080413825535,
-      "symbol": "ROO",
-      "token": "0x9bc0d5a867d9e4d9e4ce1ffe39669624e995f1d2"
-     },
-     "first_seen_ts": 1790258911.8269048,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -12992,12 +12977,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 5.642895089078955,
+   "realized_usd": 6.161296832325813,
    "symbol": "ROO",
    "tier": "A",
    "token": "0x9bc0d5a867d9e4d9e4ce1ffe39669624e995f1d2",
    "tokens_raw": 172088780772113909809152,
-   "tokens_remaining_raw": 86044390386056954904576,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2661.6
   },
   "0x9cbc95d1d665e40db65d9e27b05f5b77c1c522e9:1978": {
@@ -14445,6 +14430,50 @@
    "tokens_raw": 92582412805596860383232,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2738.39
+  },
+  "0xb203e758d9c4bbcac34c1ce924595274e0d3678f:2079": {
+   "alert_ts": 1790259151.4928217,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 8.529604033301742e-22,
+   "event_seq": 2079,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.7101,
+   "opened_ts": 1790259151.4928217,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "CYCLE",
+   "tier": "A",
+   "token": "0xb203e758d9c4bbcac34c1ce924595274e0d3678f",
+   "tokens_raw": 11723873653404609806336,
+   "tokens_remaining_raw": 11723873653404609806336,
+   "weth_px_usd_open": 2668.023
   },
   "0xb29c596af277d1928d0d08f8e28f4a81146da5e0:1976": {
    "alert_ts": 1790183403.5411804,
