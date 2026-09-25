@@ -12817,6 +12817,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2621.088
   },
+  "0x8e15239d16936d25d7972b18cdb9d0c266f52f7a:2147": {
+   "alert_ts": 1790299059.0729258,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 2.3208482772459584e-22,
+   "event_seq": 2147,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.0983,
+   "opened_ts": 1790299059.0729258,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "Wumpus",
+   "tier": "A",
+   "token": "0x8e15239d16936d25d7972b18cdb9d0c266f52f7a",
+   "tokens_raw": 43087693831785207037952,
+   "tokens_remaining_raw": 43087693831785207037952,
+   "weth_px_usd_open": 2694.53
+  },
   "0x8e1e135d8465de22c908e08b30b87999c1739d22:1983": {
    "alert_ts": 1790186284.174996,
    "champion_at_open": "cfg_ladder_stop",
@@ -19564,31 +19608,10 @@
    "cost_usd": 10.0,
    "entry_px_usd": 5.807121185110762e-22,
    "event_seq": 2144,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": null,
    "opened_ts": 1790296178.7377007,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 2144,
-      "gap_s": 240.27126789093018,
-      "kind": "tp",
-      "levels": [
-       [
-        2.0,
-        0.5
-       ]
-      ],
-      "mult": 2.171253822629969,
-      "price": 0.001562,
-      "ret": 1.1712538226299691,
-      "symbol": "FELS",
-      "token": "0xead015725c6cc0a38cdaea04cb7933210198b830"
-     },
-     "first_seen_ts": 1790298818.9849799,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -19612,12 +19635,12 @@
     "trail_arm": null
    },
    "quote_source_open": "scanhood",
-   "realized_usd": 0.0,
+   "realized_usd": 13.928054996226715,
    "symbol": "FELS",
    "tier": "A",
    "token": "0xead015725c6cc0a38cdaea04cb7933210198b830",
    "tokens_raw": 17220236466977164868309,
-   "tokens_remaining_raw": 17220236466977164868309,
+   "tokens_remaining_raw": 8610118233488582434155,
    "weth_px_usd_open": 2689.94
   },
   "0xead74aa7490fa02d1e50fedef179d8c1fedeb785:1570": {
