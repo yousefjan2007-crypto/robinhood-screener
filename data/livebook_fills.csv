@@ -21316,3 +21316,33 @@ ts,token,event_seq,symbol,tier,policy,side,frac_of_original,px,usd_proceeds,gap_
 1790372349.0538397,0xf12f66c45ea2521148a977cb1cbe42f81ae3688d,2266,MICROCHIMP,A,ctl_exit_immediately,time_exit,1.0,2.967176902028624e-22,9.883583,60.7,
 1790372468.3277748,0x250f720fafeceedaedf0578ac84aa2d1c2381e18,2263,MICROCHIMP,B,sell_30m,time_exit,1.0,1.966011295582976e-22,15.127695,60.1,
 1790372528.4666739,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,*,buy,1.0,1.1890018939547282e-22,-9.991519,0.0,"shared entry via kyber, impact 35.2359, reserve_weth ?; fired_band -; sidecar_true band_volume_early; buy 0.00373017 WETH ($9.99) → 8.4e+22 raw via kyber impact 35.24%"
+1790372588.8609903,0xf12f66c45ea2521148a977cb1cbe42f81ae3688d,2265,MICROCHIMP,B,cfg_ladder,tp_2x,0.5,3.3840768185794516e-22,10.000637,60.4,limit fill at rung level
+1790372588.8609903,0xf12f66c45ea2521148a977cb1cbe42f81ae3688d,2265,MICROCHIMP,B,cfg_ladder_stop,tp_2x,0.5,3.3840768185794516e-22,10.000637,60.4,limit fill at rung level
+1790372588.8609903,0xf12f66c45ea2521148a977cb1cbe42f81ae3688d,2265,MICROCHIMP,B,tp2_half_trail30,tp_2x,0.5,3.3840768185794516e-22,10.000637,60.4,limit fill at rung level
+1790372588.8609903,0xf12f66c45ea2521148a977cb1cbe42f81ae3688d,2265,MICROCHIMP,B,tp2_half_stop50_6h,tp_2x,0.5,3.3840768185794516e-22,10.000637,60.4,limit fill at rung level
+1790372588.8609903,0xf12f66c45ea2521148a977cb1cbe42f81ae3688d,2265,MICROCHIMP,B,cfg_ladder_trail30_6h,tp_2x,0.5,3.3840768185794516e-22,10.000637,60.4,limit fill at rung level
+1790372588.8609903,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,stop_30,stop,1.0,3.499672519514921e-23,2.940874,60.4,
+1790372588.8609903,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,stop_50,stop,1.0,3.499672519514921e-23,2.940874,60.4,
+1790372588.8609903,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,cfg_ladder_stop,stop,1.0,3.499672519514921e-23,2.940874,60.4,
+1790372588.8609903,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,trail_30,trail,1.0,3.499672519514921e-23,2.940874,60.4,
+1790372588.8609903,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,trail_50,trail,1.0,3.499672519514921e-23,2.940874,60.4,
+1790372588.8609903,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,tp2_half_trail30,trail,1.0,3.499672519514921e-23,2.940874,60.4,
+1790372588.8609903,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,tp2_half_stop50_6h,stop,1.0,3.499672519514921e-23,2.940874,60.4,
+1790372588.8609903,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,cfg_ladder_trail30_6h,trail,1.0,3.499672519514921e-23,2.940874,60.4,
+1790372588.8609903,0xd53e5a742fa13d2be38deea2de88c0c72de7e9e5,2267,e/acc,A,ctl_exit_immediately,time_exit,1.0,3.499672519514921e-23,2.940874,60.4,
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,hold_to_end,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,sell_30m,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,sell_1h,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,sell_2h,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,sell_3h,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,sell_6h,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,stop_30,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,stop_50,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,cfg_ladder,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,cfg_ladder_stop,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,trail_30,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,trail_50,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,tp2_half_trail30,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,tp2_half_stop50_6h,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,cfg_ladder_trail30_6h,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
+1790372708.1921828,0xd2b75e2d485daaa1184bd93a96448f9d4b7edb36,2264,MICROCHIMP,A,ctl_random_exit,no_route,0.0,0.0,0.0,59.1,"NO ROUTE — dead coin, proceeds $0"
