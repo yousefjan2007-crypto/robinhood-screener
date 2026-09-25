@@ -1,37 +1,5 @@
 {
- "pending_buys": [
-  {
-   "alert_ts": 1790324810.6943712,
-   "event_seq": 2179,
-   "first_seen_ts": 1790324810.6943712,
-   "plan": {
-    "flow": null,
-    "ladder": [
-     [
-      2.0,
-      0.5
-     ],
-     [
-      5.0,
-      0.25
-     ],
-     [
-      10.0,
-      0.15
-     ]
-    ],
-    "max_hold_s": null,
-    "name": "cfg_ladder_stop",
-    "stop": 0.5,
-    "trail": null,
-    "trail_arm": null
-   },
-   "symbol": "Adora",
-   "tier": "A",
-   "token": "0x602879c636f37d0705160737513df08547468c93",
-   "tries": 0
-  }
- ],
+ "pending_buys": [],
  "positions": {
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
@@ -10099,6 +10067,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2639.85
   },
+  "0x602879c636f37d0705160737513df08547468c93:2179": {
+   "alert_ts": 1790324810.6943712,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.3710223923592463e-22,
+   "event_seq": 2179,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1790325051.1693048,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "Adora",
+   "tier": "A",
+   "token": "0x602879c636f37d0705160737513df08547468c93",
+   "tokens_raw": 72938268957023131402240,
+   "tokens_remaining_raw": 72938268957023131402240,
+   "weth_px_usd_open": 2690.29
+  },
   "0x60b612627549370cf54e69492db8d941121bd607:859": {
    "alert_ts": 1789677395.485382,
    "champion_at_open": "cfg_ladder_stop",
@@ -18468,35 +18480,10 @@
    "cost_usd": 10.0,
    "entry_px_usd": 3.8025056378932776e-22,
    "event_seq": 2039,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 0.1264,
    "opened_ts": 1790234966.306032,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 2039,
-      "gap_s": 4080.223174095154,
-      "kind": "tp",
-      "levels": [
-       [
-        2.0,
-        0.5
-       ],
-       [
-        5.0,
-        0.25
-       ]
-      ],
-      "mult": 8.835668789808917,
-      "price": 0.003468,
-      "ret": 7.835668789808917,
-      "symbol": "PENIS",
-      "token": "0xd37b3537575a71f638d8f846258a8a8352598128"
-     },
-     "first_seen_ts": 1790324570.5901144,
-     "tries": 1
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -18520,12 +18507,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 0.1327747015525008,
    "symbol": "PENIS",
    "tier": "A",
    "token": "0xd37b3537575a71f638d8f846258a8a8352598128",
    "tokens_raw": 26298448844747417059328,
-   "tokens_remaining_raw": 26298448844747417059328,
+   "tokens_remaining_raw": 6574612211186854264832,
    "weth_px_usd_open": 2691.15
   },
   "0xd40e9a0b10c7e1aa057961676a82f157c57f2790:828": {
