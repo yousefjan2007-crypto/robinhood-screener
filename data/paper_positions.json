@@ -6696,31 +6696,16 @@
   "0x39bf07f9befbbb0be827de13e400d737e900434d:2053": {
    "alert_ts": 1790243071.4622364,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790334653.1588135,
    "cost_usd": 10.0,
    "entry_px_usd": 1.7864158937662008e-22,
    "event_seq": 2053,
    "gas_usd": 0.14,
    "impact_pct_open": -3.5906,
    "opened_ts": 1790243071.4622364,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 2053,
-      "gap_s": 4800.179570198059,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "ZPK",
-      "token": "0x39bf07f9befbbb0be827de13e400d737e900434d"
-     },
-     "first_seen_ts": 1790334412.7558417,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -6749,7 +6734,7 @@
    "tier": "A",
    "token": "0x39bf07f9befbbb0be827de13e400d737e900434d",
    "tokens_raw": 55978006212862109810688,
-   "tokens_remaining_raw": 27989003106431054905344,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2638.37
   },
   "0x3a6e075e10dad998fc1a11d4ac1bc8cc80d9ac32:1987": {
