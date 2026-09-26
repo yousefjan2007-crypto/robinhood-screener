@@ -2194,9 +2194,9 @@
   "0x12494d5cd884584a7d5e2ba9b6064b3b8229528c:2165": {
    "alert_ts": 1790311454.9469333,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790401758.3624501,
    "cost_usd": 10.0,
    "entry_px_usd": 1.3428340704794866e-22,
    "event_seq": 2165,
@@ -2232,7 +2232,7 @@
    "tier": "A",
    "token": "0x12494d5cd884584a7d5e2ba9b6064b3b8229528c",
    "tokens_raw": 74469364606077461594112,
-   "tokens_remaining_raw": 37234682303038730797056,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2683.43
   },
   "0x1250e0958243191f9057983ace4b3e362d8a8f1f:2093": {
@@ -8056,6 +8056,50 @@
    "tokens_raw": 102576283750638460862464,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2749.64
+  },
+  "0x3e53d968ec25e69bbc6539681151556993e11b4d:2309": {
+   "alert_ts": 1790401758.3624501,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 2.113081710030903e-22,
+   "event_seq": 2309,
+   "gas_usd": 0.07,
+   "impact_pct_open": -46.7164,
+   "opened_ts": 1790401758.3624501,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "FROGECOIN",
+   "tier": "A",
+   "token": "0x3e53d968ec25e69bbc6539681151556993e11b4d",
+   "tokens_raw": 47324246632439752949760,
+   "tokens_remaining_raw": 47324246632439752949760,
+   "weth_px_usd_open": 2687.69
   },
   "0x3e7734b34330ca85510b2be4de16787e7244ce49:1170": {
    "alert_ts": 1789757975.3260446,
