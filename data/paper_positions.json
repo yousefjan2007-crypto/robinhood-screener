@@ -10040,9 +10040,9 @@
   "0x45ca989eb0fa2c49e206fe2c792403fa0d85b68f:2335": {
    "alert_ts": 1790427167.5572336,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1790513944.3011105,
    "cost_usd": 10.0,
    "entry_px_usd": 8.405072311280836e-23,
    "event_seq": 2335,
@@ -10078,7 +10078,7 @@
    "tier": "A",
    "token": "0x45ca989eb0fa2c49e206fe2c792403fa0d85b68f",
    "tokens_raw": 118975775932094464655360,
-   "tokens_remaining_raw": 118975775932094464655360,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2687.66
   },
   "0x45e2d884cd86b707d16bbff251a05c2c9008eeb1:2230": {
@@ -23572,6 +23572,50 @@
    "tokens_raw": 50640148729156144726016,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2693.56
+  },
+  "0xd617513a8d35efab7d8d28179e2b1098dec94605:2446": {
+   "alert_ts": 1790513944.3011105,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 7.9299338755484e-22,
+   "event_seq": 2446,
+   "gas_usd": 0.07,
+   "impact_pct_open": 5.4384,
+   "opened_ts": 1790513944.3011105,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "JEANHOOD",
+   "tier": "A",
+   "token": "0xd617513a8d35efab7d8d28179e2b1098dec94605",
+   "tokens_raw": 12610445631626963582976,
+   "tokens_remaining_raw": 12610445631626963582976,
+   "weth_px_usd_open": 2703.75
   },
   "0xd72b892c601ba732f8bef1abd3db939bc8b7b689:971": {
    "alert_ts": 1789698836.8469212,
