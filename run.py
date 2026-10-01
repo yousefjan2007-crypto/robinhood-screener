@@ -130,6 +130,11 @@ class _Budget:
 
 
 # ── discovery ────────────────────────────────────────────────────────────────────
+# G4: a launch minted to the farm factory, or recorded with its caller/contract as creator, is
+# dropped at discovery — never enriched, never ledgered (config.FARM_MINT_RECIPIENTS / FARM_CALLERS)
+_FARM_ADDRS = {a.lower() for a in tuple(config.FARM_MINT_RECIPIENTS) + tuple(config.FARM_CALLERS)}
+
+
 def discover_from_logs(cursor: dict, head: int | None, budget: _Budget) -> tuple:
     """Exact discovery: (disc dict token→record, new_cursor dict, gap_blocks, meta). The cursor
     advances only to the block of the last log actually processed; log tokens are never
@@ -142,7 +147,8 @@ def discover_from_logs(cursor: dict, head: int | None, budget: _Budget) -> tuple
     launchpad burst the cursor fell behind and the DISCOVERY_MAX_CATCHUP_BLOCKS floor then dropped
     whole ranges (silently, as a gap). Catching up costs Dexscreener calls, not correctness."""
     lag = max(0, int(head or 0) - int(cursor.get("last_block") or 0)) if cursor.get("last_block") else 0
-    meta = {"catchup": False, "cap": config.DISCOVERY_MAX_LOG_TOKENS_PER_RUN, "lag_blocks": lag}
+    meta = {"catchup": False, "cap": config.DISCOVERY_MAX_LOG_TOKENS_PER_RUN, "lag_blocks": lag,
+            "farm_blocked": 0, "farm_query_dark": False}
     if not head:
         return {}, cursor, 0, meta
     last = int(cursor.get("last_block") or 0)
@@ -181,11 +187,19 @@ def discover_from_logs(cursor: dict, head: int | None, budget: _Budget) -> tuple
             print(f"  [discover] window {s}-{e} failed ({err}); cursor stays at {processed_block}")
             new = {"last_block": processed_block, "updated_ts": cursor.get("updated_ts")}
             return disc, new, gap, meta
+        farm = rpc.farm_minted_tokens(s, e)           # G4: one address-less query per window
+        if farm is None:
+            meta["farm_query_dark"] = True              # deferred blocks nothing (never a finding)
+            farm = set()
         for rec in rpc.decode_discovery(logs):
             if len(disc) >= cap:
                 capped = True
                 break
             t = rec["token"].lower()
+            if t in farm or str(rec.get("creator") or "").lower() in _FARM_ADDRS:
+                meta["farm_blocked"] = meta.get("farm_blocked", 0) + 1
+                processed_block = rec["block"]
+                continue
             if t not in disc:
                 disc[t] = rec
             processed_block = rec["block"]
@@ -456,6 +470,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         if not ok:
             return None, gates
         score, comps = screen.soft_score(m, s)
+        s = dict(s, unchecked=SAFE.unchecked_of(s))   # name every check this row's facts never ran
         first = t not in ledger_index
         fs_ts = (ledger_index.get(t) or {}).get("first_sighting_ts") or (watch.get(t) or {}).get("first_sighting_ts")
         age_s = 0.0 if first or not fs_ts else max(0.0, now_s - float(fs_ts))
@@ -534,6 +549,41 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     for t in prio:
         safety.setdefault(t, s1.get(t) or SAFE.empty_safety())   # a budget cut leaves pass-1 facts standing
     stage_s["pass2_prio"] = round(budget.elapsed(), 1)
+    # G1 + G2 BEFORE the alert: the venue's on-chain liquidity (dead pool / pulled / stale print) and
+    # the route at the book's stake, at a block read NOW (the run-start head is a minute old by here,
+    # and pulls were measured up to 569 s before alert_ts). Unanswered ⇒ passes, named dark.
+    alert_gate_rejects: list = []
+    if prio:
+        head_now = rpc.block_number() or head
+
+        def _ac(t):
+            if not budget.ok("alert_checks"):
+                return t, None
+            try:
+                return t, SAFE.alert_checks(t, markets[t], safety[t], head_now, now_s)
+            except Exception as exc:
+                print(f"  ! alert_checks({t[:10]}…) failed: {exc}")
+                return t, None
+        with ThreadPoolExecutor(max_workers=config.PASS2_WORKERS) as ex:
+            for t, s_ac in ex.map(_ac, prio):
+                if s_ac is not None:
+                    safety[t] = s_ac
+        for t in prio:
+            ok_, g_ = screen.hard_gates(markets[t], safety[t])
+            if not ok_ and (g_.get("liq_live_ok") is False or g_.get("route_ok") is False):
+                st_ = safety[t]
+                alert_gate_rejects.append({
+                    "token": t, "symbol": markets[t].get("symbol"),
+                    "failed": [k for k in ("liq_live_ok", "route_ok") if g_.get(k) is False],
+                    "venue_liq_state": st_.get("venue_liq_state"), "venue_kind": st_.get("venue_kind"),
+                    "venue_pool": st_.get("venue_pool"), "venue_liq_frac": st_.get("venue_liq_frac"),
+                    "venue_swaps_window": st_.get("venue_swaps_window"),
+                    "venue_dex_pair_swap_age_s": st_.get("venue_dex_pair_swap_age_s"),
+                    "route_at_alert": st_.get("route_at_alert"), "head": head_now})
+                print(f"  alert gate: {markets[t].get('symbol')} rejected "
+                      f"({', '.join(alert_gate_rejects[-1]['failed'])}; venue {st_.get('venue_liq_state')}, "
+                      f"route {st_.get('route_at_alert')})")
+        stage_s["alert_checks"] = round(budget.elapsed(), 1)
     early_rows = [row for row, _g in (_row_for(t, safety[t]) for t in prio) if row is not None]
     early_alerts = _a_rows(early_rows)[: config.ALERT_TOP_N]
     early_alerted: set = set()
@@ -688,7 +738,8 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         for r in survivors:
             w = watch.get(r["token"])
             if w is not None:
-                w["last_safety"] = {k: v for k, v in safety.get(r["token"], {}).items() if not k.startswith("_")}
+                w["last_safety"] = {k: v for k, v in safety.get(r["token"], {}).items()
+                                    if not k.startswith("_") and k not in SAFE.ALERT_TIME_KEYS}
                 cf = (s1.get(r["token"]) or {})
                 if cf.get("pass") == 1 or r["token"] in chain_cache:
                     w["chain_facts"] = chain_cache.get(r["token"]) or w.get("chain_facts")
@@ -728,6 +779,9 @@ def run(dry_run: bool = True, send: bool = False) -> list:
             "enriched": len(markets), "absent": len(absent), "deferred": len(deferred),
             "deferred_by_stage": dict(deferred_by_stage, **{f"budget_{k}": v for k, v in budget.cuts.items()}),
             "pass1_rejects_by_gate": pass1_rejects,
+            "farm_blocked": int(disc_meta.get("farm_blocked") or 0),
+            "farm_query_dark": bool(disc_meta.get("farm_query_dark")),
+            "alert_gate_rejects": alert_gate_rejects,
             "survivors": [{k: _round(v) if isinstance(v, float) else v for k, v in r.items()
                            if k not in ("feat", "market", "verdicts", "comps")} for r in survivors],
             "plan": exit_plan, "health": http_client.health_snapshot(), "dark": dark,

@@ -6366,4 +6366,263 @@ check("README's file table carries the RKST retrospective with its one honest bu
       and "descriptive, n = 1, chosen on the outcome" in _readme
       and "predates the ledger and no rule is derived from it" in _readme)
 
+# ═══════════════════════════════════════════════════════════════════════════════════
+section("R. alert-time safety gates — G1 dead pool, G2 no route, G4 farm factory — and the `unchecked` honesty field")
+# ═══════════════════════════════════════════════════════════════════════════════════
+# G1 replays RECORDED node answers (fixtures/g1_venue_rpc.json: the exact eth_getLogs / eth_call
+# requests rpc.venue_facts made at each token's alert block, 2026-10-01). The four rejects are the
+# research's confirmed dead-pool alerts (each pool fully removed 16-98 s BEFORE alert_ts); SI is a live
+# hook-less runner with a scorable $1.09M spot cell; NFLOAT is a hooked-template runner whose
+# FIRST-initialized pool is a hook-less decoy (3 swaps, 141 blocks earlier).
+from sources import rpc as RPCG, safety as SAFEG    # noqa: E402
+import run as RUNG                                   # noqa: E402
+_g1_path = os.path.join(ROOT, "fixtures", "g1_venue_rpc.json")
+check("the G1 replay fixture exists, is JSON, and carries no home path (public repo)",
+      os.path.isfile(_g1_path) and "/Users/" not in _read(_g1_path))
+_G1 = json.load(open(_g1_path))
+_g1_cases = {c_["symbol"]: c_ for c_ in _G1["cases"]}
+check("the G1 fixture holds the four must-reject tokens (Muse, DEBT, NEPTUNE, ARGONAUTS), a live hook-less runner and a "
+      "decoy-pool runner, each with the exact token address the research named",
+      _g1_cases["Muse"]["token"] == "0x1b81841833986214d0f3c3a5261baedde5952f58"
+      and _g1_cases["DEBT"]["token"] == "0x6f0c1145ea8ad930bbce78addccd5a39ec5b59e7"
+      and _g1_cases["NEPTUNE"]["token"] == "0x55b37fec72c41a230671ae248d81b4ada75e148f"
+      and _g1_cases["ARGONAUTS"]["token"] == "0x359a358ecfcd66c9fe67645f42f27c3dc029b831"
+      and _g1_cases["SI"]["expect"] == "pass" and _g1_cases["NFLOAT"]["expect"] == "pass_hooked_venue")
+
+
+def _g1_replay(case, missing):
+    table = {json.dumps([c_["method"], c_["params"]], sort_keys=True): (c_["result"], c_["error"]) for c_ in case["calls"]}
+
+    def fake(method, params):
+        k_ = json.dumps([method, params], sort_keys=True)
+        if k_ not in table:
+            missing.append(k_[:160])
+            return None, "network failure"
+        return table[k_]
+    return fake
+
+
+_saved_call = RPCG._call
+_g1_res = {}
+_g1_missing: list = []
+try:
+    for sym_, case_ in _g1_cases.items():
+        RPCG._call = _g1_replay(case_, _g1_missing)
+        vf_ = RPCG.venue_facts(case_["token"], case_["head"], dex_pair=None)
+        s_ = SAFEG.empty_safety()
+        m_ = {"price_usd": 1e-6, "liq_usd": 30_000.0, "vol_h24": 80_000.0, "vol_h1": 60_000.0, "pair": vf_.get("pool")}
+        SAFEG.apply_venue(s_, vf_, m_)
+        ok_, g_ = screen.hard_gates(m_, s_)
+        _g1_res[sym_] = (vf_, s_, ok_, g_)
+finally:
+    RPCG._call = _saved_call
+check("every G1 request was answered from the recording (the replay is exact: same requests, same block windows)",
+      not _g1_missing, str(_g1_missing[:2]))
+for sym_ in ("Muse", "DEBT", "NEPTUNE", "ARGONAUTS"):
+    vf_, s_, ok_, g_ = _g1_res[sym_]
+    check(f"G1 REJECTS {sym_} at its alert block: the venue's liquidity is zero (drained before the alert), liq_live_ok False, "
+          "hard gates fail — a positive on-chain finding, not a guess",
+          vf_["status"] == "ok" and s_["venue_liq_state"] == "drained" and s_["venue_liq_frac"] == 0.0
+          and g_["liq_live_ok"] is False and not ok_ and "rpc" not in s_["sources_dark"], str((vf_, s_["venue_liq_state"])))
+_vf_si, _s_si, _ok_si, _g_si = _g1_res["SI"]
+check("G1 PASSES SI (a live hook-less V4 runner, tier A, scorable $1.09M spot cell): liquidity at its peak, a swap seconds ago",
+      _vf_si["kind"] == "v4" and _vf_si["hook"] == "0x" + "0" * 40 and _s_si["venue_liq_state"] == "live"
+      and _s_si["venue_liq_frac"] == 1.0 and _g_si["liq_live_ok"] is True and _ok_si, str(_vf_si))
+_vf_nf, _s_nf, _ok_nf, _g_nf = _g1_res["NFLOAT"]
+_nf_inits = sorted((int(lg_["blockNumber"], 16), lg_["topics"][1]) for c_ in _g1_cases["NFLOAT"]["calls"]
+                   if c_["method"] == "eth_getLogs" and c_["params"][0]["topics"][0] == config.TOPIC_V4_INITIALIZE
+                   for lg_ in (c_["result"] or []))
+check("G1 picks the HOOKED venue over the decoy: NFLOAT's first-initialized pool is a hook-less decoy, the venue is the later "
+      "hooked pool with the most swaps in the window, and the runner passes",
+      len(_nf_inits) == 2 and _vf_nf["pool"] == _nf_inits[1][1] and _vf_nf["pool"] != _nf_inits[0][1]
+      and _vf_nf["hook"] != "0x" + "0" * 40 and _vf_nf["swaps"] > _vf_nf["pool_swaps"][_nf_inits[0][1]]
+      and _s_nf["venue_liq_state"] == "live" and _g_nf["liq_live_ok"] is True and _ok_nf, str((_nf_inits, _vf_nf)))
+check("ARGONAUTS (a phantom runner) carries a second, swap-less pool and is still judged on the pool that traded",
+      _g1_res["ARGONAUTS"][0]["n_pools"] == 2 and _g1_res["ARGONAUTS"][0]["swaps"] > 0)
+
+# 429 / 5xx → http_client answers None → rpc._call "network failure" → venue deferred → the gate PASSES, rpc named dark
+_saved_post = RPCG.post_json
+try:
+    RPCG.post_json = lambda *a_, **k_: None                     # what http_client returns for a 429 / 5xx after retries
+    vf_d = RPCG.venue_facts(_g1_cases["Muse"]["token"], _g1_cases["Muse"]["head"])
+    s_d = SAFEG.empty_safety(); SAFEG.apply_venue(s_d, vf_d, {"vol_h1": 60_000.0})
+    _okd, _gd = screen.hard_gates({"price_usd": 1.0, "liq_usd": 1e5, "vol_h24": 1e5, "vol_h1": 6e4}, s_d)
+    _n = [0]
+    _rec = {json.dumps([c_["method"], c_["params"]], sort_keys=True): (c_["result"], c_["error"]) for c_ in _g1_cases["Muse"]["calls"]}
+
+    def _half(method, params):
+        _n[0] += 1
+        return (None, "network failure") if _n[0] >= 7 else _rec[json.dumps([method, params], sort_keys=True)]
+    RPCG._call = _half                                          # the pool list answered, the liquidity history did not
+    vf_h = RPCG.venue_facts(_g1_cases["Muse"]["token"], _g1_cases["Muse"]["head"])
+finally:
+    RPCG.post_json = _saved_post
+    RPCG._call = _saved_call
+check("429 / 5xx: an unanswered RPC makes the venue DEFERRED — venue_kind 'unknown', no state, liq_live_ok True (passes), "
+      "rpc named in sources_dark; a run that answered the pool list but not the liquidity history is deferred too (a partial "
+      "picture never rejects)",
+      vf_d["status"] == "deferred" and s_d["venue_kind"] == "unknown" and s_d["venue_liq_state"] is None
+      and _gd["liq_live_ok"] is True and _okd and "rpc" in s_d["sources_dark"] and _gd["rpc_available"] is False
+      and vf_h["status"] == "deferred", str((vf_d, vf_h)))
+
+# the decision itself is pure (screen.venue_liq_state) and reads config thresholds only
+_vs = screen.venue_liq_state
+_base = {"venue_kind": "v4"}
+check("screen.venue_liq_state: frac 0 → drained, below VENUE_LIQ_MIN_FRAC_OF_PEAK → pulled, exactly at it → live, unknown frac "
+      "→ None; venue 'none' / 'unknown' / unchecked → None (never a finding)",
+      _vs({}, dict(_base, venue_liq_frac=0.0)) == "drained"
+      and _vs({}, dict(_base, venue_liq_frac=config.VENUE_LIQ_MIN_FRAC_OF_PEAK - 1e-9)) == "pulled"
+      and _vs({}, dict(_base, venue_liq_frac=config.VENUE_LIQ_MIN_FRAC_OF_PEAK)) == "live"
+      and _vs({}, dict(_base, venue_liq_frac=None)) is None
+      and all(_vs({}, {"venue_kind": k_, "venue_liq_frac": 0.0}) is None for k_ in ("none", "unknown", None)))
+_st = dict(_base, venue_liq_frac=1.0, venue_dex_pair_swap_age_s=config.VENUE_STALE_NO_SWAP_S + 1)
+check("the stale-quote case: Dexscreener's own pair silent for more than VENUE_STALE_NO_SWAP_S while Dexscreener still "
+      "reports >= VENUE_STALE_MIN_VOL_H1_USD of h1 volume → stale (rejected); a quieter h1, a recent swap, or a Dexscreener "
+      "pair that is not one of the token's pools (age None) → not stale",
+      _vs({"vol_h1": config.VENUE_STALE_MIN_VOL_H1_USD}, _st) == "stale"
+      and screen.hard_gates({"price_usd": 1.0, "liq_usd": 1e5, "vol_h24": 1e5, "vol_h1": 6e4}, _st)[1]["liq_live_ok"] is False
+      and _vs({"vol_h1": config.VENUE_STALE_MIN_VOL_H1_USD - 1}, _st) == "live"
+      and _vs({"vol_h1": 1e6}, dict(_st, venue_dex_pair_swap_age_s=config.VENUE_STALE_NO_SWAP_S)) == "live"
+      and _vs({"vol_h1": 1e6}, dict(_st, venue_dex_pair_swap_age_s=None)) == "live")
+check("liquidity_state: one add then a full remove → frac 0 with the pull block; re-adding above half the peak clears the "
+      "pull; a capped swap count is an answer (VENUE_LOG_CAP), a capped liquidity history is deferred",
+      RPCG.liquidity_state([(10, 0, 100), (20, 0, -100)]) == {"peak": 100, "current": 0, "frac": 0.0, "pull_block": 20}
+      and RPCG.liquidity_state([(10, 0, 100), (20, 0, -80), (30, 0, 60)])["pull_block"] is None
+      and RPCG.liquidity_state([])["frac"] is None)
+_saved_gl = RPCG.get_logs
+try:
+    RPCG.get_logs = lambda a_, t_, lo_, hi_: (None, "logs matched by query exceeds limit of 10000")
+    _cap_sw = RPCG.pool_swaps({"kind": "v4", "id": "0x" + "1" * 64, "init_block": 1}, 100_000)
+    _cap_lq = RPCG._liq_series({"kind": "v4", "id": "0x" + "1" * 64, "init_block": 1}, 100_000)
+finally:
+    RPCG.get_logs = _saved_gl
+check("…the capped answers, measured on the node's own -32000 text", _cap_sw == ("ok", config.VENUE_LOG_CAP, 100_000)
+      and _cap_lq == ("deferred", []), str((_cap_sw, _cap_lq)))
+# a migration: the most-swapped pool was emptied, but another pool kept trading AFTER the pull → judged on that pool
+_P1, _P2 = "0x" + "a" * 64, "0x" + "b" * 64
+_mig = {"pools": [{"kind": "v4", "id": _P1, "hook": "0x" + "0" * 40, "init_block": 100},
+                  {"kind": "v4", "id": _P2, "hook": "0x" + "0" * 40, "init_block": 500}]}
+_saved_vp, _saved_ps, _saved_ls = RPCG.venue_pools, RPCG.pool_swaps, RPCG._liq_series
+try:
+    RPCG.venue_pools = lambda tok, head: ("ok", _mig["pools"])
+    RPCG.pool_swaps = lambda p, head: ("ok", 300, 900) if p["id"] == _P1 else ("ok", 40, 990)
+    RPCG._liq_series = lambda p, head: ("ok", [(100, 0, 1000), (950, 0, -1000)]) if p["id"] == _P1 else ("ok", [(500, 0, 700)])
+    _vm = RPCG.venue_facts("0x" + "c" * 40, 1000)
+    RPCG.pool_swaps = lambda p, head: ("ok", 300, 900) if p["id"] == _P1 else ("ok", 0, None)
+    _vr = RPCG.venue_facts("0x" + "c" * 40, 1000)
+finally:
+    RPCG.venue_pools, RPCG.pool_swaps, RPCG._liq_series = _saved_vp, _saved_ps, _saved_ls
+check("a MIGRATION is not a rug: when the busiest pool was emptied and another pool swapped after the pull, the other pool is the "
+      "venue (live); with no trading after the pull the busiest pool stands and reads drained",
+      _vm["pool"] == _P2 and _vm["liq_frac"] == 1.0 and _vr["pool"] == _P1 and _vr["liq_frac"] == 0.0, str((_vm, _vr)))
+
+# G2: the route at alert — ABSENT fails, deferred passes and is named
+_cm = {"price_usd": 1.0, "liq_usd": 1e5, "vol_h24": 1e5}
+_ra, _rd, _ro = SAFEG.empty_safety(), SAFEG.empty_safety(), SAFEG.empty_safety()
+SAFEG.apply_route(_ra, {"status": "absent"}); SAFEG.apply_route(_rd, {"status": "deferred"}); SAFEG.apply_route(_ro, {"status": "ok"})
+_rn = SAFEG.empty_safety(); SAFEG.apply_route(_rn, None)
+check("G2: route_at_alert ABSENT fails route_ok and the hard gates (an unbuyable token cannot be A); deferred (or a probe that "
+      "raised) passes and names `route` dark; ok passes; a dict that was never probed passes",
+      screen.hard_gates(_cm, _ra)[1]["route_ok"] is False and not screen.hard_gates(_cm, _ra)[0]
+      and screen.hard_gates(_cm, _rd)[0] and "route" in _rd["sources_dark"] and _rn["route_at_alert"] == "deferred"
+      and screen.hard_gates(_cm, _ro)[0] and "route" not in _ro["sources_dark"]
+      and screen.hard_gates(_cm, SAFEG.empty_safety())[1]["route_ok"] is True)
+_ac = SAFEG.alert_checks("0x" + "d" * 40, {"pair": None, "vol_h1": 1.0}, SAFEG.empty_safety(), 1000, 1.0,
+                         venue_fn=lambda t, h, dex_pair=None: {"status": "ok", "kind": "v4", "pool": "0x" + "e" * 64,
+                                                               "swaps": 12, "last_swap_age_s": 3.0, "liq_frac": 0.0},
+                         quote_fn=lambda t, usd, now_s: {"status": "absent"})
+_ac_in = SAFEG.empty_safety()
+_ac2 = SAFEG.alert_checks("0x" + "d" * 40, {}, _ac_in, 1000, 1.0,
+                          venue_fn=lambda *a_, **k_: (_ for _ in ()).throw(RuntimeError("boom")),
+                          quote_fn=lambda *a_, **k_: (_ for _ in ()).throw(RuntimeError("boom")))
+check("alert_checks runs G1 then G2 on a COPY (the caller's dict is never mutated); an exception in either probe is a "
+      "deferral, named dark, never a rejection",
+      _ac["venue_liq_state"] == "drained" and _ac["route_at_alert"] == "absent"
+      and _ac2["venue_kind"] == "unknown" and _ac2["route_at_alert"] == "deferred" and screen.hard_gates(_cm, _ac2)[0]
+      and _ac_in["venue_kind"] is None and _ac_in["route_at_alert"] is None)
+_rs_g = _read(os.path.join(ROOT, "run.py"))
+check("run.py runs the alert-time checks on the prio candidates AFTER their fast pass 2 and BEFORE the early alert rows are built, "
+      "at a block read then (not the run-start head), and stores the rejects in latest_scan.json",
+      0 < _rs_g.index("_run_p2(prio, fast=True)") < _rs_g.index("SAFE.alert_checks(") < _rs_g.index("early_rows = [row for row")
+      and "head_now = rpc.block_number() or head" in _rs_g and '"alert_gate_rejects": alert_gate_rejects' in _rs_g)
+check("the alert-time facts never ride the watchlist's last_safety into a later run (a pool can be drained a minute later)",
+      "k not in SAFE.ALERT_TIME_KEYS" in _rs_g and set(SAFEG.ALERT_TIME_KEYS) <= set(config.FEATURE_FIELDS))
+_gc_full = screen.hard_gates(CLEAN_M, CLEAN_S)[1]
+check("the two new gates are APPENDED to _GATE_ORDER (an older 17-char gates_mask is a prefix of the new 19-char one) and are "
+      "ANDed into `passed`",
+      screen._GATE_ORDER[-2:] == ("liq_live_ok", "route_ok") and len(screen._GATE_ORDER) == 19
+      and screen._GATE_ORDER[:17][-3:] == ("rpc_available", "blockscout_available", "gt_available")
+      and len(screen.gates_bitmask(_gc_full)) == 19 and screen.gates_bitmask(_gc_full).endswith("11")
+      and not screen.hard_gates(CLEAN_M, dict(CLEAN_S, venue_kind="v4", venue_liq_frac=0.0))[0])
+
+# G4: the farm factory is dropped at discovery
+_FARM_TOK = "0x" + "f" * 40
+_v4_log = _log(config.V4_POOL_MANAGER, [config.TOPIC_V4_INITIALIZE, "0x" + "9" * 64, "0x" + "0" * 64, "0x" + rpc.enc_addr(_FARM_TOK)],
+               "0x" + rpc.enc_uint(100) + rpc.enc_uint(1) + rpc.enc_addr("0x" + "0" * 40), 5000, 0)
+_v4_ok = _log(config.V4_POOL_MANAGER, [config.TOPIC_V4_INITIALIZE, "0x" + "8" * 64, "0x" + "0" * 64, "0x" + rpc.enc_addr("0x" + "7" * 40)],
+              "0x" + rpc.enc_uint(100) + rpc.enc_uint(1) + rpc.enc_addr("0x" + "0" * 40), 5001, 0)
+_mint = {"address": _FARM_TOK, "topics": [config.TOPIC_ERC20_TRANSFER, "0x" + "0" * 64, "0x" + rpc.enc_addr(config.FARM_MINT_RECIPIENTS[0])],
+         "data": "0x" + rpc.enc_uint(10 ** 27), "blockNumber": hex(4999), "logIndex": "0x0"}
+_farm_calls: list = []
+
+
+def _farm_gl(addrs, topics, a_, b_):
+    _farm_calls.append((addrs, a_, b_))
+    if addrs is None:                                     # the address-less farm-mint query
+        return ([_mint] if a_ <= 4999 <= b_ else []), None
+    return [lg_ for lg_ in (_v4_log, _v4_ok) if a_ <= int(lg_["blockNumber"], 16) <= b_], None
+
+
+_saved_gl = rpc.get_logs
+try:
+    rpc.get_logs = _farm_gl
+    _dfarm, _cfarm, _gfarm, _mfarm = RUNG.discover_from_logs({"last_block": 4900}, 5100, RUNG._Budget(60))
+    _farm_calls.clear()
+    _fset = rpc.farm_minted_tokens(0, 100_000)
+    _spans = [b_ - a_ + 1 for addr_, a_, b_ in _farm_calls]
+    rpc.get_logs = lambda addrs, topics, a_, b_: (None, "network failure") if addrs is None else ([_v4_log, _v4_ok], None)
+    _dfd, _cfd, _gfd, _mfd = RUNG.discover_from_logs({"last_block": 4900}, 5100, RUNG._Budget(60))
+finally:
+    rpc.get_logs = _saved_gl
+check("G4: a launch minted to the farm-factory recipient is dropped at DISCOVERY (counted as farm_blocked, cursor still advances); "
+      "an ordinary hook-less launch in the same window is kept",
+      _FARM_TOK not in _dfarm and ("0x" + "7" * 40) in _dfarm and _mfarm["farm_blocked"] == 1 and _cfarm["last_block"] == 5100,
+      str((list(_dfarm), _mfarm)))
+check("G4: the address-less farm query is chunked at FARM_QUERY_MAX_BLOCKS (the node's 30k-block cap with no address); an "
+      "unanswered farm query blocks NOTHING (deferred is never a finding) and says so in the discovery meta",
+      _spans and max(_spans) <= config.FARM_QUERY_MAX_BLOCKS == 30_000 and _fset == {_FARM_TOK}
+      and _FARM_TOK in _dfd and _mfd["farm_query_dark"] is True and _mfd["farm_blocked"] == 0)
+check("G4's addresses are the research's: mint recipient 0x1cbaf24d…a149, caller 0x7afffdaf…9633",
+      config.FARM_MINT_RECIPIENTS == ("0x1cbaf24d53fe930fce8eff149fa797d2611da149",)
+      and config.FARM_CALLERS == ("0x7afffdaff8b1fe29fccc4a5e8b8836ae1c819633",))
+
+# the honesty field: fast pass 2 NAMES what it skipped; degraded_fields and the alert's DEGRADED line report it
+_saved_fast = (SAFEG._apply_gt, SAFEG._apply_blockscout_fast, SAFEG._apply_gmgn)
+try:
+    SAFEG._apply_gt = lambda s_, now_s, t: None
+    SAFEG._apply_blockscout_fast = lambda s_, t: None
+    SAFEG._apply_gmgn = lambda s_, t, row=None, info=True: None
+    _fast = SAFEG.pass2("0x" + "1" * 40, {}, SAFEG.empty_safety(), 1.0, fast=True)
+finally:
+    SAFEG._apply_gt, SAFEG._apply_blockscout_fast, SAFEG._apply_gmgn = _saved_fast
+_unc = SAFEG.unchecked_of(_fast)
+check("fast pass 2 records the checks it skipped in `unchecked` (top10 holders, the creation-tx deployer, creator history, launcher "
+      "balance, sniper count); unchecked_of adds venue_liq / route when G1 / G2 never ran, and a dict pass 2 never touched names "
+      "the whole pass 2",
+      _fast["unchecked"] == list(SAFEG.FAST_PASS2_SKIPS) and _unc[:5] == list(SAFEG.FAST_PASS2_SKIPS)
+      and _unc[-2:] == ["venue_liq", "route"] and SAFEG.unchecked_of(SAFEG.empty_safety())[:2] == ["gt_info", "blockscout_flags"]
+      and SAFEG.unchecked_of(dict(SAFEG.empty_safety(), unchecked=[], venue_kind="v4", route_at_alert="ok")) == [])
+_degr = SAFEG.degraded_fields(dict(_fast, unchecked=_unc))
+_card_row = dict(_feat(CLEAN_M, CLEAN_S), symbol="FAST", event_kind="first_sighting", unchecked=_unc, hc_misses=[])
+_t_al, _b_al = alerts.format_alert([_card_row], band="band_volume_early")
+check("degraded_fields reports every unchecked check by name ('… (unchecked)'), and the alert carries a DEGRADED header line and "
+      "a per-card 'not checked before this alert' line — an A row decided on fast pass 2 no longer looks fully checked",
+      "top10 holders (Blockscout walk) (unchecked)" in _degr and "venue liquidity (G1) (unchecked)" in _degr
+      and "check(s) never ran before this alert" in _b_al and "not checked before this alert: top10_holders" in _b_al)
+check("`unchecked` and the G1/G2 facts are FEATURE_FIELDS (so they ride latest_scan.json, the point-in-time store) and the "
+      "safety contract still equals the safety subset of FEATURE_FIELDS",
+      {"unchecked", "venue_liq_state", "venue_liq_frac", "route_at_alert"} <= set(config.FEATURE_FIELDS)
+      and set(SAFEG.SAFETY_FEATURE_KEYS) == set(config.FEATURE_FIELDS) - set(RUNG.dex.MARKET_KEYS)
+      - {"token", "score", "first_sighting", "sighting_age_s"})
+
 print(f"\nALL INVARIANTS PASSED ({N_PASS} checks, {N_SKIP} skipped)")

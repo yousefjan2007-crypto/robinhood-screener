@@ -126,7 +126,11 @@ fields are **features only** (three pre-declared candidate bands read them: `ban
 `sources_dark`. The Trenches ROW is free once the feed has been pulled, so it is attached at **pass 1**
 (`safety.apply_gmgn_row`) to every enriched token, not inside pass 2: applied in pass 2 only, the
 row-only fields reached 11 of 157 survivors (pass 2 covers ≤ `GT_INFO_BUDGET_PER_RUN` +
-`WATCH_REFRESH_PER_RUN` tokens a run while the watchlist is ~98 % of the survivors). `docs/GMGN_TRENCHES.md` is the operator's Trenches guide. `screen.hc_checks(feat)` is
+`WATCH_REFRESH_PER_RUN` tokens a run while the watchlist is ~98 % of the survivors). `docs/GMGN_TRENCHES.md` is the operator's Trenches guide. **Alert-time gates (2026-10-01):** the prio candidates get `safety.alert_checks` after
+their fast pass 2 and before the alert — G1 `rpc.venue_facts` (venue = most swaps in the window;
+liquidity from the venue's own ModifyLiquidity / Mint-Burn / LP-mint logs) and G2 `quotes.quote_buy`;
+only prio tokens, so a B row's `unchecked` names `venue_liq` and `route`. G4 drops farm-factory mints
+(`config.FARM_MINT_RECIPIENTS`) in `discover_from_logs`. `screen.hc_checks(feat)` is
 the **single** implementation of the A-tier checks (`None` for unknown / degraded inputs);
 `high_conviction` and `band_a_strict` both derive from it. `entry_lab/runtime.build_feat` is the
 single normalizer to `config.FEATURE_FIELDS` (NaN/inf/NA → `None`, every key present).
@@ -217,6 +221,12 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
 - **`docs/` and `selfimprove/research/` carry no home paths and never name the shared secrets
   file** — verify greps for both. Keep `README.md` clean the same way.
 - **The $Cubrate replay is never A-tier.** Literal at-alert numbers, permanent fixture.
+- **G1 rejects the four recorded dead-pool alerts and passes the two recorded runners.**
+  `fixtures/g1_venue_rpc.json` replays the exact node answers at each alert block (Muse, DEBT,
+  NEPTUNE, ARGONAUTS drained before alert_ts; SI live hook-less; NFLOAT's decoy pool is not the
+  venue). The venue is the pool with the most swaps in the window, never the first Initialize.
+- **`liq_live_ok` / `route_ok` are the LAST two `_GATE_ORDER` entries** (appended, never inserted:
+  a pre-2026-10-01 17-char `gates_mask` is a prefix of the 19-char one).
 
 ## Named incidents (why the code looks the way it does)
 
@@ -259,6 +269,13 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   LIFETIME volume (~$30k liquidity, $25–38k volume, buys/sells 1.4–1.5×, all above the floors).
   Hence "never match by symbol" and the separation that actually works: $50k of volume in HOUR ONE
   at an age ≤ 15 min, which the real runners cleared by 20× and the clones never do.
+
+- **Alerting on corpses, 2026-10-01 (research D4/D10)** — 16 of 17 checked tier-A dead-pool proxy
+  rows had their main pool fully removed 9.6–569 s BEFORE alert_ts while Dexscreener kept quoting
+  it; 80 A alerts in 18 days had no route at all. Hence G1 `liq_live_ok` (venue chosen by swap count
+  — a hook-5059 decoy pool is initialized ~12 s before the real one), G2 `route_ok`, the G4 farm
+  blocklist at discovery, and `unchecked` (fast pass 2's skips were logged as `fast_pass2`, so 75 %
+  of A rows looked fully checked with top-10 unknown on 99.6 % of them).
 
 ## Gotchas
 

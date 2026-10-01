@@ -280,6 +280,51 @@ REFERENCE_TOKENS = {
     "CATGPT": "0xd6FDE6a3Fc6Ab2d83b2BE58383944CA1baDe1E18",      # launched 2026-09-11 23:40Z, $15M on 09-12
     "ANTHROPIG": "0x351Ab2C51e223B28D219fE28cc3956410CC11e18",   # launched 2026-09-11 23:55Z, $4.7M on 09-12
 }
+# ── G1: the on-chain venue-liquidity gate (hard gate liq_live_ok; added 2026-10-01) ─────────────
+# Why: the screener was alerting on CORPSES. On a 4663 hook-less V4 / V3 / V2 pool the creator
+# holds the LP position and removes it in ONE transaction; Dexscreener keeps quoting the dead pool
+# (liq_usd and the price stay stale), so every market gate still passes. Measured at SHA 734870e:
+# 16 of 17 checked tier-A proxy rows (max_ret_seen == 0 and ret_1h == 0; 47/908 A rows, 5.2 %, a
+# LOWER bound — NEPTUNE's dead pool still printed +10 %) had their main pool fully removed 9.6 to 569 s
+# BEFORE alert_ts; 9 of 67 sampled V4 rug tokens had >= 90 % of their liquidity removed pre-alert.
+# The VENUE is the pool with the most Swap events in the recent window over every V4 Initialize
+# naming the token (either currency), every V3 PoolCreated and the V2 pair — never the first-
+# initialized pool: on the hook-5059 template a decoy hook-less pool with 0-7 swaps is initialized
+# ~12 s (about 124 blocks) before the real hooked pool. A safety filter, not an alpha claim: it
+# fails closed only on a POSITIVE on-chain finding; an unanswered RPC passes and names rpc dark.
+TOPIC_V4_SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
+                                   # Swap(id indexed, sender indexed, amount0, amount1, sqrtPriceX96, liquidity, tick, fee)
+TOPIC_V4_MODIFY_LIQUIDITY = "0xf208f4912782fd25c7f114ca3723a2d5dd6f3bcc3ac8db5af63baa85f711d5ec"
+                                   # ModifyLiquidity(id indexed, sender indexed, tickLower, tickUpper,
+                                   # liquidityDelta, salt): liquidityDelta is data word index 2 (int256)
+TOPIC_V3_SWAP = "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67"
+TOPIC_V3_MINT = "0x7a53080ba414158be7ec69b987b5fb7d07dee101fe85488f0853ae16239d0bde"
+                                   # Mint data words [sender, amount, amount0, amount1] → amount = word 1
+TOPIC_V3_BURN = "0x0c396cd989a39f4459b5fa1aed6a9a8dcdbc45908acfd67e028cd568da98982c"
+                                   # Burn data words [amount, amount0, amount1] → amount = word 0
+TOPIC_ERC20_TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+VENUE_LOOKBACK_BLOCKS = 3_000_000  # ~3.5 d of pool-creation logs per token (a single-value-per-position
+                                   # eth_getLogs may span 10M blocks on this RPC; an OR-list only 100k)
+VENUE_SWAP_WINDOW_BLOCKS = 18_000  # ~30 min: "the recent window" the venue is chosen in (pre-alert pulls
+                                   # were measured up to 569 s before the alert, so their swaps are inside it)
+VENUE_LIQ_MIN_FRAC_OF_PEAK = 0.5   # FAIL when the venue's current liquidity is below half its peak (or zero)
+VENUE_STALE_NO_SWAP_S = 600        # FAIL when Dexscreener's own pair is one of the token's pools, has had no
+VENUE_STALE_MIN_VOL_H1_USD = 25_000.0   # swap for this long, and Dexscreener still reports this much h1
+                                   # volume (~$420/min): the quote is a stale print of a dead pool. Safety
+                                   # thresholds chosen once, never fitted; the band's floor is $50k h1.
+VENUE_LOG_CAP = 10_000             # the node refuses an eth_getLogs matching more ("exceeds limit"): read as
+                                   # "at least this many swaps", never as a failure, for the swap COUNT only
+# ── G2: no route at alert (hard gate route_ok) ────────────────────────────────────────────────────
+# quotes.quote_buy's three-way status, probed for the alert candidates before the alert: ABSENT (a
+# drained V2 pool, or no V2 pair and BOTH aggregators answered no-route) fails; deferred passes. The
+# live book refused 80 tier-A entries over 18 days as "no route at alert (absent)" and scores them -1.
+# ── G4: the farm-factory blocklist (applied at DISCOVERY) ────────────────────────────────────────
+# A hook-less V4 launch factory minting every token to one contract: 36-37 of 142 fresh hook-less
+# launches in one hour on 2026-09-27 (~33/h), fake demand from buyers reused across launches, liquidity
+# pulled 4.9-10 min after launch; 0 ledger rows so far — a guard against any widening of discovery.
+FARM_MINT_RECIPIENTS = ("0x1cbaf24d53fe930fce8eff149fa797d2611da149",)   # the mint recipient (a contract) ...
+FARM_CALLERS = ("0x7afffdaff8b1fe29fccc4a5e8b8836ae1c819633",)          # ... called from this EOA
+FARM_QUERY_MAX_BLOCKS = 30_000     # an ADDRESS-LESS eth_getLogs is capped at a 30k-block span on this RPC
 # 4-byte selectors
 SEL_OWNER = "0x8da5cb5b"
 SEL_BALANCE_OF = "0x70a08231"
@@ -451,6 +496,11 @@ FEATURE_FIELDS = (
     "gmgn_is_wash_trading", "gmgn_holders",
     "gmgn_visiting_count", "gmgn_top10_holder_pct", "gmgn_market_cap", "gmgn_volume_24h",
     "gmgn_buys_24h", "gmgn_sells_24h", "gmgn_is_honeypot", "gmgn_created_ts",
+    # safety at ALERT time (sources/safety.alert_checks, 2026-10-01): G1's venue facts, G2's route
+    # status, and `unchecked` — the named checks this row's safety facts NEVER ran (fast pass 2's
+    # skips, a pass-1-only row's whole pass 2, G1/G2 when not probed). Facts, not a band input.
+    "venue_kind", "venue_pool", "venue_swaps_window", "venue_last_swap_age_s", "venue_liq_frac",
+    "venue_dex_pair_swap_age_s", "venue_liq_state", "route_at_alert", "unchecked",
     # runtime
     "token", "score", "first_sighting", "sighting_age_s",
 )

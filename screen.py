@@ -28,6 +28,29 @@ def _known(x) -> bool:
     return x is not None
 
 
+def venue_liq_state(market: dict, safety: dict) -> str | None:
+    """G1, the dead-pool finding, from the venue facts sources/safety.alert_checks recorded
+    (rpc.venue_facts): "drained" (the venue's liquidity is zero after something was added),
+    "pulled" (below VENUE_LIQ_MIN_FRAC_OF_PEAK x its peak), "stale" (Dexscreener's own pair is one
+    of the token's pools, had no swap for VENUE_STALE_NO_SWAP_S, and Dexscreener still reports at
+    least VENUE_STALE_MIN_VOL_H1_USD of h1 volume — a stale print of a dead pool), "live", or None
+    (not checked, RPC dark, no covered pool, or nothing was ever added: unknown, never a finding)."""
+    m, s = market or {}, safety or {}
+    kind = s.get("venue_kind")
+    if kind is None or kind in ("none", "unknown"):
+        return None
+    frac = s.get("venue_liq_frac")
+    if _known(frac) and frac <= 0.0:
+        return "drained"
+    if _known(frac) and frac < config.VENUE_LIQ_MIN_FRAC_OF_PEAK:
+        return "pulled"
+    age, vol = s.get("venue_dex_pair_swap_age_s"), m.get("vol_h1")
+    if _known(age) and _known(vol) and age > config.VENUE_STALE_NO_SWAP_S \
+            and vol >= config.VENUE_STALE_MIN_VOL_H1_USD:
+        return "stale"
+    return "live" if _known(frac) else None
+
+
 # ── hard gates ────────────────────────────────────────────────────────────────────
 def hard_gates(market: dict, safety: dict) -> tuple[bool, dict]:
     """Return (passed, results). `results` records every individual check so the alert /
@@ -71,6 +94,12 @@ def hard_gates(market: dict, safety: dict) -> tuple[bool, dict]:
     r["creator_ok"] = (not _known(prior)) or service or (prior <= max_prior and dead_ok)
     snipes = s.get("sniper_swaps_first_blocks")
     r["sniper_ok"] = (not _known(snipes)) or snipes <= config.SNIPER_SWAPS_MAX
+    # G1 (2026-10-01): the venue's on-chain liquidity — drained, below half its peak, or a stale
+    # Dexscreener print of a pool with no swaps. Unknown (not checked / rpc dark) passes.
+    r["liq_live_ok"] = venue_liq_state(m, s) not in ("drained", "pulled", "stale")
+    # G2 (2026-10-01): quotes.py answered ABSENT for the buy at alert time (a drained V2 pool, or
+    # no pair and both aggregators no-route). A deferred probe, or no probe, passes.
+    r["route_ok"] = s.get("route_at_alert") != "absent"
     # which sources answered (informational; the alert prints the dark ones)
     dark = set(s.get("sources_dark") or [])
     r["rpc_available"] = "rpc" not in dark
@@ -87,6 +116,7 @@ def hard_gates(market: dict, safety: dict) -> tuple[bool, dict]:
         and r["owner_ok"] and r["lp_ok"] and r["honeypot_ok"] and r["sell_tax_ok"]
         and r["not_scam"] and r["template_ok"] and r["top10_ok"] and r["dev_ok"]
         and r["creator_ok"] and r["sniper_ok"]
+        and r["liq_live_ok"] and r["route_ok"]
     )
     return bool(passed), r
 
@@ -94,12 +124,16 @@ def hard_gates(market: dict, safety: dict) -> tuple[bool, dict]:
 _GATE_ORDER = ("has_market", "has_safety", "liq_ok", "vol_ok", "owner_ok", "lp_ok",
                "honeypot_ok", "sell_tax_ok", "not_scam", "template_ok", "top10_ok", "dev_ok",
                "creator_ok", "sniper_ok", "rpc_available", "blockscout_available",
-               "gt_available")
+               "gt_available",
+               # appended 2026-10-01 (G1, G2): APPENDED, never inserted, so every older 17-char mask
+               # is a prefix of the 19-char one and position k means the same gate in both
+               "liq_live_ok", "route_ok")
 
 
 def gates_bitmask(gates: dict) -> str:
     """Compact per-row record for the ledger: one char per gate in _GATE_ORDER
-    ('1' pass, '0' fail, '-' informational/None). The full dict lives in latest_scan.json."""
+    ('1' pass, '0' fail, '-' informational/None). The full dict lives in latest_scan.json.
+    Rows ledgered before 2026-10-01 carry 17 chars; the two new gates are the last two."""
     out = []
     for k in _GATE_ORDER:
         v = gates.get(k)

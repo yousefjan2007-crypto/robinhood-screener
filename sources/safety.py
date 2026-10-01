@@ -71,7 +71,31 @@ SAFETY_FEATURE_KEYS = (
     "gmgn_is_wash_trading", "gmgn_holders",
     "gmgn_visiting_count", "gmgn_top10_holder_pct", "gmgn_market_cap", "gmgn_volume_24h",
     "gmgn_buys_24h", "gmgn_sells_24h", "gmgn_is_honeypot", "gmgn_created_ts",
+    # alert-time checks (alert_checks: G1 venue liquidity, G2 route) + the honesty field
+    "venue_kind", "venue_pool", "venue_swaps_window", "venue_last_swap_age_s", "venue_liq_frac",
+    "venue_dex_pair_swap_age_s", "venue_liq_state", "route_at_alert", "unchecked",
 )
+# The alert-time keys describe ONE instant (a pool can be drained a minute later): never carried in
+# the watchlist's last_safety into a later run's merge (run.py strips them).
+ALERT_TIME_KEYS = ("venue_kind", "venue_pool", "venue_swaps_window", "venue_last_swap_age_s",
+                   "venue_liq_frac", "venue_dex_pair_swap_age_s", "venue_liq_state", "route_at_alert")
+# What fast pass 2 (the early-alert path) does NOT run, by name — recorded in `unchecked` so a row
+# decided on them can never look fully checked (D6, 2026-10-01: top10 unknown on 99.6 % of A, yet
+# 75 % of A rows carried an empty sources_dark, because the skip was logged as 'fast_pass2', dark=False).
+FAST_PASS2_SKIPS = ("top10_holders", "deployer_tx_sender", "creator_history", "launcher_balance",
+                    "sniper_count")
+PASS2_CHECKS = ("gt_info", "blockscout_flags") + FAST_PASS2_SKIPS
+UNCHECKED_LABELS = {
+    "gt_info": "GT info (score, GT top10, GT dev %)",
+    "blockscout_flags": "Blockscout counters / is_scam / template",
+    "top10_holders": "top10 holders (Blockscout walk)",
+    "deployer_tx_sender": "deployer = creation-tx sender",
+    "creator_history": "creator history (RobinX / launch log / explorer)",
+    "launcher_balance": "launcher balance (dev %)",
+    "sniper_count": "sniper swaps",
+    "venue_liq": "venue liquidity (G1)",
+    "route": "route at alert (G2)",
+}
 # … plus the solana-only keys carried as None and never gated (persisted dicts stay
 # comparable across the two screeners) …
 SOLANA_ONLY_KEYS = ("mint_authority_active", "freeze_authority_active", "insider_pct",
@@ -687,6 +711,10 @@ def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = 
             s["total_holders"], s["holders_source"] = gt_holders, "gt"
         s.pop(_PAIR_BLOCK_KEY, None)
         _mark(s, "fast_pass2", dark=False)
+        # what this path skipped is NAMED, not implied by 'fast_pass2': the alert's DEGRADED line
+        # and degraded_fields read `unchecked`, so an A row decided without them never looks
+        # fully checked (the gates still pass these unknowns through — that rule is unchanged)
+        s["unchecked"] = list(FAST_PASS2_SKIPS)
         s["pass"] = 2
         s["safety_ts"] = now_s
         return s
@@ -786,9 +814,84 @@ def pass2(token: str, market: dict, s1: dict, now_s: float, disc: dict | None = 
         if s["sniper_swaps_first_blocks"] is None:
             _mark(s, "rpc", dark=True)
 
+    s["unchecked"] = []                          # the full pass attempted every applicable check
     s["pass"] = 2
     s["safety_ts"] = now_s
     return s
+
+
+# ── alert-time checks: G1 (venue liquidity) and G2 (route) ─────────────────────────
+def unchecked_of(s: dict) -> list:
+    """The named checks a safety dict NEVER ran, in a fixed order: `unchecked` as pass 2 recorded
+    it (None ⇒ pass 2 never ran on this dict: every PASS2_CHECKS name), plus venue_liq when G1 was
+    not probed (venue_kind None) and route when G2 was not (route_at_alert None). A check that RAN
+    against a dark source is not here — that is sources_dark's job."""
+    s = s or {}
+    u = s.get("unchecked")
+    names = set(PASS2_CHECKS) if u is None else {str(x) for x in (u or [])}
+    if s.get("venue_kind") is None:
+        names.add("venue_liq")
+    if s.get("route_at_alert") is None:
+        names.add("route")
+    order = list(PASS2_CHECKS) + ["venue_liq", "route"]
+    return [n for n in order if n in names] + sorted(n for n in names if n not in order)
+
+
+def apply_venue(s: dict, vf: dict | None, market: dict | None) -> None:
+    """rpc.venue_facts → the venue_* fields + venue_liq_state (screen.venue_liq_state, the ONE
+    decision). A deferred probe is venue_kind 'unknown' (the gate passes) and names rpc dark."""
+    import screen                                 # pure; imported here to keep the module graph flat
+    vf = vf if isinstance(vf, dict) else {}
+    if vf.get("status") != "ok":
+        s["venue_kind"] = "unknown"
+        _mark(s, "rpc", dark=True)
+    else:
+        s["venue_kind"] = vf.get("kind")
+        _mark(s, "rpc", dark=False)
+    s["venue_pool"] = vf.get("pool")
+    s["venue_swaps_window"] = _i(vf.get("swaps"))
+    s["venue_last_swap_age_s"] = _f(vf.get("last_swap_age_s"))
+    s["venue_liq_frac"] = _f(vf.get("liq_frac"))
+    s["venue_dex_pair_swap_age_s"] = _f(vf.get("dex_pair_last_swap_age_s"))
+    s["venue_liq_state"] = screen.venue_liq_state(market or {}, s)
+
+
+def apply_route(s: dict, q: dict | None) -> None:
+    """quotes.quote_buy → route_at_alert ('ok' | 'absent' | 'deferred'). Deferred names `route`
+    dark (the gate passes); absent is the positive finding route_ok fails on."""
+    st = (q or {}).get("status") if isinstance(q, dict) else None
+    st = st if st in ("ok", "absent", "deferred") else "deferred"
+    s["route_at_alert"] = st
+    _mark(s, "route", dark=(st == "deferred"))
+
+
+def alert_checks(token: str, market: dict, s: dict, head: int | None, now_s: float,
+                 venue_fn=None, quote_fn=None) -> dict:
+    """G1 + G2 for ONE alert candidate, run after its pass 2 and BEFORE the alert is decided:
+    rpc.venue_facts at `head` (a fresh block number the caller reads just before) and a
+    quotes.quote_buy at the book's stake. Returns a NEW dict (s is never mutated). Never raises:
+    an exception is a deferral of that check, named dark."""
+    out = _copy(s if isinstance(s, dict) else empty_safety())
+    m = market or {}
+    t = _lower(token) or ""
+    if venue_fn is None:
+        venue_fn = rpc.venue_facts
+    if quote_fn is None:
+        import quotes                             # lazy: quotes imports the sources package
+        quote_fn = quotes.quote_buy
+    try:
+        vf = venue_fn(t, head, dex_pair=m.get("pair")) if head else None
+    except Exception as exc:
+        print(f"  [safety] {t[:10]}… venue facts failed: {exc}")
+        vf = None
+    apply_venue(out, vf, m)
+    try:
+        q = quote_fn(t, float(config.STACK_USD * config.POSITION_PCT), now_s)
+    except Exception as exc:
+        print(f"  [safety] {t[:10]}… route probe failed: {exc}")
+        q = None
+    apply_route(out, q)
+    return out
 
 
 # ── the DEGRADED line ─────────────────────────────────────────────────────────────
@@ -817,8 +920,9 @@ _DEGRADED_MAP = (
 
 
 def degraded_fields(s: dict) -> list:
-    """Human-readable gates that passed through because their source was dark, for the
-    alert's DEGRADED line. Holders and template carry their own rule: holders are 'exact'
+    """Human-readable gates that passed through because their source was dark — and, since
+    2026-10-01, every check the row's facts never RAN (`unchecked`, '<label> (unchecked)') — for
+    the alert's DEGRADED line. Holders and template carry their own rule: holders are 'exact'
     only from Blockscout (a GT count is stale, never A), template needs either an impl name
     or a verification flag."""
     s = s or {}
@@ -835,6 +939,12 @@ def degraded_fields(s: dict) -> list:
             unknown = s.get(field) is None
         if unknown:
             out.append(f"{label} ({src} dark)")
+    # checks that never RAN (fast pass 2's skips, G1/G2 unprobed): named as unchecked, because a
+    # value that was never fetched is not "dark" — and must not read as fully checked either
+    u = s.get("unchecked")
+    if isinstance(u, (list, tuple)):
+        for name in u:
+            out.append(f"{UNCHECKED_LABELS.get(str(name), str(name))} (unchecked)")
     return out
 
 

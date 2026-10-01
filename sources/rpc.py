@@ -887,6 +887,276 @@ def swaps_in_first_blocks(pair: str, from_block: int, n: int) -> int | None:
     return len(logs) if isinstance(logs, list) else None
 
 
+# ── G1: the venue and its liquidity (the dead-pool gate's raw facts) ─────────────
+# The trading venue is chosen by SWAP COUNT in the recent window, never by creation order: on the
+# hook-5059 template a decoy hook-less pool (0-7 swaps) is initialized ~124 blocks before the real
+# hooked pool (410-1,386 swaps before the alert). Liquidity is the cumulative position liquidity
+# from the venue's own logs (V4 ModifyLiquidity liquidityDelta, V3 Mint/Burn amount, V2 LP-token
+# mint/burn), so "current < 0.5 x peak" and "zero" are exact on-chain facts. Everything here is
+# keyed on `head` (the caller's block), never on a clock, so a recorded payload replays exactly.
+def _topic_of(addr: str) -> str:
+    return "0x" + "0" * 24 + _strip(addr).lower()[-40:]
+
+
+def _int256(word: str) -> int:
+    v = int(word, 16)
+    return v - (1 << 256) if v >= (1 << 255) else v
+
+
+def _log_key(lg: dict) -> tuple:
+    return (int(lg.get("blockNumber", "0x0"), 16), int(lg.get("logIndex") or "0x0", 16))
+
+
+def _logs3(address, topics: list, lo: int, hi: int) -> tuple:
+    """eth_getLogs with the venue gate's three outcomes: ("ok", logs) | ("capped", None) when the
+    node refused because MORE than VENUE_LOG_CAP logs match (an answer: "at least that many") |
+    ("deferred", None) for anything else (network, 429, 5xx, a range error)."""
+    if hi < lo:
+        return "ok", []
+    logs, err = get_logs(address, topics, lo, hi)
+    if isinstance(logs, list):
+        return "ok", logs
+    if err and "exceeds limit" in str(err).lower():
+        return "capped", None
+    return "deferred", None
+
+
+def venue_pools(token: str, head: int) -> tuple:
+    """(status, pools) — every pool the token could trade on, from creation logs:
+    V4 Initialize with the token as currency0 or currency1 (two single-value queries), V3 PoolCreated
+    with the token as token0 or token1 (two more), and the V2 pair from factory.getPair. A pool is
+    {kind: v4|v3|v2, id: pool id (V4, 32 bytes) or address, hook, init_block}. status is "ok" or
+    "deferred" (any leg unanswered — a partial pool list must never pick a venue)."""
+    tok = _strip(token).lower()
+    tt = _topic_of(tok)
+    lo = max(0, int(head) - config.VENUE_LOOKBACK_BLOCKS)
+    pools: list = []
+    for pos in (2, 3):
+        topics = [config.TOPIC_V4_INITIALIZE, None, None, None][:pos + 1]
+        topics[pos] = tt
+        st, logs = _logs3(config.V4_POOL_MANAGER, topics, lo, int(head))
+        if st != "ok":
+            return "deferred", []
+        for lg in logs:
+            try:
+                tps = [str(x).lower() for x in lg.get("topics") or []]
+                hook = dec_addr(lg.get("data") or "0x", 2)
+                pools.append({"kind": "v4", "id": tps[1], "hook": hook,
+                              "init_block": _log_key(lg)[0]})
+            except (IndexError, ValueError, TypeError):
+                continue
+    for pos in (1, 2):
+        topics = [config.TOPIC_POOL_CREATED, None, None][:pos + 1]
+        topics[pos] = tt
+        st, logs = _logs3(config.V3_FACTORY, topics, lo, int(head))
+        if st != "ok":
+            return "deferred", []
+        for lg in logs:
+            try:
+                nw = len(_strip(lg.get("data") or "0x")) // 64
+                pools.append({"kind": "v3", "id": dec_addr(lg["data"], nw - 1), "hook": None,
+                              "init_block": _log_key(lg)[0]})
+            except (IndexError, ValueError, TypeError, KeyError):
+                continue
+    r, err = eth_call_ex(config.UNIV2_FACTORY, _get_pair_data("0x" + tok))
+    if r is None and err != "execution reverted":
+        return "deferred", []
+    st, pair = _pair_from(r is not None, r)
+    if st == "deferred":
+        return "deferred", []
+    if st == "ok":
+        pools.append({"kind": "v2", "id": pair, "hook": None, "init_block": None})
+    seen, out = set(), []
+    for p in pools:
+        if p["id"] not in seen:
+            seen.add(p["id"])
+            out.append(p)
+    return "ok", out
+
+
+def _swap_query(p: dict) -> tuple:
+    if p["kind"] == "v4":
+        return config.V4_POOL_MANAGER, [config.TOPIC_V4_SWAP, p["id"]]
+    if p["kind"] == "v3":
+        return p["id"], [config.TOPIC_V3_SWAP]
+    return p["id"], [config.TOPIC_SWAP_V2]
+
+
+def pool_swaps(p: dict, head: int) -> tuple:
+    """(status, n_swaps, last_swap_block|None) in the recent window [head - VENUE_SWAP_WINDOW_BLOCKS,
+    head] (never before the pool's own Initialize). A capped answer is VENUE_LOG_CAP swaps, last = head."""
+    lo = max(int(p.get("init_block") or 0), int(head) - config.VENUE_SWAP_WINDOW_BLOCKS)
+    addr, topics = _swap_query(p)
+    st, logs = _logs3(addr, topics, lo, int(head))
+    if st == "capped":
+        return "ok", config.VENUE_LOG_CAP, int(head)
+    if st != "ok":
+        return "deferred", None, None
+    blocks = []
+    for lg in logs:
+        try:
+            blocks.append(_log_key(lg)[0])
+        except (TypeError, ValueError):
+            continue
+    return "ok", len(blocks), (max(blocks) if blocks else None)
+
+
+def _liq_series(p: dict, head: int) -> tuple:
+    """(status, [(block, log_index, delta), ...]) — the venue's position-liquidity changes since
+    creation. V4: ModifyLiquidity on the pool id (liquidityDelta, word 2, signed). V3: Mint (+word 1)
+    and Burn (-word 0) on the pool. V2: LP-token Transfer from 0x0 (+) and to 0x0 (-), the
+    0x0 -> 0x0 MINIMUM_LIQUIDITY lock excluded. A capped answer here is deferred: a truncated history
+    cannot be summed."""
+    lo = int(p.get("init_block") or max(0, int(head) - config.VENUE_LOOKBACK_BLOCKS))
+    out = []
+    if p["kind"] == "v4":
+        st, logs = _logs3(config.V4_POOL_MANAGER, [config.TOPIC_V4_MODIFY_LIQUIDITY, p["id"]], lo, int(head))
+        if st != "ok":
+            return "deferred", []
+        for lg in logs:
+            try:
+                d = _strip(lg.get("data") or "")
+                out.append(_log_key(lg) + (_int256(d[128:192]),))
+            except (TypeError, ValueError):
+                return "deferred", []
+    elif p["kind"] == "v3":
+        for topic, word, sign in ((config.TOPIC_V3_MINT, 1, 1), (config.TOPIC_V3_BURN, 0, -1)):
+            st, logs = _logs3(p["id"], [topic], lo, int(head))
+            if st != "ok":
+                return "deferred", []
+            for lg in logs:
+                try:
+                    out.append(_log_key(lg) + (sign * dec_uint(lg.get("data") or "0x", word),))
+                except (TypeError, ValueError):
+                    return "deferred", []
+    else:
+        st, logs = _logs3(p["id"], [config.TOPIC_ERC20_TRANSFER], lo, int(head))
+        if st != "ok":
+            return "deferred", []
+        zero = "0x" + "0" * 64
+        for lg in logs:
+            try:
+                tps = [str(x).lower() for x in lg.get("topics") or []]
+                frm, to = tps[1], tps[2]
+                if frm == to:
+                    continue                         # the 0x0 -> 0x0 MINIMUM_LIQUIDITY lock
+                amt = dec_uint(lg.get("data") or "0x", 0)
+                if frm == zero:
+                    out.append(_log_key(lg) + (amt,))
+                elif to == zero:
+                    out.append(_log_key(lg) + (-amt,))
+            except (IndexError, TypeError, ValueError):
+                return "deferred", []
+    out.sort()
+    return "ok", out
+
+
+def liquidity_state(series: list) -> dict:
+    """{peak, current, frac, pull_block} from a liquidity series. frac = current / peak (None when
+    nothing was ever added); pull_block = the first block at which the running total fell below
+    VENUE_LIQ_MIN_FRAC_OF_PEAK x the running peak and never recovered (None when it never did)."""
+    cur = peak = 0
+    pull = None
+    for blk, _li, d in series:
+        cur += d
+        peak = max(peak, cur)
+        if peak > 0 and cur < config.VENUE_LIQ_MIN_FRAC_OF_PEAK * peak:
+            if pull is None:
+                pull = blk
+        else:
+            pull = None
+    cur = max(cur, 0)
+    return {"peak": peak, "current": cur, "frac": (cur / peak) if peak > 0 else None,
+            "pull_block": pull if peak > 0 else None}
+
+
+def venue_facts(token: str, head: int, dex_pair: str | None = None) -> dict:
+    """G1's raw facts at block `head`: {status ok|deferred, kind v4|v3|v2|none, pool, hook,
+    n_pools, swaps (venue, in the window), last_swap_age_s, liq_frac, liq_current_zero,
+    dex_pair_last_swap_age_s, pool_swaps {id: n}}. The VENUE is the pool with the most swaps in the
+    window (ties → the later swap, then the later Initialize, then the id). When the venue's
+    liquidity was pulled and ANOTHER pool still swapped after the pull, the liquidity moved (a
+    migration or re-range, not a rug): that pool is the venue and is judged instead. Any unanswered
+    leg → status deferred with whatever is known; the caller names rpc dark and the gate passes."""
+    out = {"status": "deferred", "kind": None, "pool": None, "hook": None, "n_pools": None,
+           "swaps": None, "last_swap_age_s": None, "liq_frac": None, "liq_current_zero": None,
+           "dex_pair_last_swap_age_s": None, "pool_swaps": {}}
+    try:
+        head = int(head)
+        st, pools = venue_pools(token, head)
+        if st != "ok":
+            return out
+        out["n_pools"] = len(pools)
+        if not pools:
+            out.update({"status": "ok", "kind": "none"})
+            return out
+        counted = []
+        for p in pools:
+            sst, n, last = pool_swaps(p, head)
+            if sst != "ok":
+                return out
+            out["pool_swaps"][p["id"]] = n
+            counted.append((n, last if last is not None else -1, int(p.get("init_block") or 0), p["id"], p))
+        counted.sort(key=lambda x: x[:4], reverse=True)
+        venue = counted[0]
+        lst, series = _liq_series(venue[4], head)
+        if lst != "ok":
+            return out
+        ls = liquidity_state(series)
+        if ls["pull_block"] is not None:
+            moved = [c for c in counted[1:] if c[1] > ls["pull_block"]]
+            if moved:
+                alt = max(moved, key=lambda c: (c[1], c[0], c[3]))
+                ast, aser = _liq_series(alt[4], head)
+                if ast != "ok":
+                    return out
+                venue, ls = alt, liquidity_state(aser)
+        p = venue[4]
+        last = venue[1] if venue[1] >= 0 else None
+        win_s = config.VENUE_SWAP_WINDOW_BLOCKS * config.BLOCK_TIME_S
+        dp = str(dex_pair or "").lower()
+        dex_last = None
+        for c in counted:
+            if dp and c[3] == dp:
+                dex_last = round((head - c[1]) * config.BLOCK_TIME_S, 1) if c[1] >= 0 else round(win_s, 1)
+        out.update({"status": "ok", "kind": p["kind"], "pool": p["id"], "hook": p.get("hook"),
+                    "swaps": venue[0],
+                    "last_swap_age_s": round((head - last) * config.BLOCK_TIME_S, 1) if last is not None else round(win_s, 1),
+                    "liq_frac": None if ls["frac"] is None else round(ls["frac"], 6),
+                    "liq_current_zero": (ls["current"] == 0) if ls["peak"] > 0 else None,
+                    "dex_pair_last_swap_age_s": dex_last})
+        return out
+    except Exception as exc:                       # one bad token never kills a run
+        print(f"  [rpc] venue_facts({str(token)[:10]}…) failed: {exc}")
+        return out
+
+
+# ── G4: the farm-factory blocklist (discovery) ───────────────────────────────────
+def farm_minted_tokens(from_block: int, to_block: int) -> set | None:
+    """Tokens whose mint Transfer (from 0x0) went to a config.FARM_MINT_RECIPIENTS contract in
+    [from_block, to_block] — the farm factory mints every launch to itself. Address-less
+    single-value queries, chunked at FARM_QUERY_MAX_BLOCKS (the node's span cap for a query with no
+    address). None when any chunk went unanswered: the caller then blocks NOTHING (deferred is
+    never a finding) and says so."""
+    out: set = set()
+    if to_block < from_block or not config.FARM_MINT_RECIPIENTS:
+        return out
+    zero = "0x" + "0" * 64
+    for rcpt in config.FARM_MINT_RECIPIENTS:
+        lo = int(from_block)
+        while lo <= to_block:
+            hi = min(int(to_block), lo + config.FARM_QUERY_MAX_BLOCKS - 1)
+            logs, _err = get_logs(None, [config.TOPIC_ERC20_TRANSFER, zero, _topic_of(rcpt)], lo, hi)
+            if not isinstance(logs, list):
+                return None
+            for lg in logs:
+                a = str(lg.get("address") or "").lower()
+                if a.startswith("0x") and len(a) == 42:
+                    out.add(a)
+            lo = hi + 1
+    return out
+
+
 # ── attribution fallback (creation tx via earliest log) ──────────────────────────
 def find_creation_tx(token: str, head: int | None = None) -> dict | None:
     """The token's FIRST-EVER log → the transaction that created it.

@@ -231,6 +231,17 @@ def _token_block(s: dict) -> str:
     ]
     if dark:
         lines.append(f"   ⚠ passed through (dark): {', '.join(str(d) for d in dark)}")
+    unchecked = s.get("unchecked") or []
+    if isinstance(unchecked, str):
+        unchecked = [u for u in unchecked.split(",") if u]
+    if unchecked:                                # never fetched before this alert — not "clean"
+        lines.append(f"   ⚠ not checked before this alert: {', '.join(str(u) for u in unchecked)}")
+    vstate = s.get("venue_liq_state")
+    if vstate or s.get("route_at_alert"):
+        frac = s.get("venue_liq_frac")
+        lines.append(f"   venue {s.get('venue_kind') or '?'} liquidity {vstate or '?'}"
+                     + ("" if frac is None else f" ({_frac_pct(frac)} of peak)")
+                     + f" · route at alert {s.get('route_at_alert') or '?'}")
     if misses:                                   # a B card: say exactly what it fell short of
         lines.append(f"   short of {s.get('band') or config.DEFAULT_ENTRY_BAND}: "
                      + "; ".join(str(m) for m in misses))
@@ -257,6 +268,14 @@ def format_alert(survivors: list, degraded=(), band: str = config.DEFAULT_ENTRY_
     if degraded:
         head.append(f"⚠ DEGRADED: {', '.join(str(h) for h in degraded)} dark this run — "
                     f"gates keyed on them passed through")
+    skipped = []
+    for s in survivors:
+        for u in (s or {}).get("unchecked") or []:
+            if u not in skipped:
+                skipped.append(u)
+    if skipped:                                  # the fast alert path's skips, named (2026-10-01)
+        head.append(f"⚠ DEGRADED: {len(skipped)} check(s) never ran before this alert — "
+                    f"{', '.join(str(u) for u in skipped)} (unknown passes the hard gates)")
     if champion_reason:
         head.append(str(champion_reason))
     blocks = []

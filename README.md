@@ -176,6 +176,31 @@ reverts the champion to `band_a_strict` if its selection lift over the same-day,
 is not positive. The FOMO the screener ledgered on day one went from $44k to $568 within hours:
 the exit policy, judged by the live book, matters as much as the entry.
 
+**Dead pools, unbuyable tokens and the farm factory (three safety gates, 2026-10-01).** The
+screener was alerting on corpses. On this chain the creator of a hook-less V4, V3 or V2 pool holds
+the LP position and removes it in one transaction, after which Dexscreener keeps quoting the dead
+pool, so every market gate still passes. At SHA 734870e, 47 of 908 tier-A rows (5.2 %, 14 alert-days)
+carried the dead-pool footprint (`max_ret_seen == 0` and `ret_1h == 0`), and 16 of the 17 checked
+on-chain had their main pool fully removed 9.6 to 569 seconds *before* the alert; that count is a
+lower bound, because NEPTUNE's dead pool still printed +10 % in the ledger. **G1** (`liq_live_ok`)
+reads, for each alert candidate just before the alert, every pool the token can trade on, takes the
+one with the most swaps in the last ~30 minutes as the venue (never the first one created: one hooked
+launch template sets up a hook-less decoy pool about 12 seconds before the real one), and rejects
+when the venue's on-chain liquidity is zero or below half its peak, or when Dexscreener's own pair
+has had no swap for 10 minutes while Dexscreener still reports at least $25k of hour-1 volume.
+**G2** (`route_ok`): a buy the quote layer answers as *absent* (a drained V2 pool, or no V2 pair and
+both aggregators say no route) means the token cannot be A; the live book had refused 80 tier-A
+entries over 18 days for exactly that, and scores them at −1. **G4**: one hook-less V4 launch factory
+(mint recipient `0x1cbaf24d…a149`, about 33 launches an hour, fake demand, liquidity pulled 5–10
+minutes after launch) is dropped at discovery. All three fail closed only on a positive on-chain
+finding; an unanswered RPC or quote passes and is named in `sources_dark`. They are safety filters,
+not an edge: the expected effect is fewer alerts on tokens that were already dead or unbuyable, with
+no measured cost on real runners (a pre-alert-pulled "runner" like ARGONAUTS, +28.6× in the ledger,
+was a garbage 24 h quote on a dead pool). G1 and G2 run only on the alert candidates, so B rows are not
+matched on them; every row now says so in its `unchecked` list, and the alert card prints the checks
+the fast alert path never ran (top-10 holders, the creation-tx deployer, the creator's history, the
+launcher's balance, the sniper count) instead of looking fully checked.
+
 Some of the Solana gates have **no analogue** here. There is no funding-graph clustering of insider
 wallets, no behavioural wallet tags, no freeze authority, and honeypot.is rejects the chain; GoPlus
 lists it but covers ~3 % of tokens, so it is never a gate. The substitutes are the router round trip
