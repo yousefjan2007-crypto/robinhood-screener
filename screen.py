@@ -94,12 +94,18 @@ def hard_gates(market: dict, safety: dict) -> tuple[bool, dict]:
     r["creator_ok"] = (not _known(prior)) or service or (prior <= max_prior and dead_ok)
     snipes = s.get("sniper_swaps_first_blocks")
     r["sniper_ok"] = (not _known(snipes)) or snipes <= config.SNIPER_SWAPS_MAX
-    # G1 (2026-10-01): the venue's on-chain liquidity — drained, below half its peak, or a stale
-    # Dexscreener print of a pool with no swaps. Unknown (not checked / rpc dark) passes.
-    r["liq_live_ok"] = venue_liq_state(m, s) not in ("drained", "pulled", "stale")
-    # G2 (2026-10-01): quotes.py answered ABSENT for the buy at alert time (a drained V2 pool, or
-    # no pair and both aggregators no-route). A deferred probe, or no probe, passes.
-    r["route_ok"] = s.get("route_at_alert") != "absent"
+    # G1 / G2 (2026-10-01) are TIER CAPS, not hard gates: recorded here (and in gates_mask), never
+    # ANDed into `passed`. A positive finding makes the row B (runtime.tier_for(alert_ok=...)) and
+    # the row is STILL LEDGERED with its verdicts, so the champion's arm loses no rows to a filter
+    # the other arms never see (review, 2026-10-01). None = not probed / the probe went unanswered:
+    # '-' in gates_mask, never '1' — a check that did not run must not read as passed.
+    vstate = venue_liq_state(m, s)
+    fails = ("drained", "pulled") + (("stale",) if config.VENUE_STALE_FAILS else ())
+    r["liq_live_ok"] = None if vstate is None else (vstate not in fails)
+    # G2: quotes.py answered ABSENT for the buy at alert time (a drained V2 pool, or no pair and
+    # both aggregators no-route). Deferred, or no probe, is None.
+    route = s.get("route_at_alert")
+    r["route_ok"] = None if route not in ("ok", "absent") else (route == "ok")
     # which sources answered (informational; the alert prints the dark ones)
     dark = set(s.get("sources_dark") or [])
     r["rpc_available"] = "rpc" not in dark
@@ -116,7 +122,6 @@ def hard_gates(market: dict, safety: dict) -> tuple[bool, dict]:
         and r["owner_ok"] and r["lp_ok"] and r["honeypot_ok"] and r["sell_tax_ok"]
         and r["not_scam"] and r["template_ok"] and r["top10_ok"] and r["dev_ok"]
         and r["creator_ok"] and r["sniper_ok"]
-        and r["liq_live_ok"] and r["route_ok"]
     )
     return bool(passed), r
 
@@ -130,10 +135,19 @@ _GATE_ORDER = ("has_market", "has_safety", "liq_ok", "vol_ok", "owner_ok", "lp_o
                "liq_live_ok", "route_ok")
 
 
+def alert_cap_ok(gates: dict) -> bool:
+    """The alert-time tier cap (G1 liq_live_ok, G2 route_ok): False only on a POSITIVE finding
+    (a False), True when both passed or were never probed / unanswered (None). runtime.tier_for
+    composes it: a row can be A only when the hard gates passed AND this is True."""
+    g = gates or {}
+    return g.get("liq_live_ok") is not False and g.get("route_ok") is not False
+
+
 def gates_bitmask(gates: dict) -> str:
     """Compact per-row record for the ledger: one char per gate in _GATE_ORDER
     ('1' pass, '0' fail, '-' informational/None). The full dict lives in latest_scan.json.
-    Rows ledgered before 2026-10-01 carry 17 chars; the two new gates are the last two."""
+    Rows ledgered before 2026-10-01 carry 17 chars; the two alert-time caps are the last two, and
+    read '-' wherever they were not probed (every row but the champion's alert candidates)."""
     out = []
     for k in _GATE_ORDER:
         v = gates.get(k)

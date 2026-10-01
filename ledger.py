@@ -160,20 +160,66 @@ def warn_if_behind_origin(led: pd.DataFrame, where: str) -> int | None:
     return remote
 
 
+# ── the alert-time cap (G1 venue liquidity, G2 route; 2026-10-01) ─────────────────
+# A capped row is a champion pick whose alert G1/G2 WITHHELD: tier B, a '0' in one of the two LAST
+# gates_mask positions (screen._GATE_ORDER appends liq_live_ok, route_ok; '-' = not probed). It is
+# ledgered — never dropped — so the verdict-defined arms the entry gate compares are the same
+# population as without the cap; what changes at the cut-over is only which champion picks are A.
+_CAP_GATES = ("liq_live_ok", "route_ok")
+
+
+def _cap_positions() -> tuple:
+    from screen import _GATE_ORDER
+    return tuple(_GATE_ORDER.index(k) for k in _CAP_GATES)
+
+
+def mask_has_caps(mask) -> bool:
+    """True when the row's gates_mask was written by the cap-aware code (it carries both positions)."""
+    m = "" if mask is None else str(mask)
+    return m not in _EMPTY and len(m) > max(_cap_positions())
+
+
+def alert_capped(mask) -> bool:
+    """True when a G1/G2 position of the mask reads '0' (a positive finding withheld the alert)."""
+    if not mask_has_caps(mask):
+        return False
+    m = str(mask)
+    return any(m[i] == "0" for i in _cap_positions())
+
+
+def alert_cap_cutover(led: pd.DataFrame) -> float | None:
+    """The cut-over instant: config.ALERT_CAP_CUTOVER_TS when the operator pinned it, else the
+    alert_ts of the FIRST row whose gates_mask carries the two cap positions (the first row the
+    cap-aware code ledgered). None when neither exists (the cap is not live in this ledger yet)."""
+    pinned = getattr(config, "ALERT_CAP_CUTOVER_TS", None)
+    if pinned is not None:
+        return float(pinned)
+    if led is None or len(led) == 0 or "gates_mask" not in led.columns:
+        return None
+    ts = pd.to_numeric(led["alert_ts"], errors="coerce")
+    has = led["gates_mask"].apply(mask_has_caps)
+    sel = ts[has & ts.notna()]
+    return float(sel.min()) if len(sel) else None
+
+
 def index(led: pd.DataFrame) -> dict:
     """Per-token view for run.py's event decisions:
-    {token: {"n": rows, "has_a": bool, "first_sighting_ts": float|None, "fired": set[band],
-             "last_alert_ts": float}}"""
+    {token: {"n": rows, "has_a": bool, "alert_withheld": bool, "first_sighting_ts": float|None,
+             "fired": set[band], "last_alert_ts": float}}
+    alert_withheld: the token has a capped row (a champion pick G1/G2 kept from A) — its one
+    champion event is spent exactly as an A row's would be, so it gets no later promotion."""
     out: dict = {}
     if len(led) == 0:
         return out
     for _, r in led.iterrows():
         t = str(r["token"]).lower()
-        d = out.setdefault(t, {"n": 0, "has_a": False, "first_sighting_ts": None,
-                               "fired": set(), "last_alert_ts": 0.0})
+        d = out.setdefault(t, {"n": 0, "has_a": False, "alert_withheld": False,
+                               "first_sighting_ts": None, "fired": set(), "last_alert_ts": 0.0})
         d["n"] += 1
         if str(r["tier"]) == "A":
             d["has_a"] = True
+        elif alert_capped(r.get("gates_mask")):
+            d["alert_withheld"] = True
         ts = _num(r["alert_ts"])
         if str(r["event_kind"]) == "first_sighting" or d["first_sighting_ts"] is None:
             d["first_sighting_ts"] = ts if d["first_sighting_ts"] is None else min(d["first_sighting_ts"], ts)
@@ -215,10 +261,10 @@ def record_rows(events: list, alert_ts: float, plan_name: str | None = None,
         token = str(ev["token"]).lower()
         if token in written:
             continue
-        info = idx.get(token, {"n": 0, "has_a": False, "fired": set()})
+        info = idx.get(token, {"n": 0, "has_a": False, "alert_withheld": False, "fired": set()})
         is_promo = ev.get("event_kind") == "promotion"
-        if is_promo and info["has_a"]:
-            continue                      # a token is alerted at most once
+        if is_promo and (info["has_a"] or info.get("alert_withheld")):
+            continue                      # a token gets ONE champion event (A, or capped B)
         if not is_promo and info["n"] >= config.BAND_MAX_EVENTS_PER_TOKEN:
             continue                      # the cap binds band fires, never the champion's fire
         m = ev.get("market") or {}
@@ -438,7 +484,29 @@ def _fmt_ret(v) -> str:
     return f"{float(v) * 100:+5.0f}%"
 
 
-TIER_LABEL = {"A": "alerted", "B": "silent control"}
+TIER_LABEL = {"A": "alerted", "B": "silent control",
+              "capped": "champion pick, alert withheld by G1/G2"}
+
+
+def _summary_group(tier: str, sub: pd.DataFrame) -> None:
+    days = sub["_day"].nunique()
+    promoted = int((~empty_mask(sub["promoted_ts"])).sum())
+    extra = f", promoted-B n={promoted}" if tier == "B" else ""
+    print(f"  tier {tier} ({TIER_LABEL[tier]}), n={len(sub)} across {days} alert-day(s){extra}:")
+    for bname, bsub in sub.groupby(sub["band"].astype(str)):
+        if sub["band"].nunique() > 1:
+            print(f"    band {bname}: n={len(bsub)}")
+    for h in HORIZ:
+        r = pd.to_numeric(sub[f"ret_{h}"], errors="coerce").dropna()
+        if len(r):
+            print(f"    {h:>3s}: n={len(r):4d}  hit-rate={(r > 0).mean()*100:4.0f}%  "
+                  f"median={r.median()*100:+6.1f}%  dead={(r <= -0.99).mean()*100:3.0f}%  "
+                  f"best={r.max()*100:+.0f}%  worst={r.min()*100:+.0f}%")
+    ra = sub["rugged_after"].astype(str).str.lower().eq("true").mean()
+    print(f"    rugged-after-passing-gates: {ra*100:.0f}%")
+    if days < config.MIN_BOOTSTRAP_CLUSTERS:
+        print(f"    n_{tier} = {len(sub)} across {days} alert-days — below "
+              f"MIN_BOOTSTRAP_CLUSTERS={config.MIN_BOOTSTRAP_CLUSTERS}, this is not a bound")
 
 
 def summary(path: str | None = None) -> None:
@@ -461,28 +529,32 @@ def summary(path: str | None = None) -> None:
               f"{_fmt_ret(r['ret_1h'])} {_fmt_ret(r['ret_6h'])} {_fmt_ret(r['ret_24h'])} "
               f"{_fmt_ret(r['ret_7d'])}  {_num(r['max_ret_seen'])*100:+5.0f}%  {r['status']}{flag}")
     print()
-    for tier in ("A", "B"):
-        sub = led[led["_tier"] == tier]
-        if len(sub) == 0:
-            continue
-        days = sub["_day"].nunique()
-        promoted = int((~empty_mask(sub["promoted_ts"])).sum())
-        extra = f", promoted-B n={promoted}" if tier == "B" else ""
-        print(f"  tier {tier} ({TIER_LABEL[tier]}), n={len(sub)} across {days} alert-day(s){extra}:")
-        for bname, bsub in sub.groupby(sub["band"].astype(str)):
-            if sub["band"].nunique() > 1:
-                print(f"    band {bname}: n={len(bsub)}")
-        for h in HORIZ:
-            r = pd.to_numeric(sub[f"ret_{h}"], errors="coerce").dropna()
-            if len(r):
-                print(f"    {h:>3s}: n={len(r):4d}  hit-rate={(r > 0).mean()*100:4.0f}%  "
-                      f"median={r.median()*100:+6.1f}%  dead={(r <= -0.99).mean()*100:3.0f}%  "
-                      f"best={r.max()*100:+.0f}%  worst={r.min()*100:+.0f}%")
-        ra = sub["rugged_after"].astype(str).str.lower().eq("true").mean()
-        print(f"    rugged-after-passing-gates: {ra*100:.0f}%")
-        if days < config.MIN_BOOTSTRAP_CLUSTERS:
-            print(f"    n_{tier} = {len(sub)} across {days} alert-days — below "
-                  f"MIN_BOOTSTRAP_CLUSTERS={config.MIN_BOOTSTRAP_CLUSTERS}, this is not a bound")
+    # The G1/G2 alert cap changes WHICH champion picks are A from its cut-over on (a capped pick is a
+    # B row carrying a '0' in a cap position). The two epochs are never pooled: before it, A is the
+    # champion's whole selection; after it, A is that selection minus the withheld rows, which are
+    # printed as their own group — kept OUT of B, which stays the non-champion control it always was.
+    led["_capped"] = led["gates_mask"].apply(alert_capped) & (led["_tier"] == "B")
+    cut = alert_cap_cutover(led)
+    ts_all = pd.to_numeric(led["alert_ts"], errors="coerce").fillna(0.0)
+    if cut is None:
+        epochs = [(None, led)]
+    else:
+        epochs = [(f"before the G1/G2 alert-cap cut-over ({time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(cut))})",
+                   led[ts_all < cut]),
+                  ("from the cut-over on (A = the champion's picks the cap let through)", led[ts_all >= cut])]
+    for k_ep, (label, ep) in enumerate(epochs):
+        if label is not None:
+            print(f"  ── {label}: n={len(ep)} ──")
+        groups = (("A", ep[ep["_tier"] == "A"]), ("B", ep[(ep["_tier"] == "B") & ~ep["_capped"]]),
+                  ("capped", ep[ep["_capped"]]))
+        for tier, sub in groups:
+            if len(sub) == 0:
+                continue
+            _summary_group(tier, sub)
+        if label is not None and k_ep == 1:
+            print("    NOT like-for-like: after the cut-over A excludes the champion picks G1/G2 withheld "
+                  "and B was never probed; compare A + capped (the champion's whole selection) with B. "
+                  "The entry-band scorecard reads band VERDICTS, which capped rows keep, so it is unaffected.")
     print(f"  forward-cell sampling lag (write-once, stamped with the cell; a cell filled later than "
           f"LEDGER_MAX_CELL_LAG_S={config.LEDGER_MAX_CELL_LAG_S:.0f}s is a spot sample of a different "
           f"instant — the entry-band scorecard (scorecard.outcome_series) and the paper gate exclude "

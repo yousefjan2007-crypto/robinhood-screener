@@ -5,7 +5,7 @@ band's verdict, the tier, the event decision and the 24 h watchlist.
 WHAT run.py does with this module, in order (after the second hard_gates pass + soft_score):
     feat      = build_feat(token, market, safety, score, first_sighting, sighting_age_s)
     verdicts  = evaluate_bands(feat, registry, champion)
-    tier      = tier_for(gates_ok, verdicts, champion)
+    tier      = tier_for(gates_ok, verdicts, champion, alert_ok)
     reason    = champion_reason(feat, registry, champion, verdicts)     # B cards / band_na_reason
     events    = decide_events(survivors, ledger.index(led), now_s, champion, registry)
     seqs      = ledger.record_rows(events, alert_ts=now_s, plan_name=...)
@@ -158,7 +158,10 @@ def decide_events(survivors: list, ledger_index: dict, now_s: float, champion: s
     fired_band, prior_event_seq (None; the ledger fills it), tier and band (= champion).
 
       token not in the ledger                      -> first_sighting (tier from tier_for)
-      champion True, no A row, inside the window   -> promotion (tier A, fired_band=champion)
+      champion True, no A row, no withheld alert,
+        inside the window                          -> promotion (tier A, fired_band=champion;
+                                                      tier B when the alert-time cap fired —
+                                                      survivor["alert_ok"] False, G1/G2)
       a non-control band newly True, not fired yet,
         n < BAND_MAX_EVENTS_PER_TOKEN, in window   -> band_fire (tier B, alphabetically first)
       else                                          -> nothing
@@ -181,10 +184,11 @@ def decide_events(survivors: list, ledger_index: dict, now_s: float, champion: s
             ev["token"] = token
             ev["band"] = champion
             ev["prior_event_seq"] = None
+            alert_ok = s.get("alert_ok", True) is not False
             if info is None:
                 ev["event_kind"] = "first_sighting"
                 ev["fired_band"] = None
-                ev["tier"] = tier_for(gates_ok, verdicts, champion)
+                ev["tier"] = tier_for(gates_ok, verdicts, champion, alert_ok=alert_ok)
                 out.append(ev)
                 continue
             if not gates_ok:
@@ -193,10 +197,14 @@ def decide_events(survivors: list, ledger_index: dict, now_s: float, champion: s
             has_a = bool(info.get("has_a"))
             fired = set(info.get("fired") or ()) | set(prior_true.get(token) or ())
             inside = _inside_window(info, now_s)
-            if verdicts.get(champion) is True and not has_a and inside:
+            withheld = bool(info.get("alert_withheld"))
+            if verdicts.get(champion) is True and not has_a and not withheld and inside:
+                # a capped promotion (G1/G2 positive at alert time) is still LEDGERED, as tier B,
+                # so the champion's verdict-defined arm keeps the row a filter would have removed;
+                # it is the token's one champion event, exactly as an A promotion would have been
                 ev["event_kind"] = "promotion"
                 ev["fired_band"] = champion
-                ev["tier"] = "A"
+                ev["tier"] = "A" if alert_ok else "B"
                 out.append(ev)
                 continue
             if n >= config.BAND_MAX_EVENTS_PER_TOKEN or not inside:

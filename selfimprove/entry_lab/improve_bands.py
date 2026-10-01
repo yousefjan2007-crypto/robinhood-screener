@@ -211,7 +211,7 @@ def evaluate_all(now_s: float, led=None, verdicts=None, reg=None, champion: str 
            "nomination": None, "forward_only": False, "trials_n": TR.family_count("bands", P["trials"]),
            "champ_state": dict(st), "demotion": None, "kill_verdict": None, "span_days": 0.0,
            "own_lb_min": BAND_OWN_LB_MIN, "default_band": config.DEFAULT_ENTRY_BAND,
-           "gapped_share": float("nan"), "lag_unknown": 0}
+           "gapped_share": float("nan"), "lag_unknown": 0, "alert_cap_cutover_ts": None}
     try:
         if led is None:
             import ledger as LED
@@ -228,6 +228,14 @@ def evaluate_all(now_s: float, led=None, verdicts=None, reg=None, champion: str 
         res["max_event_seq"] = int(seqs.max()) if len(seqs) else 0
     except Exception:
         res["max_event_seq"] = 0
+    # The G1/G2 alert cap (2026-10-01) changes TIERS, not verdicts: a capped champion pick is
+    # ledgered as a B row with its sidecar verdicts, so every arm here (verdict-defined) is the
+    # same population on both sides of the cut-over. It is reported, and deliberately NOT split on.
+    try:
+        import ledger as _LED
+        res["alert_cap_cutover_ts"] = _LED.alert_cap_cutover(led)
+    except Exception:
+        res["alert_cap_cutover_ts"] = None
     series, excl = SC.outcome_series(led, verdicts, metric=metric)
     # Sampling health of the run grid, over the rows that CARRY a lag cell:
     #     gapped_share = gapped / (gapped + rows kept with a lag cell).
@@ -551,6 +559,10 @@ def write_proposal(res: dict, verdict: dict, paths: dict | None = None) -> str:
               f"- DSR bar: a per-day Sharpe of ≥ {dsr_bar(config.BAND_PROMOTE_MIN_CLUSTERS, res.get('trials_n') or 1):.2f} "
               f"over {config.BAND_PROMOTE_MIN_CLUSTERS} days at {res.get('trials_n')} trials (normal day means) "
               f"is what check 4 implies at these floors.",
+              ("- G1/G2 alert cap: " + ("not live in this ledger." if res.get("alert_cap_cutover_ts") is None else
+               f"live since {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(res['alert_cap_cutover_ts']))}. It caps "
+               "TIERS, not verdicts — a capped champion pick stays ledgered (B) with its verdicts — so these arms are "
+               "one population across the cut-over and are not split; the tier tables (ledger.summary) are.")),
               "- Means are context; the decision criterion is a day-clustered lower bound, paired against the "
               "champion and stratified by sighting age. A-tier = survival odds, not predicted ROI. Not financial advice.",
               "", "---", "", FOOTER]

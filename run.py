@@ -476,11 +476,13 @@ def run(dry_run: bool = True, send: bool = False) -> list:
         age_s = 0.0 if first or not fs_ts else max(0.0, now_s - float(fs_ts))
         feat = LAB.build_feat(t, m, s, score, first, age_s)
         verdicts = LAB.evaluate_bands(feat, reg, champion)
-        tier = LAB.tier_for(True, verdicts, champion)
+        alert_ok = screen.alert_cap_ok(gates)        # G1/G2: a positive finding caps the tier at B
+        tier = LAB.tier_for(True, verdicts, champion, alert_ok=alert_ok)
         reason = LAB.champion_reason(feat, reg, champion, verdicts)
         _, misses = screen.high_conviction(feat)
         row = dict(feat)
         row.update({"symbol": m.get("symbol", "?"), "url": m.get("url", ""), "gates_ok": True,
+                    "alert_ok": alert_ok,
                     "verdicts": verdicts, "feat": feat, "market": m, "score": score, "gates": gates,
                     "sources_dark": list(s.get("sources_dark") or []), "deployer": s.get("deployer"),
                     "tier": tier, "band": champion, "hc_misses": misses, "champion_reason": reason,
@@ -549,9 +551,11 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     for t in prio:
         safety.setdefault(t, s1.get(t) or SAFE.empty_safety())   # a budget cut leaves pass-1 facts standing
     stage_s["pass2_prio"] = round(budget.elapsed(), 1)
-    # G1 + G2 BEFORE the alert: the venue's on-chain liquidity (dead pool / pulled / stale print) and
-    # the route at the book's stake, at a block read NOW (the run-start head is a minute old by here,
-    # and pulls were measured up to 569 s before alert_ts). Unanswered ⇒ passes, named dark.
+    # G1 + G2 BEFORE the alert: the venue's on-chain liquidity (dead pool / pulled) and the route at
+    # the book's stake, at a block read NOW (the run-start head is a minute old by here, and pulls
+    # were measured up to 569 s before alert_ts). Unanswered ⇒ passes, named dark. A positive finding
+    # is a TIER CAP: the pick becomes a B row with its verdicts and the finding in gates_mask — never
+    # dropped, so the champion's verdict-defined arm loses nothing the other arms keep.
     alert_gate_rejects: list = []
     if prio:
         head_now = rpc.block_number() or head
@@ -569,8 +573,8 @@ def run(dry_run: bool = True, send: bool = False) -> list:
                 if s_ac is not None:
                     safety[t] = s_ac
         for t in prio:
-            ok_, g_ = screen.hard_gates(markets[t], safety[t])
-            if not ok_ and (g_.get("liq_live_ok") is False or g_.get("route_ok") is False):
+            _ok, g_ = screen.hard_gates(markets[t], safety[t])
+            if not screen.alert_cap_ok(g_):          # withheld from A; the row is STILL ledgered (B)
                 st_ = safety[t]
                 alert_gate_rejects.append({
                     "token": t, "symbol": markets[t].get("symbol"),
@@ -580,7 +584,7 @@ def run(dry_run: bool = True, send: bool = False) -> list:
                     "venue_swaps_window": st_.get("venue_swaps_window"),
                     "venue_dex_pair_swap_age_s": st_.get("venue_dex_pair_swap_age_s"),
                     "route_at_alert": st_.get("route_at_alert"), "head": head_now})
-                print(f"  alert gate: {markets[t].get('symbol')} rejected "
+                print(f"  alert cap: {markets[t].get('symbol')} withheld from A, ledgered as B "
                       f"({', '.join(alert_gate_rejects[-1]['failed'])}; venue {st_.get('venue_liq_state')}, "
                       f"route {st_.get('route_at_alert')})")
         stage_s["alert_checks"] = round(budget.elapsed(), 1)
@@ -664,7 +668,8 @@ def run(dry_run: bool = True, send: bool = False) -> list:
     for r in survivors[: max(config.ALERT_TOP_N, len(a_tier))]:
         print(f"  {r['tier']} {r['symbol']:12s} score {r['score']:5.1f} liq ${r.get('liq_usd') or 0:,.0f} "
               f"age {r.get('pair_age_min') or 0:.0f}m [{r.get('event_kind') or '-'}]"
-              + ("" if r["tier"] == "A" else f"  short of {champion}: {r['champion_reason'][:80]}"))
+              + ("" if r["tier"] == "A" else ("  alert withheld by the G1/G2 cap" if r.get("alert_ok") is False
+                                               else f"  short of {champion}: {r['champion_reason'][:80]}")))
 
     # ── alerts (whatever the early path did not already send) ────────────────────
     fresh_alerts = [r for r in a_tier[: config.ALERT_TOP_N]

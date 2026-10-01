@@ -5992,6 +5992,26 @@ try:
           pga["n_armed"] is None and pga["flow_dark_share"] is None and not pga["has_flow"]
           and pga["n_days"] == 7 and "a number, not a bound (floor 12)" in pga["line"], pga["line"])
 
+    # the G1/G2 alert-cap cut-over INSIDE the window: the two halves are never pooled silently — VOID, named; a cut-over
+    # before the window (or none) adds nothing. Read-only evaluations (record=False): nothing is minted here.
+    _saved_cut_q = config.ALERT_CAP_CUTOVER_TS
+    try:
+        config.ALERT_CAP_CUTOVER_TS = _q_t0 + 2 * 86400.0
+        pg_cut, _ = _pg(book_a, t_open, record=False)
+        pg_cut_closed, _ = _pg(book_a, t_closed, record=False)
+        config.ALERT_CAP_CUTOVER_TS = _q_t0 - 86400.0
+        pg_cut_before, _ = _pg(book_a, t_open, record=False)
+    finally:
+        config.ALERT_CAP_CUTOVER_TS = _saved_cut_q
+    check("the paper gate VOIDs a window the G1/G2 alert-cap cut-over falls inside (SELECTION CHANGE, named, with the advice to "
+          "open a new counted window) — the open line says it would VOID, the closed one IS VOID (not recorded: read-only); a "
+          "cut-over before the window start adds no void",
+          any(v_.startswith("SELECTION CHANGE: the G1/G2 alert cap went live at") for v_ in pg_cut["void"])
+          and "would VOID if judged now: SELECTION CHANGE" in pg_cut["line"] and pg_cut_closed["status"] == "VOID"
+          and "(not recorded: dry)" in pg_cut_closed["line"] and not _tr_lines("paper_verdict:")
+          and not any(v_.startswith("SELECTION CHANGE") for v_ in pg_cut_before["void"])
+          and pg_cut["alert_cap_cutover_ts"] == _q_t0 + 2 * 86400.0, f"{pg_cut['line']} | {pg_cut_closed['line']}")
+
     # CLOSED window, everything clears ⇒ PASS, recorded once, printed from the record afterwards
     pgp, _ = _pg(book_a, t_closed)
     pgp2, _ = _pg(book_a, t_closed)
@@ -6371,9 +6391,10 @@ section("R. alert-time safety gates — G1 dead pool, G2 no route, G4 farm facto
 # ═══════════════════════════════════════════════════════════════════════════════════
 # G1 replays RECORDED node answers (fixtures/g1_venue_rpc.json: the exact eth_getLogs / eth_call
 # requests rpc.venue_facts made at each token's alert block, 2026-10-01). The four rejects are the
-# research's confirmed dead-pool alerts (each pool fully removed 16-98 s BEFORE alert_ts); SI is a live
-# hook-less runner with a scorable $1.09M spot cell; NFLOAT is a hooked-template runner whose
-# FIRST-initialized pool is a hook-less decoy (3 swaps, 141 blocks earlier).
+# research's confirmed dead-pool alerts (each pool fully removed 16-98 s BEFORE alert_ts); BAG is the
+# review's migration false negative (its 416-swap hooked pool emptied ~207 s before the alert, five
+# side pools trickling); SI is a live hook-less runner with a scorable $1.09M spot cell; NFLOAT is a
+# hooked-template runner whose FIRST-initialized pool is a hook-less decoy (3 swaps, 141 blocks earlier).
 from sources import rpc as RPCG, safety as SAFEG    # noqa: E402
 import run as RUNG                                   # noqa: E402
 _g1_path = os.path.join(ROOT, "fixtures", "g1_venue_rpc.json")
@@ -6387,6 +6408,7 @@ check("the G1 fixture holds the four must-reject tokens (Muse, DEBT, NEPTUNE, AR
       and _g1_cases["DEBT"]["token"] == "0x6f0c1145ea8ad930bbce78addccd5a39ec5b59e7"
       and _g1_cases["NEPTUNE"]["token"] == "0x55b37fec72c41a230671ae248d81b4ada75e148f"
       and _g1_cases["ARGONAUTS"]["token"] == "0x359a358ecfcd66c9fe67645f42f27c3dc029b831"
+      and _g1_cases["BAG"]["token"] == "0x2dfbddb0405da61799b6beb08e7dfd4867ff18e2" and _g1_cases["BAG"]["expect"] == "reject"
       and _g1_cases["SI"]["expect"] == "pass" and _g1_cases["NFLOAT"]["expect"] == "pass_hooked_venue")
 
 
@@ -6418,16 +6440,29 @@ finally:
     RPCG._call = _saved_call
 check("every G1 request was answered from the recording (the replay is exact: same requests, same block windows)",
       not _g1_missing, str(_g1_missing[:2]))
-for sym_ in ("Muse", "DEBT", "NEPTUNE", "ARGONAUTS"):
+for sym_ in ("Muse", "DEBT", "NEPTUNE", "ARGONAUTS", "BAG"):
     vf_, s_, ok_, g_ = _g1_res[sym_]
     check(f"G1 REJECTS {sym_} at its alert block: the venue's liquidity is zero (drained before the alert), liq_live_ok False, "
-          "hard gates fail — a positive on-chain finding, not a guess",
+          "the alert-time cap fails and the champion pick is tier B — a positive on-chain finding, not a guess; the hard gates "
+          "still pass (the cap is not a hard gate: the row is LEDGERED as B, never dropped)",
           vf_["status"] == "ok" and s_["venue_liq_state"] == "drained" and s_["venue_liq_frac"] == 0.0
-          and g_["liq_live_ok"] is False and not ok_ and "rpc" not in s_["sources_dark"], str((vf_, s_["venue_liq_state"])))
+          and g_["liq_live_ok"] is False and screen.alert_cap_ok(g_) is False and ok_
+          and B.tier_for(ok_, {"band_volume_early": True}, "band_volume_early", alert_ok=screen.alert_cap_ok(g_)) == "B"
+          and "rpc" not in s_["sources_dark"], str((vf_, s_["venue_liq_state"])))
+_vf_bag = _g1_res["BAG"][0]
+_bag_hooked = [lg_["topics"][1] for c_ in _g1_cases["BAG"]["calls"]
+               if c_["method"] == "eth_getLogs" and c_["params"][0]["topics"][0] == config.TOPIC_V4_INITIALIZE
+               for lg_ in (c_["result"] or []) if RPCG.dec_addr(lg_["data"], 2) != "0x" + "0" * 40]
+check("BAG (review finding): six pools, the hooked 416-swap venue drained ~207 s before the alert while five hook-less side pools "
+      "kept trading and three of them even added liquidity after the pull — none traded enough after the pull to be a migration "
+      "(>= max(VENUE_MIGRATION_MIN_SWAPS, VENUE_MIGRATION_MIN_SWAP_FRAC x 416)), so the drained venue stands (the first rule "
+      "read it 'live' off a 2-swap side pool)",
+      _vf_bag["n_pools"] == 6 and _vf_bag["swaps"] == 416 and _vf_bag["pool"] == _bag_hooked[0] and len(_bag_hooked) == 1
+      and _vf_bag["migrated_from"] is None and sum(1 for n_ in _vf_bag["pool_swaps"].values() if n_ > 0) == 6, str(_vf_bag))
 _vf_si, _s_si, _ok_si, _g_si = _g1_res["SI"]
 check("G1 PASSES SI (a live hook-less V4 runner, tier A, scorable $1.09M spot cell): liquidity at its peak, a swap seconds ago",
       _vf_si["kind"] == "v4" and _vf_si["hook"] == "0x" + "0" * 40 and _s_si["venue_liq_state"] == "live"
-      and _s_si["venue_liq_frac"] == 1.0 and _g_si["liq_live_ok"] is True and _ok_si, str(_vf_si))
+      and _s_si["venue_liq_frac"] == 1.0 and _g_si["liq_live_ok"] is True and screen.alert_cap_ok(_g_si) and _ok_si, str(_vf_si))
 _vf_nf, _s_nf, _ok_nf, _g_nf = _g1_res["NFLOAT"]
 _nf_inits = sorted((int(lg_["blockNumber"], 16), lg_["topics"][1]) for c_ in _g1_cases["NFLOAT"]["calls"]
                    if c_["method"] == "eth_getLogs" and c_["params"][0]["topics"][0] == config.TOPIC_V4_INITIALIZE
@@ -6458,11 +6493,12 @@ try:
 finally:
     RPCG.post_json = _saved_post
     RPCG._call = _saved_call
-check("429 / 5xx: an unanswered RPC makes the venue DEFERRED — venue_kind 'unknown', no state, liq_live_ok True (passes), "
-      "rpc named in sources_dark; a run that answered the pool list but not the liquidity history is deferred too (a partial "
-      "picture never rejects)",
+check("429 / 5xx: an unanswered RPC makes the venue DEFERRED — venue_kind 'unknown', no state, liq_live_ok None (unknown: "
+      "'-' in gates_mask, the cap passes), rpc named in sources_dark; a run that answered the pool list but not the liquidity "
+      "history is deferred too (a partial picture never rejects)",
       vf_d["status"] == "deferred" and s_d["venue_kind"] == "unknown" and s_d["venue_liq_state"] is None
-      and _gd["liq_live_ok"] is True and _okd and "rpc" in s_d["sources_dark"] and _gd["rpc_available"] is False
+      and _gd["liq_live_ok"] is None and screen.alert_cap_ok(_gd) and _okd and "rpc" in s_d["sources_dark"]
+      and _gd["rpc_available"] is False and screen.gates_bitmask(_gd)[screen._GATE_ORDER.index("liq_live_ok")] == "-"
       and vf_h["status"] == "deferred", str((vf_d, vf_h)))
 
 # the decision itself is pure (screen.venue_liq_state) and reads config thresholds only
@@ -6476,11 +6512,20 @@ check("screen.venue_liq_state: frac 0 → drained, below VENUE_LIQ_MIN_FRAC_OF_P
       and _vs({}, dict(_base, venue_liq_frac=None)) is None
       and all(_vs({}, {"venue_kind": k_, "venue_liq_frac": 0.0}) is None for k_ in ("none", "unknown", None)))
 _st = dict(_base, venue_liq_frac=1.0, venue_dex_pair_swap_age_s=config.VENUE_STALE_NO_SWAP_S + 1)
+_m_st = {"price_usd": 1.0, "liq_usd": 1e5, "vol_h24": 1e5, "vol_h1": 6e4}
+_saved_sf = config.VENUE_STALE_FAILS
+try:
+    config.VENUE_STALE_FAILS = True
+    _st_on = screen.hard_gates(_m_st, _st)[1]["liq_live_ok"]
+finally:
+    config.VENUE_STALE_FAILS = _saved_sf
 check("the stale-quote case: Dexscreener's own pair silent for more than VENUE_STALE_NO_SWAP_S while Dexscreener still "
-      "reports >= VENUE_STALE_MIN_VOL_H1_USD of h1 volume → stale (rejected); a quieter h1, a recent swap, or a Dexscreener "
-      "pair that is not one of the token's pools (age None) → not stale",
-      _vs({"vol_h1": config.VENUE_STALE_MIN_VOL_H1_USD}, _st) == "stale"
-      and screen.hard_gates({"price_usd": 1.0, "liq_usd": 1e5, "vol_h24": 1e5, "vol_h1": 6e4}, _st)[1]["liq_live_ok"] is False
+      "reports >= VENUE_STALE_MIN_VOL_H1_USD of h1 volume → stale; it is RECORDED but does not fail liq_live_ok while "
+      "VENUE_STALE_FAILS is False (never measured to fail closed; the 7-day replay with each row's at-alert pair fired on 0 of "
+      "422 A rows), and fails it when the operator sets it; a quieter h1, a recent swap, or a Dexscreener pair that is not one "
+      "of the token's pools (age None) → not stale",
+      config.VENUE_STALE_FAILS is False and _vs({"vol_h1": config.VENUE_STALE_MIN_VOL_H1_USD}, _st) == "stale"
+      and screen.hard_gates(_m_st, _st)[1]["liq_live_ok"] is True and _st_on is False
       and _vs({"vol_h1": config.VENUE_STALE_MIN_VOL_H1_USD - 1}, _st) == "live"
       and _vs({"vol_h1": 1e6}, dict(_st, venue_dex_pair_swap_age_s=config.VENUE_STALE_NO_SWAP_S)) == "live"
       and _vs({"vol_h1": 1e6}, dict(_st, venue_dex_pair_swap_age_s=None)) == "live")
@@ -6496,37 +6541,62 @@ try:
     _cap_lq = RPCG._liq_series({"kind": "v4", "id": "0x" + "1" * 64, "init_block": 1}, 100_000)
 finally:
     RPCG.get_logs = _saved_gl
-check("…the capped answers, measured on the node's own -32000 text", _cap_sw == ("ok", config.VENUE_LOG_CAP, 100_000)
+check("…the capped answers, measured on the node's own -32000 text (a capped swap count carries no block list)", _cap_sw == ("ok", config.VENUE_LOG_CAP, 100_000, None)
       and _cap_lq == ("deferred", []), str((_cap_sw, _cap_lq)))
-# a migration: the most-swapped pool was emptied, but another pool kept trading AFTER the pull → judged on that pool
-_P1, _P2 = "0x" + "a" * 64, "0x" + "b" * 64
+# MIGRATION (rewritten after review): a pulled venue moves to another pool ONLY when that pool ADDED liquidity after
+# the pull AND traded at least max(VENUE_MIGRATION_MIN_SWAPS, VENUE_MIGRATION_MIN_SWAP_FRAC x the pulled pool's swaps)
+# times after it; otherwise the drained venue stands. P1: 300 swaps, emptied at block 950.
+_P1, _P2, _P3 = "0x" + "a" * 64, "0x" + "b" * 64, "0x" + "c" * 64
 _mig = {"pools": [{"kind": "v4", "id": _P1, "hook": "0x" + "0" * 40, "init_block": 100},
-                  {"kind": "v4", "id": _P2, "hook": "0x" + "0" * 40, "init_block": 500}]}
+                  {"kind": "v4", "id": _P2, "hook": "0x" + "0" * 40, "init_block": 500},
+                  {"kind": "v4", "id": _P3, "hook": "0x" + "0" * 40, "init_block": 600}]}
+_need = max(config.VENUE_MIGRATION_MIN_SWAPS, math.ceil(config.VENUE_MIGRATION_MIN_SWAP_FRAC * 300))
+
+
+def _mig_case(p2_blocks, p2_series, p3_blocks=(), p3_series=((600, 0, 50),)):
+    sw = {_P1: sorted(list(range(400, 700)))[:300], _P2: sorted(p2_blocks), _P3: sorted(p3_blocks)}
+    ser = {_P1: [(100, 0, 1000), (950, 0, -1000)], _P2: list(p2_series), _P3: list(p3_series)}
+    RPCG.venue_pools = lambda tok, head: ("ok", _mig["pools"])
+    RPCG.pool_swaps = lambda p, head: ("ok", len(sw[p["id"]]), (sw[p["id"]][-1] if sw[p["id"]] else None), sw[p["id"]])
+    RPCG._liq_series = lambda p, head: ("ok", ser[p["id"]])
+    return RPCG.venue_facts("0x" + "c" * 40, 1000)
+
+
 _saved_vp, _saved_ps, _saved_ls = RPCG.venue_pools, RPCG.pool_swaps, RPCG._liq_series
 try:
-    RPCG.venue_pools = lambda tok, head: ("ok", _mig["pools"])
-    RPCG.pool_swaps = lambda p, head: ("ok", 300, 900) if p["id"] == _P1 else ("ok", 40, 990)
-    RPCG._liq_series = lambda p, head: ("ok", [(100, 0, 1000), (950, 0, -1000)]) if p["id"] == _P1 else ("ok", [(500, 0, 700)])
-    _vm = RPCG.venue_facts("0x" + "c" * 40, 1000)
-    RPCG.pool_swaps = lambda p, head: ("ok", 300, 900) if p["id"] == _P1 else ("ok", 0, None)
-    _vr = RPCG.venue_facts("0x" + "c" * 40, 1000)
+    _after = list(range(951, 951 + _need))                        # exactly the floor of post-pull swaps
+    _vm = _mig_case(_after, [(500, 0, 300), (960, 0, 700)])       # a real migration: added after the pull + traded
+    _vno_add = _mig_case(_after, [(500, 0, 700)])                 # traded after the pull, liquidity only from BEFORE it
+    _vone = _mig_case([951], [(500, 0, 300), (960, 0, 700)])      # one swap after the pull (the review's defeat)
+    _vfew = _mig_case(_after[:-1], [(500, 0, 300), (960, 0, 700)])   # one swap short of the floor
+    _vr = _mig_case([], [(500, 0, 700)])                          # nothing traded after the pull
+    _vpick = _mig_case(_after, [(500, 0, 300), (960, 0, 700)],    # two qualifying pools: the busier after the pull wins
+                       p3_blocks=list(range(951, 951 + _need + 5)), p3_series=[(600, 0, 50), (970, 0, 10)])
 finally:
     RPCG.venue_pools, RPCG.pool_swaps, RPCG._liq_series = _saved_vp, _saved_ps, _saved_ls
-check("a MIGRATION is not a rug: when the busiest pool was emptied and another pool swapped after the pull, the other pool is the "
-      "venue (live); with no trading after the pull the busiest pool stands and reads drained",
-      _vm["pool"] == _P2 and _vm["liq_frac"] == 1.0 and _vr["pool"] == _P1 and _vr["liq_frac"] == 0.0, str((_vm, _vr)))
+check("a MIGRATION needs a liquidity ADD after the pull AND real trading after it: with both, the other pool is the venue "
+      "(migrated_from = the pulled pool); traded-but-no-add, one swap after the pull, one swap short of the floor, or no "
+      "trading at all → the drained venue stands; two qualifying pools → the one with more post-pull swaps",
+      _vm["pool"] == _P2 and _vm["liq_frac"] == 1.0 and _vm["migrated_from"] == _P1
+      and all(v_["pool"] == _P1 and v_["liq_frac"] == 0.0 and v_["migrated_from"] is None
+              for v_ in (_vno_add, _vone, _vfew, _vr))
+      and _vpick["pool"] == _P3 and _vpick["migrated_from"] == _P1,
+      str([(v_["pool"][:6], v_["liq_frac"]) for v_ in (_vm, _vno_add, _vone, _vfew, _vr, _vpick)]))
 
 # G2: the route at alert — ABSENT fails, deferred passes and is named
 _cm = {"price_usd": 1.0, "liq_usd": 1e5, "vol_h24": 1e5}
 _ra, _rd, _ro = SAFEG.empty_safety(), SAFEG.empty_safety(), SAFEG.empty_safety()
 SAFEG.apply_route(_ra, {"status": "absent"}); SAFEG.apply_route(_rd, {"status": "deferred"}); SAFEG.apply_route(_ro, {"status": "ok"})
 _rn = SAFEG.empty_safety(); SAFEG.apply_route(_rn, None)
-check("G2: route_at_alert ABSENT fails route_ok and the hard gates (an unbuyable token cannot be A); deferred (or a probe that "
-      "raised) passes and names `route` dark; ok passes; a dict that was never probed passes",
-      screen.hard_gates(_cm, _ra)[1]["route_ok"] is False and not screen.hard_gates(_cm, _ra)[0]
-      and screen.hard_gates(_cm, _rd)[0] and "route" in _rd["sources_dark"] and _rn["route_at_alert"] == "deferred"
-      and screen.hard_gates(_cm, _ro)[0] and "route" not in _ro["sources_dark"]
-      and screen.hard_gates(_cm, SAFEG.empty_safety())[1]["route_ok"] is True)
+check("G2: route_at_alert ABSENT fails route_ok and the alert-time cap (an unbuyable token cannot be A) but NOT the hard gates "
+      "(the row is still ledgered, as B); deferred (or a probe that raised) is None, passes and names `route` dark; ok is True; "
+      "a dict that was never probed is None ('-' in gates_mask, never '1')",
+      screen.hard_gates(_cm, _ra)[1]["route_ok"] is False and screen.hard_gates(_cm, _ra)[0]
+      and screen.alert_cap_ok(screen.hard_gates(_cm, _ra)[1]) is False
+      and screen.hard_gates(_cm, _rd)[1]["route_ok"] is None and screen.alert_cap_ok(screen.hard_gates(_cm, _rd)[1])
+      and "route" in _rd["sources_dark"] and _rn["route_at_alert"] == "deferred"
+      and screen.hard_gates(_cm, _ro)[1]["route_ok"] is True and "route" not in _ro["sources_dark"]
+      and screen.hard_gates(_cm, SAFEG.empty_safety())[1]["route_ok"] is None)
 _ac = SAFEG.alert_checks("0x" + "d" * 40, {"pair": None, "vol_h1": 1.0}, SAFEG.empty_safety(), 1000, 1.0,
                          venue_fn=lambda t, h, dex_pair=None: {"status": "ok", "kind": "v4", "pool": "0x" + "e" * 64,
                                                                "swaps": 12, "last_swap_age_s": 3.0, "liq_frac": 0.0},
@@ -6548,12 +6618,83 @@ check("run.py runs the alert-time checks on the prio candidates AFTER their fast
 check("the alert-time facts never ride the watchlist's last_safety into a later run (a pool can be drained a minute later)",
       "k not in SAFE.ALERT_TIME_KEYS" in _rs_g and set(SAFEG.ALERT_TIME_KEYS) <= set(config.FEATURE_FIELDS))
 _gc_full = screen.hard_gates(CLEAN_M, CLEAN_S)[1]
-check("the two new gates are APPENDED to _GATE_ORDER (an older 17-char gates_mask is a prefix of the new 19-char one) and are "
-      "ANDed into `passed`",
+_gc_probed = screen.hard_gates(CLEAN_M, dict(CLEAN_S, venue_kind="v4", venue_liq_frac=1.0, route_at_alert="ok"))[1]
+_ok_cap, _gc_cap = screen.hard_gates(CLEAN_M, dict(CLEAN_S, venue_kind="v4", venue_liq_frac=0.0, route_at_alert="absent"))
+check("the two alert-time caps are APPENDED to _GATE_ORDER (an older 17-char gates_mask is a prefix of the new 19-char one), are "
+      "NOT ANDed into `passed`, and read '-' when not probed, '1' when probed and clean, '0' on a finding",
       screen._GATE_ORDER[-2:] == ("liq_live_ok", "route_ok") and len(screen._GATE_ORDER) == 19
       and screen._GATE_ORDER[:17][-3:] == ("rpc_available", "blockscout_available", "gt_available")
-      and len(screen.gates_bitmask(_gc_full)) == 19 and screen.gates_bitmask(_gc_full).endswith("11")
-      and not screen.hard_gates(CLEAN_M, dict(CLEAN_S, venue_kind="v4", venue_liq_frac=0.0))[0])
+      and len(screen.gates_bitmask(_gc_full)) == 19 and screen.gates_bitmask(_gc_full).endswith("--")
+      and screen.gates_bitmask(_gc_probed).endswith("11") and screen.gates_bitmask(_gc_cap).endswith("00")
+      and _ok_cap and not screen.alert_cap_ok(_gc_cap) and screen.alert_cap_ok(_gc_full))
+
+# THE POPULATION (review, important #2): a capped champion pick is LEDGERED as a B row with its verdicts — never dropped —
+# so the verdict-defined arms the entry gate compares are one population across the cut-over. It spends the token's ONE
+# champion event exactly as an A row would (no later promotion), and a capped promotion is a B row too.
+_CH_V = "band_volume_early"
+_tmp_cap = tempfile.mkdtemp(prefix="verify_cap_")
+_cap_led = os.path.join(_tmp_cap, "ledger.csv")
+_mask_cap = screen.gates_bitmask(_gc_cap)
+_mask_ok = screen.gates_bitmask(_gc_full)
+_TC, _TP = "0x" + "c1" * 20, "0x" + "c2" * 20
+
+
+def _cap_surv(tok, alert_ok, champ_true=True):
+    return {"token": tok, "symbol": "CAP", "verdicts": {_CH_V: champ_true}, "gates_ok": True, "alert_ok": alert_ok,
+            "market": {"price_usd": 1.0, "mcap": 1e5, "liq_usd": 5e4}, "score": 50.0,
+            "gates": _gc_cap if alert_ok is False else _gc_full, "sources_dark": []}
+
+
+_ev1 = LAB.decide_events([_cap_surv(_TC, False), _cap_surv(_TP, True, champ_true=False)], {}, 1000.0, _CH_V, None)
+LED.record_rows(_ev1, alert_ts=1000.0, path=_cap_led)
+_idx1 = LED.index(LED.load(_cap_led))
+_ev2 = LAB.decide_events([_cap_surv(_TC, True), _cap_surv(_TP, False)], _idx1, 1300.0, _CH_V, None)
+LED.record_rows(_ev2, alert_ts=1300.0, path=_cap_led)
+_led2 = LED.load(_cap_led)
+_idx2 = LED.index(_led2)
+_ev3 = LAB.decide_events([_cap_surv(_TC, True), _cap_surv(_TP, True)], _idx2, 1600.0, _CH_V, None)
+check("a capped champion pick is a first_sighting B row in the ledger (gates_mask '00' at the end); it spends the token's one "
+      "champion event (alert_withheld), so the next run's clean champion verdict opens NO promotion; a token whose champion "
+      "flips True while capped gets a PROMOTION row at tier B, after which no further promotion is minted either",
+      [(e_["event_kind"], e_["tier"]) for e_ in _ev1] == [("first_sighting", "B"), ("first_sighting", "B")]
+      and _led2["gates_mask"].iloc[0].endswith("00") and LED.alert_capped(_led2["gates_mask"].iloc[0])
+      and not LED.alert_capped(_led2["gates_mask"].iloc[1]) and not LED.alert_capped("1" * 17)
+      and _idx1[_TC]["alert_withheld"] and not _idx1[_TP]["alert_withheld"]
+      and [(e_["token"], e_["event_kind"], e_["tier"]) for e_ in _ev2] == [(_TP, "promotion", "B")]
+      and len(_led2) == 3 and _idx2[_TP]["alert_withheld"] and not _idx2[_TP]["has_a"] and _ev3 == [],
+      str((_ev1, _ev2, _ev3)))
+check("…and nothing downstream treats a capped promotion as A: the live book admits it on the B path, the exit gate's A "
+      "stratum excludes it, and tier_for composes the cap (a laxer row is impossible)",
+      not IM._in_stratum_a({"event_kind": "promotion", "tier": "B"}) and IM._in_stratum_a({"event_kind": "promotion", "tier": "A"})
+      and "item[\"event_kind\"] == \"promotion\" and item[\"tier\"] != \"B\"" in _read(os.path.join(ROOT, "selfimprove", "livebook.py"))
+      and B.tier_for(True, {_CH_V: True}, _CH_V, alert_ok=False) == "B" and B.tier_for(True, {_CH_V: True}, _CH_V) == "A")
+# the cut-over: derived from the first row whose mask carries the cap positions, or pinned; summary splits the epochs on it
+_cut_led = pd.DataFrame({"alert_ts": ["10", "20", "30"], "gates_mask": ["1" * 17, _mask_ok, _mask_cap]})
+_saved_cut = config.ALERT_CAP_CUTOVER_TS
+try:
+    _cut_derived = LED.alert_cap_cutover(_cut_led)
+    _cut_none = LED.alert_cap_cutover(_cut_led.iloc[:1])
+    config.ALERT_CAP_CUTOVER_TS = 15.0
+    _cut_pinned = LED.alert_cap_cutover(_cut_led)
+finally:
+    config.ALERT_CAP_CUTOVER_TS = _saved_cut
+_old17 = LED.load(_cap_led)
+_old17.loc[len(_old17)] = dict(_old17.iloc[1], token="0x" + "c3" * 20, event_seq=0, alert_ts=900.0, gates_mask="1" * 17, tier="A")
+LED.save(_old17, _cap_led)
+_rc_sum, _out_sum = _capture(LED.summary, _cap_led)
+check("the cut-over is the first row with a cap-carrying gates_mask (None when the cap is not live; config.ALERT_CAP_CUTOVER_TS "
+      "pins it); ledger.summary prints the two epochs APART, keeps capped rows OUT of B as their own group, and says the "
+      "post-cut-over A vs B is not like-for-like",
+      _cut_derived == 20.0 and _cut_none is None and _cut_pinned == 15.0 and config.ALERT_CAP_CUTOVER_TS is None
+      and "before the G1/G2 alert-cap cut-over" in _out_sum and "from the cut-over on" in _out_sum
+      and "tier capped (champion pick, alert withheld by G1/G2), n=2" in _out_sum and "NOT like-for-like" in _out_sum,
+      _out_sum[-900:])
+shutil.rmtree(_tmp_cap, ignore_errors=True)
+_ib_src = _read(os.path.join(ROOT, "selfimprove", "entry_lab", "improve_bands.py"))
+check("the entry gate REPORTS the cut-over and does not split on it (it reads verdicts, which capped rows keep); the paper gate "
+      "VOIDs a window the cut-over falls inside (section Q replays it)",
+      'res["alert_cap_cutover_ts"] = _LED.alert_cap_cutover(led)' in _ib_src and "G1/G2 alert cap: " in _ib_src
+      and "SELECTION CHANGE: the G1/G2 alert cap went live at" in _read(os.path.join(ROOT, "selfimprove", "improve.py")))
 
 # G4: the farm factory is dropped at discovery
 _FARM_TOK = "0x" + "f" * 40

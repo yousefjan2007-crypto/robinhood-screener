@@ -129,7 +129,12 @@ row-only fields reached 11 of 157 survivors (pass 2 covers ≤ `GT_INFO_BUDGET_P
 `WATCH_REFRESH_PER_RUN` tokens a run while the watchlist is ~98 % of the survivors). `docs/GMGN_TRENCHES.md` is the operator's Trenches guide. **Alert-time gates (2026-10-01):** the prio candidates get `safety.alert_checks` after
 their fast pass 2 and before the alert — G1 `rpc.venue_facts` (venue = most swaps in the window;
 liquidity from the venue's own ModifyLiquidity / Mint-Burn / LP-mint logs) and G2 `quotes.quote_buy`;
-only prio tokens, so a B row's `unchecked` names `venue_liq` and `route`. G4 drops farm-factory mints
+only prio tokens, so a B row's `unchecked` names `venue_liq` and `route`. G1/G2 are **tier caps, not
+hard gates**: a positive finding makes the champion pick a B row that is STILL LEDGERED with its
+verdicts (and spends the token's one champion event: `ledger.index` → `alert_withheld`), so the
+entry gate's verdict-defined arms never lose rows to a filter the other arms do not see;
+`ledger.summary()` / the weekly summary split on the cut-over and the paper gate voids a window it
+falls inside (`config.ALERT_CAP_CUTOVER_TS`, None ⇒ the first row with a cap-carrying mask). G4 drops farm-factory mints
 (`config.FARM_MINT_RECIPIENTS`) in `discover_from_logs`. `screen.hc_checks(feat)` is
 the **single** implementation of the A-tier checks (`None` for unknown / degraded inputs);
 `high_conviction` and `band_a_strict` both derive from it. `entry_lab/runtime.build_feat` is the
@@ -204,7 +209,8 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   point capture `time.time()` **once** and thread `now_s`; `time.monotonic()` only for durations.
 - **Fail closed only on a positive finding.** A dark or absent source passes through and is named
   in `sources_dark`; **unknown is never A** (`hc_checks` returns `None`, not `False`).
-- **A can never be laxer than the hard gates** — `tier_for` composes `gates_ok and verdict is True`.
+- **A can never be laxer than the hard gates** — `tier_for` composes `gates_ok and alert_ok and verdict is True`
+  (`alert_ok` = `screen.alert_cap_ok`, the G1/G2 tier cap).
 - **Controls must fail.** A control clearing either gate voids the run and alerts APPARATUS FAULT.
 - **Deferred is never scored** — not in the ledger, the book, the paths, or the paper fills.
 - **Every state write is atomic** (tmp + `os.replace`, `allow_nan=False` after a NaN→None pass).
@@ -221,12 +227,18 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
 - **`docs/` and `selfimprove/research/` carry no home paths and never name the shared secrets
   file** — verify greps for both. Keep `README.md` clean the same way.
 - **The $Cubrate replay is never A-tier.** Literal at-alert numbers, permanent fixture.
-- **G1 rejects the four recorded dead-pool alerts and passes the two recorded runners.**
+- **G1 rejects the five recorded dead-pool alerts and passes the two recorded runners.**
   `fixtures/g1_venue_rpc.json` replays the exact node answers at each alert block (Muse, DEBT,
-  NEPTUNE, ARGONAUTS drained before alert_ts; SI live hook-less; NFLOAT's decoy pool is not the
-  venue). The venue is the pool with the most swaps in the window, never the first Initialize.
+  NEPTUNE, ARGONAUTS, BAG drained before alert_ts; SI live hook-less; NFLOAT's decoy pool is not the
+  venue). The venue is the pool with the most swaps in the window, never the first Initialize; a
+  pulled venue MIGRATES only to a pool with a liquidity add after the pull AND max(5, 10 %) of its
+  swaps after it — never on one side-pool swap (BAG).
 - **`liq_live_ok` / `route_ok` are the LAST two `_GATE_ORDER` entries** (appended, never inserted:
-  a pre-2026-10-01 17-char `gates_mask` is a prefix of the 19-char one).
+  a pre-2026-10-01 17-char `gates_mask` is a prefix of the 19-char one), are never ANDed into
+  `passed`, and read `-` wherever they were not probed — never `1` for a check that did not run.
+- **A capped champion pick is ledgered, never dropped** (tier B, verdicts in the sidecar). Do not
+  "simplify" G1/G2 back into hard gates: the drop removes the champion's worst rows from its arm
+  only, and every A-vs-B, paired-lift and control comparison then measures the filter.
 
 ## Named incidents (why the code looks the way it does)
 
@@ -275,7 +287,10 @@ research diff allowlist (`research/allowlist.py`, run from the **Mac tree's** co
   it; 80 A alerts in 18 days had no route at all. Hence G1 `liq_live_ok` (venue chosen by swap count
   — a hook-5059 decoy pool is initialized ~12 s before the real one), G2 `route_ok`, the G4 farm
   blocklist at discovery, and `unchecked` (fast pass 2's skips were logged as `fast_pass2`, so 75 %
-  of A rows looked fully checked with top-10 unknown on 99.6 % of them).
+  of A rows looked fully checked with top-10 unknown on 99.6 % of them). The review of that round
+  found BAG (a 416-swap pool emptied 207 s pre-alert read `live` off a 2-swap side pool: hence the
+  migration rule) and that dropping capped rows biased every comparison (hence the tier cap); the
+  7-day replay withholds 18 of 422 A rows, all drained, and all 48 runners read at peak.
 
 ## Gotchas
 

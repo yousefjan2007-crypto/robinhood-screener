@@ -138,6 +138,8 @@ def _ledger_frame(P: dict):
     led = led[led["_ts"].notna()]
     led["_day"] = led["_ts"].apply(_day)
     led["_tier"] = led["tier"].astype(str).where(led["tier"].astype(str).isin(["A", "B"]), "B")
+    # a champion pick the G1/G2 cap withheld from A (2026-10-01): kept out of B, shown on its own
+    led["_capped"] = led["gates_mask"].apply(ledger.alert_capped) & (led["_tier"] == "B")
     led["_ret"] = pd.to_numeric(led[config.BAND_OUTCOME_METRIC], errors="coerce")
     led["_price"] = pd.to_numeric(led["entry_price"], errors="coerce").fillna(0.0)
     led["_seq"] = pd.to_numeric(led["event_seq"], errors="coerce")
@@ -159,13 +161,21 @@ def ledger_section(led) -> list:
              f"{config.BAND_OUTCOME_METRIC} rows {len(mat)}; suspect {n_sus}; promoted-B {promo_b} "
              f"(kept in B: intention-to-treat)"]
     parts = []
-    for tier, label in (("A", "alerted"), ("B", "silent control")):
-        r = mat[mat["_tier"] == tier]["_ret"]
+    capped = mat["_capped"] if "_capped" in mat.columns else (mat["_tier"] != mat["_tier"])
+    arms = [("A", "alerted", mat["_tier"] == "A"), ("B", "silent control", (mat["_tier"] == "B") & ~capped)]
+    if bool(capped.any()):
+        arms.append(("capped", "champion pick, alert withheld by G1/G2", capped))
+    for tier, label, m_ in arms:
+        r = mat[m_]["_ret"]
         if len(r):
             parts.append(f"{tier} ({label}) median {_pct(float(r.median()))} dead {(r <= -0.99).mean():.0%} n={len(r)}")
         else:
             parts.append(f"{tier} ({label}) n=0")
     lines.append(f"{config.BAND_OUTCOME_METRIC}: " + " · ".join(parts))
+    cut = ledger.alert_cap_cutover(led)
+    if cut is not None:
+        lines.append(f"G1/G2 alert-cap cut-over {_day(cut)}: A vs B after it is NOT like-for-like (A + capped = the "
+                     f"champion's whole selection); ledger.summary() prints the two epochs apart")
     if len(mat) and mat["_day"].nunique() < config.MIN_BOOTSTRAP_CLUSTERS:
         lines[-1] += f" — {mat['_day'].nunique()} matured day(s) < {config.MIN_BOOTSTRAP_CLUSTERS}: not a bound"
     return lines
@@ -326,7 +336,7 @@ def _selected_mask(led, wide, champion_band: str):
     """Rows the champion band selected: verdict == 1 in the sidecar (joined on event_seq),
     falling back to tier A where the sidecar has no line for the event."""
     import numpy as np
-    sel = (led["_tier"] == "A").to_numpy(copy=True)
+    sel = ((led["_tier"] == "A") | (led["_capped"] if "_capped" in led.columns else False)).to_numpy(copy=True)
     if wide is not None and len(wide) and champion_band in wide.columns:
         col = wide[champion_band]
         for i, (idx, seq) in enumerate(zip(led.index, led["_seq"])):

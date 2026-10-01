@@ -742,7 +742,9 @@ def feed_from_ledger(now_s: float, *, quote_buy_fn=quotes.quote_buy, rows_fn=_cl
             stats["stamp_wait"] += 1
             return False
         under_test = but is not None and but in (item.get("sidecar_true") or [])
-        unconditional = item["tier"] == "A" or item["event_kind"] == "promotion"
+        # a promotion is A by construction — except a CAPPED one (G1/G2 withheld the alert,
+        # 2026-10-01), which is a B row and takes the B path like any other control row
+        unconditional = item["tier"] == "A" or (item["event_kind"] == "promotion" and item["tier"] != "B")
         sub_cap = (under_test and not unconditional
                    and under_test_open < config.LIVEBOOK_BAND_UNDER_TEST_MAX_OPEN)
         always = unconditional or sub_cap

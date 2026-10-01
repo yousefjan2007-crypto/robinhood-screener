@@ -33,6 +33,7 @@ so every range scan halves its window on error.
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 import time
@@ -983,22 +984,34 @@ def _swap_query(p: dict) -> tuple:
 
 
 def pool_swaps(p: dict, head: int) -> tuple:
-    """(status, n_swaps, last_swap_block|None) in the recent window [head - VENUE_SWAP_WINDOW_BLOCKS,
-    head] (never before the pool's own Initialize). A capped answer is VENUE_LOG_CAP swaps, last = head."""
+    """(status, n_swaps, last_swap_block|None, blocks|None) in the recent window
+    [head - VENUE_SWAP_WINDOW_BLOCKS, head] (never before the pool's own Initialize). `blocks` is the
+    sorted list of swap blocks; a capped answer is VENUE_LOG_CAP swaps, last = head, blocks None
+    (the node only said "at least that many")."""
     lo = max(int(p.get("init_block") or 0), int(head) - config.VENUE_SWAP_WINDOW_BLOCKS)
     addr, topics = _swap_query(p)
     st, logs = _logs3(addr, topics, lo, int(head))
     if st == "capped":
-        return "ok", config.VENUE_LOG_CAP, int(head)
+        return "ok", config.VENUE_LOG_CAP, int(head), None
     if st != "ok":
-        return "deferred", None, None
+        return "deferred", None, None, None
     blocks = []
     for lg in logs:
         try:
             blocks.append(_log_key(lg)[0])
         except (TypeError, ValueError):
             continue
-    return "ok", len(blocks), (max(blocks) if blocks else None)
+    blocks.sort()
+    return "ok", len(blocks), (blocks[-1] if blocks else None), blocks
+
+
+def _swaps_after(blocks, last, n, block: int) -> int:
+    """Swaps strictly after `block`: exact from the block list; for a capped answer (blocks None)
+    VENUE_LOG_CAP when its last swap is after `block` (the node said "at least that many" and the
+    window reaches head), else 0."""
+    if blocks is not None:
+        return sum(1 for b in blocks if b > block)
+    return int(n or 0) if (last is not None and last > block) else 0
 
 
 def _liq_series(p: dict, head: int) -> tuple:
@@ -1073,14 +1086,23 @@ def liquidity_state(series: list) -> dict:
 def venue_facts(token: str, head: int, dex_pair: str | None = None) -> dict:
     """G1's raw facts at block `head`: {status ok|deferred, kind v4|v3|v2|none, pool, hook,
     n_pools, swaps (venue, in the window), last_swap_age_s, liq_frac, liq_current_zero,
-    dex_pair_last_swap_age_s, pool_swaps {id: n}}. The VENUE is the pool with the most swaps in the
-    window (ties → the later swap, then the later Initialize, then the id). When the venue's
-    liquidity was pulled and ANOTHER pool still swapped after the pull, the liquidity moved (a
-    migration or re-range, not a rug): that pool is the venue and is judged instead. Any unanswered
-    leg → status deferred with whatever is known; the caller names rpc dark and the gate passes."""
+    dex_pair_last_swap_age_s, pool_swaps {id: n}, migrated_from}. The VENUE is the pool with the most
+    swaps in the window (ties → the later swap, then the later Initialize, then the id).
+
+    MIGRATION (fixed 2026-10-01 after review): when the venue's liquidity was pulled, another pool
+    becomes the venue ONLY when it shows BOTH a liquidity ADD after the pull block (a positive
+    ModifyLiquidity delta / V3 Mint / V2 LP mint at a block > pull_block) AND real trading after the
+    pull — at least max(VENUE_MIGRATION_MIN_SWAPS, VENUE_MIGRATION_MIN_SWAP_FRAC x the pulled pool's
+    window swaps) swaps after the pull block. Among such pools the one with the most post-pull swaps
+    wins (then the larger post-pull add, then the id). Otherwise the drained venue stands. The first
+    version switched on ONE swap in any side pool after the pull, ranked by latest swap: BAG (event_seq
+    2138) had its 416-swap hooked pool emptied 207 s before the alert and was read 'live' off a 2-swap
+    side pool, and one swap after a pull would defeat the gate on purpose.
+    Any unanswered leg → status deferred with whatever is known; the caller names rpc dark and the
+    gate passes."""
     out = {"status": "deferred", "kind": None, "pool": None, "hook": None, "n_pools": None,
            "swaps": None, "last_swap_age_s": None, "liq_frac": None, "liq_current_zero": None,
-           "dex_pair_last_swap_age_s": None, "pool_swaps": {}}
+           "dex_pair_last_swap_age_s": None, "pool_swaps": {}, "migrated_from": None}
     try:
         head = int(head)
         st, pools = venue_pools(token, head)
@@ -1092,11 +1114,11 @@ def venue_facts(token: str, head: int, dex_pair: str | None = None) -> dict:
             return out
         counted = []
         for p in pools:
-            sst, n, last = pool_swaps(p, head)
+            sst, n, last, blocks = pool_swaps(p, head)
             if sst != "ok":
                 return out
             out["pool_swaps"][p["id"]] = n
-            counted.append((n, last if last is not None else -1, int(p.get("init_block") or 0), p["id"], p))
+            counted.append((n, last if last is not None else -1, int(p.get("init_block") or 0), p["id"], p, blocks))
         counted.sort(key=lambda x: x[:4], reverse=True)
         venue = counted[0]
         lst, series = _liq_series(venue[4], head)
@@ -1104,12 +1126,24 @@ def venue_facts(token: str, head: int, dex_pair: str | None = None) -> dict:
             return out
         ls = liquidity_state(series)
         if ls["pull_block"] is not None:
-            moved = [c for c in counted[1:] if c[1] > ls["pull_block"]]
-            if moved:
-                alt = max(moved, key=lambda c: (c[1], c[0], c[3]))
-                ast, aser = _liq_series(alt[4], head)
+            pb = int(ls["pull_block"])
+            need = max(int(config.VENUE_MIGRATION_MIN_SWAPS),
+                       math.ceil(float(config.VENUE_MIGRATION_MIN_SWAP_FRAC) * int(venue[0] or 0)))
+            moved = []
+            for c in counted[1:]:
+                n_after = _swaps_after(c[5], c[1] if c[1] >= 0 else None, c[0], pb)
+                if n_after < need:
+                    continue                       # no real trading after the pull: not where it went
+                ast, aser = _liq_series(c[4], head)
                 if ast != "ok":
-                    return out
+                    return out                     # a partial picture never rejects
+                added = sum(d for blk, _li, d in aser if blk > pb and d > 0)
+                if added <= 0:
+                    continue                       # liquidity that predates the pull is not a migration
+                moved.append((n_after, added, c[3], c, aser))
+            if moved:
+                n_after, added, _id, alt, aser = max(moved, key=lambda m: m[:3])
+                out["migrated_from"] = venue[3]
                 venue, ls = alt, liquidity_state(aser)
         p = venue[4]
         last = venue[1] if venue[1] >= 0 else None

@@ -198,9 +198,11 @@ def live_returns(book: dict | None = None, counts: dict | None = None) -> tuple:
 
 
 def _in_stratum_a(p: dict) -> bool:
-    """A stratum = a champion promotion, or a first sighting the champion band tiered A."""
+    """A stratum = a champion promotion, or a first sighting the champion band tiered A. A CAPPED
+    promotion (G1/G2 withheld the alert: tier B) is not A."""
     kind = str(p.get("event_kind") or "")
-    return kind == "promotion" or (kind == "first_sighting" and str(p.get("tier") or "") == "A")
+    tier = str(p.get("tier") or "")
+    return (kind == "promotion" and tier != "B") or (kind == "first_sighting" and tier == "A")
 
 
 def _a_mask(meta: list) -> np.ndarray:
@@ -630,6 +632,20 @@ def _paper_refusals(start: float, end: float, band: str) -> dict:
             "n_unattributed": n_unattributed, "unknown": unknown}
 
 
+def alert_cap_cutover_ts() -> tuple:
+    """(ts | None, error | None): the G1/G2 alert-cap cut-over — config.ALERT_CAP_CUTOVER_TS, else
+    ledger.alert_cap_cutover on data/ledger.csv (None = the cap is not live in this ledger). An
+    unreadable ledger is an ERROR, not "no cut-over": the caller VOIDs rather than pool blind."""
+    if getattr(config, "ALERT_CAP_CUTOVER_TS", None) is not None:
+        return float(config.ALERT_CAP_CUTOVER_TS), None
+    try:
+        import ledger as _LED
+        return _LED.alert_cap_cutover(_LED.load()), None
+    except Exception as exc:
+        print(f"  [paper gate] ledger unreadable for the alert-cap cut-over ({exc})")
+        return None, str(exc)
+
+
 def _iso(ts: float) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(float(ts)))
 
@@ -708,7 +724,7 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
            "has_flow": False, "n_armed": None,
            "flow_dark_share": None, "checks": [], "void": [], "reasons": [],
            "nomination_key": None, "recorded": None, "bound_label": "",
-           "record": bool(record), "recorded_now": [], "would_record": []}
+           "record": bool(record), "recorded_now": [], "would_record": [], "alert_cap_cutover_ts": None}
     if band is None or start is None:
         why = ("no band under test (config.LIVEBOOK_BAND_UNDER_TEST)" if band is None
                else "no window start (config.PAPER_GATE_WINDOW_START)")
@@ -856,6 +872,18 @@ def paper_gate(now_s: float, *, book: dict | None = None, counts: dict | None = 
     if refused_share is not None and refused_share > config.PAPER_GATE_MAX_REFUSED_SHARE:
         void.append(f"CAPACITY: refused share {refused_share:.3f} > PAPER_GATE_MAX_REFUSED_SHARE "
                     f"{config.PAPER_GATE_MAX_REFUSED_SHARE} ({n_ref} refused / {n_admitted} admitted)")
+    cut, cut_err = alert_cap_cutover_ts()
+    out["alert_cap_cutover_ts"] = cut
+    if cut_err is not None:
+        void.append(f"SELECTION CHANGE UNKNOWN: the G1/G2 alert-cap cut-over could not be read ({cut_err})")
+    elif cut is not None and start < cut < end:
+        # the G1/G2 alert cap changed which champion picks are A (unconditional book admissions) and
+        # which take the band-under-test sub-cap, INSIDE this window: the two halves are not one
+        # sample and are never pooled silently — the window is void, and a new one starting at or
+        # after the cut-over is a new counted `paper:` trial the operator opens
+        void.append(f"SELECTION CHANGE: the G1/G2 alert cap went live at {_iso(cut)}, inside the window "
+                    f"[{_iso(start)}, {_iso(end)}) — rows before and after it are not one sample; open a new "
+                    f"window at or after the cut-over (a counted paper: trial)")
     if has_flow and flow_dark is not None and flow_dark > PAPER_FLOW_DARK_MAX:
         void.append(f"FLOW DARK: tick-level dark share over armed positions {flow_dark:.3f} > "
                     f"{PAPER_FLOW_DARK_MAX:.2f} (n_armed {n_armed}) — the rule was mostly not running "

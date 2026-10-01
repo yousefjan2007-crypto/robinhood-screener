@@ -713,10 +713,12 @@ def load_registry(path: str | None = None) -> Registry:
     return Registry(entries, specs, skipped)
 
 
-def tier_for(gates_ok: bool, verdicts: dict, champion: str) -> str:
-    """'A' iff the hard gates passed AND the champion band's verdict is True. A band laxer than
-    the hard gates is impossible by construction; an NA champion is B."""
-    return "A" if (gates_ok and (verdicts or {}).get(champion) is True) else "B"
+def tier_for(gates_ok: bool, verdicts: dict, champion: str, alert_ok: bool = True) -> str:
+    """'A' iff the hard gates passed AND the alert-time cap passed (screen.alert_cap_ok: G1 venue
+    liquidity, G2 route — False only on a positive finding) AND the champion band's verdict is True.
+    A band laxer than the hard gates is impossible by construction; an NA champion is B. A capped
+    champion pick is a B row that still carries its verdicts (it is never dropped)."""
+    return "A" if (gates_ok and alert_ok and (verdicts or {}).get(champion) is True) else "B"
 
 
 # ── smoke test (offline) ───────────────────────────────────────────────────────────

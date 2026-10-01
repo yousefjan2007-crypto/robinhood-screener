@@ -185,21 +185,44 @@ on-chain had their main pool fully removed 9.6 to 569 seconds *before* the alert
 lower bound, because NEPTUNE's dead pool still printed +10 % in the ledger. **G1** (`liq_live_ok`)
 reads, for each alert candidate just before the alert, every pool the token can trade on, takes the
 one with the most swaps in the last ~30 minutes as the venue (never the first one created: one hooked
-launch template sets up a hook-less decoy pool about 12 seconds before the real one), and rejects
-when the venue's on-chain liquidity is zero or below half its peak, or when Dexscreener's own pair
-has had no swap for 10 minutes while Dexscreener still reports at least $25k of hour-1 volume.
-**G2** (`route_ok`): a buy the quote layer answers as *absent* (a drained V2 pool, or no V2 pair and
-both aggregators say no route) means the token cannot be A; the live book had refused 80 tier-A
-entries over 18 days for exactly that, and scores them at −1. **G4**: one hook-less V4 launch factory
-(mint recipient `0x1cbaf24d…a149`, about 33 launches an hour, fake demand, liquidity pulled 5–10
-minutes after launch) is dropped at discovery. All three fail closed only on a positive on-chain
-finding; an unanswered RPC or quote passes and is named in `sources_dark`. They are safety filters,
-not an edge: the expected effect is fewer alerts on tokens that were already dead or unbuyable, with
-no measured cost on real runners (a pre-alert-pulled "runner" like ARGONAUTS, +28.6× in the ledger,
-was a garbage 24 h quote on a dead pool). G1 and G2 run only on the alert candidates, so B rows are not
-matched on them; every row now says so in its `unchecked` list, and the alert card prints the checks
-the fast alert path never ran (top-10 holders, the creation-tx deployer, the creator's history, the
-launcher's balance, the sniper count) instead of looking fully checked.
+launch template sets up a hook-less decoy pool about 12 seconds before the real one), and withholds
+the alert when the venue's on-chain liquidity is zero or below half its peak. A pulled venue counts as
+*migrated* only when another pool added liquidity after the pull and traded at least
+max(5, 10 % of the pulled pool's swaps) times after it: the first version accepted one swap in any
+side pool, and BAG (a 416-swap pool emptied 207 seconds before its alert) read "live" off a 2-swap
+side pool. A third branch (Dexscreener's own pair silent for 10 minutes while Dexscreener still
+reports at least $25k of hour-1 volume) is recorded but does not withhold anything: replayed with
+each row's at-alert pair, it fired on 0 of 422 tier-A rows, so it has neither a measured cost nor a
+measured catch. **G2** (`route_ok`): a buy the quote layer answers as *absent* (a drained V2 pool, or
+no V2 pair and both aggregators say no route) means the token cannot be A; the live book had refused
+80 tier-A entries over 18 days for exactly that, and scores them at −1. Replayed at each alert block
+over the 422 tier-A rows of the 7 days to 2026-10-01 (SHA 9d4a044), G1 would have withheld 18: every
+one had its venue drained before the alert, none moved more than +17 % after it, and the one with a
+≥ $500k spot cell (AXD) entered at $769k and stayed frozen there on a dead pool. 404 read live, and
+all 48 runners in the window (entry under $500k, a scorable spot cell at $500k or more; hooked V4
+included) read at their liquidity peak; four live rows sat below it, the lowest ALFA at 65 %, above
+the half-peak line. That replay measures the cost on runners for these 7 days only.
+
+G1 and G2 are **tier caps, not hard gates**. A capped champion pick is still written to the ledger,
+as a B row carrying its band verdicts and the finding (a `0` in one of the last two `gates_mask`
+characters; `-` where the check never ran), and it spends the token's one champion event exactly as
+an A row would. The reason is the comparison, not the alert: dropping those rows would remove the
+worst of the champion's picks from its own arm only, while B rows and every other band's picks are
+never probed, inflating A against B and biasing every candidate's paired lift against the champion.
+The entry gate reads band verdicts, so its arms are the same population on both sides of the change.
+The tier tables are not: `ledger.summary()` prints the epochs before and after the cut-over apart
+(the first row whose mask carries the two caps, or `config.ALERT_CAP_CUTOVER_TS`) and shows capped
+rows as their own group, outside B; the paper gate voids any window the cut-over falls inside.
+
+**G4**: one hook-less V4 launch factory (mint recipient `0x1cbaf24d…a149`, about 33 launches an
+hour, fake demand, liquidity pulled 5–10 minutes after launch) is dropped at discovery. All three
+act only on a positive on-chain finding; an unanswered RPC or quote passes and is named in
+`sources_dark`. They are safety filters, not an edge: the expected effect is fewer alerts on tokens
+that were already dead or unbuyable (a pre-alert-pulled "runner" like ARGONAUTS, +28.6× in the
+ledger, was a garbage 24 h quote on a dead pool). G1 and G2 run only on the alert candidates, so B
+rows are not matched on them; every row says so in its `unchecked` list, and the alert card prints
+the checks the fast alert path never ran (top-10 holders, the creation-tx deployer, the creator's
+history, the launcher's balance, the sniper count) instead of looking fully checked.
 
 Some of the Solana gates have **no analogue** here. There is no funding-graph clustering of insider
 wallets, no behavioural wallet tags, no freeze authority, and honeypot.is rejects the chain; GoPlus

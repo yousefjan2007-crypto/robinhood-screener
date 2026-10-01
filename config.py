@@ -314,6 +314,22 @@ VENUE_STALE_MIN_VOL_H1_USD = 25_000.0   # swap for this long, and Dexscreener st
                                    # thresholds chosen once, never fitted; the band's floor is $50k h1.
 VENUE_LOG_CAP = 10_000             # the node refuses an eth_getLogs matching more ("exceeds limit"): read as
                                    # "at least this many swaps", never as a failure, for the swap COUNT only
+VENUE_STALE_FAILS = False          # the 'stale' branch is RECORDED (venue_liq_state) but does not fail
+                                   # liq_live_ok until its false-positive rate on live runners is measured
+                                   # with each row's at-alert Dexscreener pair (review, 2026-10-01)
+VENUE_MIGRATION_MIN_SWAP_FRAC = 0.10   # a pulled venue counts as MIGRATED to another pool only when that pool
+VENUE_MIGRATION_MIN_SWAPS = 5          # added liquidity AFTER the pull and traded at least max(5, 10 % x the
+                                   # pulled pool's window swaps) times after it. One swap in a side pool was
+                                   # enough in the first version: BAG (event_seq 2138, 416 swaps on its emptied
+                                   # hooked pool) read 'live' off a 2-swap side pool. Chosen once, never fitted.
+# ── the alert-time CAP and its cut-over (review, 2026-10-01) ─────────────────────────────────────
+# G1 and G2 are TIER CAPS, not hard gates: a positive finding makes the champion pick a B row that is
+# still ledgered with its verdicts (gates_mask carries '0' in the last two positions; '-' = not
+# probed). The entry gate reads verdicts, so its arms are the same population on both sides of the
+# cut-over; ledger.summary and the paper gate read TIERS / the book, and split on this instant.
+# None ⇒ derived from the ledger (ledger.alert_cap_cutover: the first row whose gates_mask carries the
+# two cap positions). The operator may pin it (epoch seconds) once the change is live.
+ALERT_CAP_CUTOVER_TS = None
 # ── G2: no route at alert (hard gate route_ok) ────────────────────────────────────────────────────
 # quotes.quote_buy's three-way status, probed for the alert candidates before the alert: ABSENT (a
 # drained V2 pool, or no V2 pair and BOTH aggregators answered no-route) fails; deferred passes. The
