@@ -110,16 +110,21 @@ jobs:
         run: |
           git config user.name "robinhood-improve[bot]"          # publish.py's identity
           git config user.email "bot@users.noreply.github.com"
-          # EXACTLY run_improve.sh's list: the six state files plus the last 4 proposals. The four
-          # committed book files ride keeper.sh's `git add data/ docs/` and are never staged here;
-          # the one book path below is the weekly digest the dashboard and the summary read.
+          # The six state files plus the NEWEST proposal of EACH gate, picked separately: the exit
+          # gate writes data/proposals/proposal-<stamp>.md and the entry gate entry-<stamp>.md.
+          # One `sort | tail -n 4` over both prefixes never reached entry-*: "entry-" sorts before
+          # "proposal-", so the four tail slots were always proposal files and the entry gate's
+          # proposal never published (found 2026-10-01). The four committed book files ride
+          # keeper.sh's `git add data/ docs/` and are never staged here; the one book path below
+          # is the weekly digest the dashboard and the summary read.
           for f in selfimprove/champion.json \
                    selfimprove/trials.json \
                    selfimprove/improve_history.jsonl \
                    selfimprove/candidates/registry.json \
                    data/entry_lab_history.jsonl \
                    data/livebook_summary.json \
-                   $(ls data/proposals/*.md 2>/dev/null | sort | tail -n 4); do
+                   $(ls data/proposals/entry-*.md 2>/dev/null | sort | tail -n 1) \
+                   $(ls data/proposals/proposal-*.md 2>/dev/null | sort | tail -n 1); do
             if [ -f "$f" ]; then git add -- "$f"; fi
           done
           if git diff --cached --quiet; then echo "no state change to publish"; exit 0; fi

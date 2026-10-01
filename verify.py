@@ -681,6 +681,11 @@ for _p in ("selfimprove/champion.json", "selfimprove/trials.json", "selfimprove/
            "selfimprove/candidates/registry.json", "data/entry_lab_history.jsonl", "data/livebook_summary.json",
            "data/proposals/"):
     check(f"weekly.yml's publish step stages {_p!r} (exactly the deleted run_improve.sh's list)", _p in _wpub)
+check("weekly.yml's publish step stages the newest entry-*.md AND the newest proposal-*.md SEPARATELY (one `sort | tail -n 4` over "
+      "both prefixes never reached entry-*: 'entry-' sorts before 'proposal-', so the entry gate's proposal never published)",
+      "ls data/proposals/entry-*.md 2>/dev/null | sort | tail -n 1" in _wpub
+      and "ls data/proposals/proposal-*.md 2>/dev/null | sort | tail -n 1" in _wpub
+      and "data/proposals/*.md" not in _wpub)
 check("weekly.yml never stages a Mac-local book file: data/livebook.json / _fills.csv / _feed.json / _missed.jsonl / _ticks.jsonl "
       "appear nowhere in it (they ride keeper.sh's `git add data/ docs/`); the ONE data/livebook* path is the weekly digest",
       not any(x in wyml for x in ("data/livebook.json", "data/livebook_fills.csv", "data/livebook_feed.json",

@@ -89,7 +89,8 @@ dashboard tripwire are the signal. `latest_scan.json.trigger` records who fired 
 (`KEEPER_BOOK=1`: a 60 s `livebook.py --tick` whose state reads and write phase take the scan's
 lock from Python, four state files committed with the scan). The SUNDAY GATES run in `weekly.yml`
 at 10:00 UTC on the runner's own checkout, and its Publish step stages its six state paths plus
-the last four proposals explicitly, as `robinhood-improve[bot]`. What is left on the Mac is the
+the newest `entry-*.md` and the newest `proposal-*.md` explicitly (picked separately — one
+`sort | tail` over both never reached `entry-*`), as `robinhood-improve[bot]`. What is left on the Mac is the
 OPTIONAL research session, and it does **not** use `publish.py`: `run_research.sh` ff-syncs the
 tree, works in a detached temp worktree, then merges its own `research/<date>` branch onto
 `origin/main` and pushes it with git directly (3 retries, else the branch is pushed for a human).
