@@ -1,6 +1,50 @@
 {
  "pending_buys": [],
  "positions": {
+  "0x000050e18ffa3f8f7ad170eb9cef160eb3ed1111:4071": {
+   "alert_ts": 1791657603.979974,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 2.925280184011448e-22,
+   "event_seq": 4071,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.3953,
+   "opened_ts": 1791657603.979974,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "TORCH",
+   "tier": "A",
+   "token": "0x000050e18ffa3f8f7ad170eb9cef160eb3ed1111",
+   "tokens_raw": 34184759650225921982464,
+   "tokens_remaining_raw": 34184759650225921982464,
+   "weth_px_usd_open": 2508.41
+  },
   "0x0009ef7a824323ac69596f2c9c336638c90025a0:1469": {
    "alert_ts": 1789847924.5052927,
    "champion_at_open": "cfg_ladder_stop",
@@ -27720,9 +27764,9 @@
   "0x58f659855786c4ffeee5baa428b9bffddea99254:4065": {
    "alert_ts": 1791650404.062619,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1791657603.979974,
    "cost_usd": 10.0,
    "entry_px_usd": 1.204417586033887e-22,
    "event_seq": 4065,
@@ -27758,7 +27802,7 @@
    "tier": "A",
    "token": "0x58f659855786c4ffeee5baa428b9bffddea99254",
    "tokens_raw": 83027681727312841146368,
-   "tokens_remaining_raw": 83027681727312841146368,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2504.84
   },
   "0x58f7e271641bb4a29a99604cf11d799a26f498e8:3339": {
