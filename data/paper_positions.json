@@ -5802,9 +5802,9 @@
   "0x1160fe7ab196137ba74cfa725bf9b8cc21230a0f:4249": {
    "alert_ts": 1791826884.6448197,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1791828805.317719,
    "cost_usd": 10.0,
    "entry_px_usd": 1.8249825358075514e-22,
    "event_seq": 4249,
@@ -5840,7 +5840,7 @@
    "tier": "A",
    "token": "0x1160fe7ab196137ba74cfa725bf9b8cc21230a0f",
    "tokens_raw": 54795044904772300701696,
-   "tokens_remaining_raw": 54795044904772300701696,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2502.67
   },
   "0x11d7f78319ee7b9b55263451e52bfe030f25159a:3984": {
@@ -32240,13 +32240,13 @@
   "0x6795db4d1352fa9ec3983bbd8bfc21f37ffb388a:4253": {
    "alert_ts": 1791828324.8905873,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1791828805.317719,
    "cost_usd": 10.0,
    "entry_px_usd": 1.831293269212484e-22,
    "event_seq": 4253,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 37.3165,
    "opened_ts": 1791828324.8905873,
    "pending_exits": [],
@@ -32273,12 +32273,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 0.13326843078872888,
    "symbol": "VRAX",
    "tier": "A",
    "token": "0x6795db4d1352fa9ec3983bbd8bfc21f37ffb388a",
    "tokens_raw": 54606218283652223074304,
-   "tokens_remaining_raw": 54606218283652223074304,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2508.79
   },
   "0x67b72d4c1b6ce40ace8d1c49ce5326d1caf38390:298": {
@@ -42072,6 +42072,50 @@
    "tokens_raw": 44917377429386402201600,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2684.45
+  },
+  "0x96b352ed2948ac3981adf3bb161481e4853e8b3d:4255": {
+   "alert_ts": 1791828805.317719,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.3933843864037739e-22,
+   "event_seq": 4255,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1791828805.317719,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "MarsX",
+   "tier": "A",
+   "token": "0x96b352ed2948ac3981adf3bb161481e4853e8b3d",
+   "tokens_raw": 71767705290636206800896,
+   "tokens_remaining_raw": 71767705290636206800896,
+   "weth_px_usd_open": 2510.069
   },
   "0x970646fdc76016fe064b84472a8c3a31fde87457:3056": {
    "alert_ts": 1790929196.6666865,
