@@ -13354,9 +13354,9 @@
   "0x25d89d95b26c370df043cebfe87a1a7a8c2d32a6:4166": {
    "alert_ts": 1791770051.482153,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1791856803.2937026,
    "cost_usd": 10.0,
    "entry_px_usd": 5.834946378396593e-23,
    "event_seq": 4166,
@@ -13392,7 +13392,7 @@
    "tier": "A",
    "token": "0x25d89d95b26c370df043cebfe87a1a7a8c2d32a6",
    "tokens_raw": 171381180759846818938880,
-   "tokens_remaining_raw": 171381180759846818938880,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2532.61
   },
   "0x25d9f0d524bb27a5fc0fc6152c56a47aeebdf90a:2667": {
@@ -18752,6 +18752,50 @@
    "tokens_raw": 219296669018406363594752,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2722.048
+  },
+  "0x33e2b648c9497d167147905aac3f2386802384e7:4296": {
+   "alert_ts": 1791856803.2937026,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.4087368566337467e-22,
+   "event_seq": 4296,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.028,
+   "opened_ts": 1791856803.2937026,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "SI",
+   "tier": "A",
+   "token": "0x33e2b648c9497d167147905aac3f2386802384e7",
+   "tokens_raw": 70985577987187354370048,
+   "tokens_remaining_raw": 70985577987187354370048,
+   "weth_px_usd_open": 2461.17
   },
   "0x341d471ae9fbf1c0c46814a280458775a8406b7c:4067": {
    "alert_ts": 1791653283.5032115,
@@ -63562,7 +63606,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.4593391645863481e-22,
    "event_seq": 4283,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": 0.0346,
    "opened_ts": 1791849361.8100064,
    "pending_exits": [],
@@ -63589,12 +63633,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 9.539325286785061,
+   "realized_usd": 21.72099817802082,
    "symbol": "UNICORN",
    "tier": "A",
    "token": "0xfd8e303dac4a7298de79f4d9e4e7433282696ed7",
    "tokens_raw": 68524166572576805486592,
-   "tokens_remaining_raw": 34262083286288402743296,
+   "tokens_remaining_raw": 17131041643144201371648,
    "weth_px_usd_open": 2442.92
   },
   "0xfdc5754d112ec8702809f19c81ff9f55be70c400:3857": {
