@@ -1799,6 +1799,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2715.54
   },
+  "0x05008ee5eb5c1ad6257a1c7b800098c0b152a8b5:4394": {
+   "alert_ts": 1791920667.2024791,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 2.219113625145819e-22,
+   "event_seq": 4394,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1791920667.2024791,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "Demone",
+   "tier": "A",
+   "token": "0x05008ee5eb5c1ad6257a1c7b800098c0b152a8b5",
+   "tokens_raw": 45063037271662437335040,
+   "tokens_remaining_raw": 45063037271662437335040,
+   "weth_px_usd_open": 2500.45
+  },
   "0x050fd3dd7c5edb4a778497120f03da7ec613e615:4097": {
    "alert_ts": 1791698650.8257568,
    "champion_at_open": "cfg_ladder_stop",
@@ -27548,13 +27592,13 @@
   "0x4a995d621bc8b3e0e68556200e7449e15bdf97d4:4392": {
    "alert_ts": 1791920426.9979453,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1791920667.2024791,
    "cost_usd": 10.0,
    "entry_px_usd": 6.228284073317755e-22,
    "event_seq": 4392,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 31.8351,
    "opened_ts": 1791920426.9979453,
    "pending_exits": [],
@@ -27581,12 +27625,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 1.7004218938375986,
    "symbol": "VRAX",
    "tier": "A",
    "token": "0x4a995d621bc8b3e0e68556200e7449e15bdf97d4",
    "tokens_raw": 16055786605560339628032,
-   "tokens_remaining_raw": 16055786605560339628032,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2504.84
   },
   "0x4aafbe5779b684fa34f114a85577c7283416648b:4292": {
@@ -33298,13 +33342,13 @@
   "0x61dfb1e2bdef7b4303f9d8d56cdec73ba5050f5d:4386": {
    "alert_ts": 1791919467.3564901,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1791920667.2024791,
    "cost_usd": 10.0,
    "entry_px_usd": 1.2311339846483358e-21,
    "event_seq": 4386,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 0.3866,
    "opened_ts": 1791919467.3564901,
    "pending_exits": [],
@@ -33331,12 +33375,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": -0.049650355926096484,
    "symbol": "VRAX",
    "tier": "A",
    "token": "0x61dfb1e2bdef7b4303f9d8d56cdec73ba5050f5d",
    "tokens_raw": 8122592767883363745792,
-   "tokens_remaining_raw": 8122592767883363745792,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2506.87
   },
   "0x621280e000ad10ae1a0afd83810b9c3d197535cb:1482": {
@@ -39398,6 +39442,50 @@
    "tokens_raw": 9970114229311715147776,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2688.078
+  },
+  "0x7ee3cdc8a89ed8f799ba92eba1c367c504f55617:4395": {
+   "alert_ts": 1791920667.2024791,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 5.426080070442273e-22,
+   "event_seq": 4395,
+   "gas_usd": 0.07,
+   "impact_pct_open": -24.1332,
+   "opened_ts": 1791920667.2024791,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "VRAX",
+   "tier": "A",
+   "token": "0x7ee3cdc8a89ed8f799ba92eba1c367c504f55617",
+   "tokens_raw": 18429510567810165637120,
+   "tokens_remaining_raw": 18429510567810165637120,
+   "weth_px_usd_open": 2500.45
   },
   "0x7ef631ccc120b598a92d96f490677936ebda59ed:1487": {
    "alert_ts": 1789864911.3408647,
