@@ -9888,9 +9888,9 @@
   "0x1b0fd8b55936aff26b90722c3da50e2540efdef2:4391": {
    "alert_ts": 1791920426.9979453,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1792011209.7873352,
    "cost_usd": 10.0,
    "entry_px_usd": 7.832261594279113e-23,
    "event_seq": 4391,
@@ -9926,7 +9926,7 @@
    "tier": "A",
    "token": "0x1b0fd8b55936aff26b90722c3da50e2540efdef2",
    "tokens_raw": 127677042954033344544768,
-   "tokens_remaining_raw": 63838521477016672272384,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2504.84
   },
   "0x1b17b0386b12971523072b78f52fa36604549524:2780": {
@@ -39883,6 +39883,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2679.49
   },
+  "0x785d48d33d289bd516aad39121e47108a86b1039:4571": {
+   "alert_ts": 1792011209.7873352,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 7.851775953011496e-23,
+   "event_seq": 4571,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1792011209.7873352,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "GOAT",
+   "tier": "A",
+   "token": "0x785d48d33d289bd516aad39121e47108a86b1039",
+   "tokens_raw": 127359721671178957357056,
+   "tokens_remaining_raw": 127359721671178957357056,
+   "weth_px_usd_open": 2419.77
+  },
   "0x78631a65f42e3c26542edb709b46b6da5bb94fc4:3290": {
    "alert_ts": 1791093531.695703,
    "champion_at_open": "cfg_ladder_stop",
@@ -41300,7 +41344,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 5.807626269086983e-23,
    "event_seq": 4566,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 100.0,
    "opened_ts": 1792008329.9287379,
    "pending_exits": [],
@@ -41327,12 +41371,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 3.6692790346282944,
    "symbol": "DIKSHIT",
    "tier": "A",
    "token": "0x7eb909b92457ec7a788491048cde5f146bb6023f",
    "tokens_raw": 172187388386685931749376,
-   "tokens_remaining_raw": 172187388386685931749376,
+   "tokens_remaining_raw": 86093694193342965874688,
    "weth_px_usd_open": 2428.56
   },
   "0x7ee3cdc8a89ed8f799ba92eba1c367c504f55617:4395": {
@@ -56850,7 +56894,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 3.831025965165742e-22,
    "event_seq": 4568,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": -119.224,
    "opened_ts": 1792009049.89259,
    "pending_exits": [],
@@ -56877,12 +56921,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 22.829019394206096,
    "symbol": "LLL",
    "tier": "A",
    "token": "0xca27c03c6e62bbb295c1670b5945ba5b702a806e",
    "tokens_raw": 26102668295455861899264,
-   "tokens_remaining_raw": 26102668295455861899264,
+   "tokens_remaining_raw": 13051334147727930949632,
    "weth_px_usd_open": 2429.92
   },
   "0xca319f3e2bea4922aa69cd69eeb76ebdd96ffc96:1414": {
