@@ -15598,13 +15598,13 @@
   "0x26a72330ee5ea4b1471199a5e2605abdc114af5d:4696": {
    "alert_ts": 1792097308.1092958,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1792184314.4026523,
    "cost_usd": 10.0,
    "entry_px_usd": 1.436476292124214e-22,
    "event_seq": 4696,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 0.2045,
    "opened_ts": 1792097308.1092958,
    "pending_exits": [],
@@ -15631,12 +15631,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 10.115816297760809,
    "symbol": "TOAST",
    "tier": "A",
    "token": "0x26a72330ee5ea4b1471199a5e2605abdc114af5d",
    "tokens_raw": 69614793190998842277888,
-   "tokens_remaining_raw": 69614793190998842277888,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2457.76
   },
   "0x26b7ff12d5a2b747d445c4667e090e561e726151:4480": {
@@ -32162,6 +32162,50 @@
    "tokens_raw": 102186918274037264154624,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2692.27
+  },
+  "0x4e398005e43bfcb67c22e18c39dc1bc97ae0b653:4833": {
+   "alert_ts": 1792184314.4026523,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 2.0412879804801287e-21,
+   "event_seq": 4833,
+   "gas_usd": 0.07,
+   "impact_pct_open": 4.3591,
+   "opened_ts": 1792184314.4026523,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "DOPESTER",
+   "tier": "A",
+   "token": "0x4e398005e43bfcb67c22e18c39dc1bc97ae0b653",
+   "tokens_raw": 4898867820525702348800,
+   "tokens_remaining_raw": 4898867820525702348800,
+   "weth_px_usd_open": 2413.72
   },
   "0x4e5d840a78e0c950a25c768e064608b9d1e54672:4327": {
    "alert_ts": 1791893146.6234386,
@@ -60458,7 +60502,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.6940381949283553e-22,
    "event_seq": 4830,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": -30.8441,
    "opened_ts": 1792184075.2639482,
    "pending_exits": [],
@@ -60485,12 +60529,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 15.352945046583045,
    "symbol": "KUMIO",
    "tier": "A",
    "token": "0xc8204444aaadfc582bf5420478fbd8d0ca0cf506",
    "tokens_raw": 59030546241154394882048,
-   "tokens_remaining_raw": 59030546241154394882048,
+   "tokens_remaining_raw": 29515273120577197441024,
    "weth_px_usd_open": 2411.9
   },
   "0xc88f382ac1d0cd3243e4698088d7b2667c075b6e:3998": {
