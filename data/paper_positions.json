@@ -55311,6 +55311,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2698.19
   },
+  "0xa472318678664cc67ffdf111fe48beb36e69f95f:4971": {
+   "alert_ts": 1792268163.1476219,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.3415630092711361e-22,
+   "event_seq": 4971,
+   "gas_usd": 0.07,
+   "impact_pct_open": 45.7192,
+   "opened_ts": 1792268163.1476219,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "MOON",
+   "tier": "A",
+   "token": "0xa472318678664cc67ffdf111fe48beb36e69f95f",
+   "tokens_raw": 74539920457652938735616,
+   "tokens_remaining_raw": 74539920457652938735616,
+   "weth_px_usd_open": 2416.48
+  },
   "0xa4da0e095a8f467549a20b21507063bc89732946:3230": {
    "alert_ts": 1791063590.795209,
    "champion_at_open": "cfg_ladder_stop",
@@ -69022,9 +69066,9 @@
   "0xe14f727e69d361bfcef1cfdb5804cb09a377fd67:4822": {
    "alert_ts": 1792180802.441182,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1792268163.1476219,
    "cost_usd": 10.0,
    "entry_px_usd": 1.127363426824209e-22,
    "event_seq": 4822,
@@ -69060,7 +69104,7 @@
    "tier": "A",
    "token": "0xe14f727e69d361bfcef1cfdb5804cb09a377fd67",
    "tokens_raw": 88702540476854667575296,
-   "tokens_remaining_raw": 88702540476854667575296,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2409.24
   },
   "0xe19a1525fe717cb891aa514af2877a3eb1864de6:3040": {
