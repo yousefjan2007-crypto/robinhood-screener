@@ -11780,9 +11780,9 @@
   "0x1a3237964567c8c0708f00b14d8279e9c1b6b269:5141": {
    "alert_ts": 1792350462.6066716,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1792439211.0665426,
    "cost_usd": 10.0,
    "entry_px_usd": 8.282603218854147e-23,
    "event_seq": 5141,
@@ -11818,7 +11818,7 @@
    "tier": "A",
    "token": "0x1a3237964567c8c0708f00b14d8279e9c1b6b269",
    "tokens_raw": 120734987971371697438720,
-   "tokens_remaining_raw": 120734987971371697438720,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2366.21
   },
   "0x1a554409d8bfd338f929e692616132f52e307020:1247": {
@@ -46970,6 +46970,50 @@
    "tokens_raw": 12010811346087273562112,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2699.37
+  },
+  "0x71a01d22912fec86c4eac290f1d66b5d2857a9de:5287": {
+   "alert_ts": 1792439211.0665426,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.5338738148770145e-21,
+   "event_seq": 5287,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.0155,
+   "opened_ts": 1792439211.0665426,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "Dacity",
+   "tier": "A",
+   "token": "0x71a01d22912fec86c4eac290f1d66b5d2857a9de",
+   "tokens_raw": 6519441105917696802816,
+   "tokens_remaining_raw": 6519441105917696802816,
+   "weth_px_usd_open": 2399.67
   },
   "0x71a2caf346af0d52fe398baba7593f6614721edb:2564": {
    "alert_ts": 1790615135.085215,
