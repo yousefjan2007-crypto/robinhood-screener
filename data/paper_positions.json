@@ -14065,6 +14065,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2366.21
   },
+  "0x1a3c4459db22a16b49ae2b549c39dafb346beaf7:5927": {
+   "alert_ts": 1792888570.3797827,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.144683084003189e-22,
+   "event_seq": 5927,
+   "gas_usd": 0.07,
+   "impact_pct_open": 24.4551,
+   "opened_ts": 1792888570.3797827,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "WILDWOOD",
+   "tier": "A",
+   "token": "0x1a3c4459db22a16b49ae2b549c39dafb346beaf7",
+   "tokens_raw": 87360424380763719335936,
+   "tokens_remaining_raw": 87360424380763719335936,
+   "weth_px_usd_open": 2355.92
+  },
   "0x1a554409d8bfd338f929e692616132f52e307020:1247": {
    "alert_ts": 1789767655.1430397,
    "champion_at_open": "cfg_ladder_stop",
@@ -18068,9 +18112,9 @@
   "0x20b357cf31e390e84d429ff9b86149a05cc23584:5924": {
    "alert_ts": 1792886410.7264473,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1792888570.3797827,
    "cost_usd": 10.0,
    "entry_px_usd": 1.373545097765238e-22,
    "event_seq": 5924,
@@ -18106,7 +18150,7 @@
    "tier": "A",
    "token": "0x20b357cf31e390e84d429ff9b86149a05cc23584",
    "tokens_raw": 72804307745483058577408,
-   "tokens_remaining_raw": 72804307745483058577408,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2353.27
   },
   "0x20f2b4938d5eb7e55be809fe2360e469e9de2aa4:3484": {
