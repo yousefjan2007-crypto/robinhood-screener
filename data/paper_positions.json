@@ -21230,9 +21230,9 @@
   "0x25c21ff7ee2bffcb4143f45e0d961f1cded79167:5894": {
    "alert_ts": 1792854463.145316,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1792942077.452619,
    "cost_usd": 10.0,
    "entry_px_usd": 1.494295778542496e-22,
    "event_seq": 5894,
@@ -21268,7 +21268,7 @@
    "tier": "A",
    "token": "0x25c21ff7ee2bffcb4143f45e0d961f1cded79167",
    "tokens_raw": 66921155393705153134592,
-   "tokens_remaining_raw": 66921155393705153134592,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2320.021
   },
   "0x25cc1f828f8daf727240e7e7844bf4b437596251:5853": {
@@ -48446,7 +48446,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 2.000863511018114e-21,
    "event_seq": 5970,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": 0.0786,
    "opened_ts": 1792941837.3247252,
    "pending_exits": [],
@@ -48473,12 +48473,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 6.381903940740274,
    "symbol": "BTC",
    "tier": "A",
    "token": "0x5a574730898e91106d35e96ee698cac6281871ca",
    "tokens_raw": 4997842154116562812928,
-   "tokens_remaining_raw": 4997842154116562812928,
+   "tokens_remaining_raw": 2498921077058281406464,
    "weth_px_usd_open": 2333.8
   },
   "0x5aa8bd871eec292921e9de8907a880b316467e2b:5759": {
@@ -82578,6 +82578,50 @@
    "tokens_raw": 101461709136350012243968,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2448.29
+  },
+  "0xcc9a9f85986ffafb41fe022efbecc2f0af27d02e:5971": {
+   "alert_ts": 1792942077.452619,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 7.396474223406204e-23,
+   "event_seq": 5971,
+   "gas_usd": 0.07,
+   "impact_pct_open": 1.5948,
+   "opened_ts": 1792942077.452619,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "GME",
+   "tier": "A",
+   "token": "0xcc9a9f85986ffafb41fe022efbecc2f0af27d02e",
+   "tokens_raw": 135199551812874799153152,
+   "tokens_remaining_raw": 135199551812874799153152,
+   "weth_px_usd_open": 2334.81
   },
   "0xccac3bc4aba6f6a9e9669ce114fbfe537cac5bc5:2569": {
    "alert_ts": 1790617295.2878077,
