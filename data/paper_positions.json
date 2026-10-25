@@ -2635,6 +2635,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2767.37
   },
+  "0x04d5bf87fb2b0b5ad37de20df030cdb8788a8762:5982": {
+   "alert_ts": 1792947598.5607197,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 2.364191475668029e-24,
+   "event_seq": 5982,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1792947598.5607197,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "GME",
+   "tier": "A",
+   "token": "0x04d5bf87fb2b0b5ad37de20df030cdb8788a8762",
+   "tokens_raw": 4229775846380795812904960,
+   "tokens_remaining_raw": 4229775846380795812904960,
+   "weth_px_usd_open": 2353.34
+  },
   "0x04dc5ce1c7add255ff1af6cc8f099006316a645a:2634": {
    "alert_ts": 1790669548.9356265,
    "champion_at_open": "cfg_ladder_stop",
@@ -6158,9 +6202,9 @@
   "0x0aecbede7df8a8a24c23cdda7723afea4ad8c4e4:5981": {
    "alert_ts": 1792947359.0310404,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1792947598.5607197,
    "cost_usd": 10.0,
    "entry_px_usd": 2.360656156732687e-24,
    "event_seq": 5981,
@@ -6196,7 +6240,7 @@
    "tier": "A",
    "token": "0x0aecbede7df8a8a24c23cdda7723afea4ad8c4e4",
    "tokens_raw": 4236110359181109126758400,
-   "tokens_remaining_raw": 4236110359181109126758400,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2349.57
   },
   "0x0afb83a3b113a221daacbb4f2be208f3a947a885:5830": {
