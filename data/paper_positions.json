@@ -444,31 +444,16 @@
   "0x00bf65c09ed8a4ac1eb4cacffb57c1a8c54f727d:5965": {
    "alert_ts": 1792939028.0895917,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1793026984.2230124,
    "cost_usd": 10.0,
    "entry_px_usd": 1.5220339402381287e-22,
    "event_seq": 5965,
    "gas_usd": 0.07,
    "impact_pct_open": 0.8596,
    "opened_ts": 1792939028.0895917,
-   "pending_exits": [
-    {
-     "event": {
-      "event_seq": 5965,
-      "gap_s": 1200.0204529762268,
-      "kind": "stop",
-      "mult": 0.0,
-      "price": 0.0,
-      "ret": -1.0,
-      "symbol": "TEMPTATION",
-      "token": "0x00bf65c09ed8a4ac1eb4cacffb57c1a8c54f727d"
-     },
-     "first_seen_ts": 1793026703.6326194,
-     "tries": 0
-    }
-   ],
+   "pending_exits": [],
    "plan": {
     "flow": null,
     "ladder": [
@@ -497,7 +482,7 @@
    "tier": "A",
    "token": "0x00bf65c09ed8a4ac1eb4cacffb57c1a8c54f727d",
    "tokens_raw": 65701557209923038740480,
-   "tokens_remaining_raw": 65701557209923038740480,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2330.73
   },
   "0x00c25c499ce818d01b47bb0d6358620b4967b434:858": {
