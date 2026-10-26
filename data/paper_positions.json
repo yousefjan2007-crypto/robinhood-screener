@@ -18376,9 +18376,9 @@
   "0x1f9a07e9fc8a91089da8e355822d289551b8e0bf:5938": {
    "alert_ts": 1792901413.0895433,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1792988442.841207,
    "cost_usd": 10.0,
    "entry_px_usd": 1.0429194769651668e-22,
    "event_seq": 5938,
@@ -18414,7 +18414,7 @@
    "tier": "A",
    "token": "0x1f9a07e9fc8a91089da8e355822d289551b8e0bf",
    "tokens_raw": 95884679698373272403968,
-   "tokens_remaining_raw": 95884679698373272403968,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2361.037
   },
   "0x1fac75d4ee75e80d9357ceb31a3275ecdd1db3bb:3951": {
@@ -75326,6 +75326,50 @@
    "tokens_raw": 75330653341210755727360,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2405.87
+  },
+  "0xae4d9ad3caf67c9a09147da1e80c7d2145c46b62:6039": {
+   "alert_ts": 1792988442.841207,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 7.40508033207535e-23,
+   "event_seq": 6039,
+   "gas_usd": 0.07,
+   "impact_pct_open": -0.2242,
+   "opened_ts": 1792988442.841207,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "SHELLBAY",
+   "tier": "A",
+   "token": "0xae4d9ad3caf67c9a09147da1e80c7d2145c46b62",
+   "tokens_raw": 135042424275732294270976,
+   "tokens_remaining_raw": 135042424275732294270976,
+   "weth_px_usd_open": 2308.91
   },
   "0xae67fead16257362157c82bac270e4097d59aeb8:883": {
    "alert_ts": 1789681313.4321344,
