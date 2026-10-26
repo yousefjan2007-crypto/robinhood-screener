@@ -453,7 +453,22 @@
    "gas_usd": 0.07,
    "impact_pct_open": 0.8596,
    "opened_ts": 1792939028.0895917,
-   "pending_exits": [],
+   "pending_exits": [
+    {
+     "event": {
+      "event_seq": 5965,
+      "gap_s": 1200.0204529762268,
+      "kind": "stop",
+      "mult": 0.0,
+      "price": 0.0,
+      "ret": -1.0,
+      "symbol": "TEMPTATION",
+      "token": "0x00bf65c09ed8a4ac1eb4cacffb57c1a8c54f727d"
+     },
+     "first_seen_ts": 1793026703.6326194,
+     "tries": 0
+    }
+   ],
    "plan": {
     "flow": null,
     "ladder": [
@@ -66588,13 +66603,13 @@
   "0x8ee60c7b2a4cfec9dff8ad322e8ad06e50f8d3be:5964": {
    "alert_ts": 1792935907.917933,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1793026703.6326194,
    "cost_usd": 10.0,
    "entry_px_usd": 2.533309743480144e-22,
    "event_seq": 5964,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": 0.0506,
    "opened_ts": 1792935907.917933,
    "pending_exits": [],
@@ -66621,12 +66636,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 8.970265650809454,
+   "realized_usd": 8.97903429076996,
    "symbol": "JuJu",
    "tier": "A",
    "token": "0x8ee60c7b2a4cfec9dff8ad322e8ad06e50f8d3be",
    "tokens_raw": 39474051784376202559488,
-   "tokens_remaining_raw": 19737025892188101279744,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2334.48
   },
   "0x8f27ff6f7f41c053bd468a2998675b16cb9e4109:5248": {
