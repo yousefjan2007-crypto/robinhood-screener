@@ -1170051,10 +1170051,10 @@
   "weth_px_usd_open": 2315.47,
   "quote_source_open": "kyber",
   "entry_impact_pct": 8.8675,
-  "last_tick_ts": 1793016983.759857,
-  "n_ticks": 260,
+  "last_tick_ts": 1793017223.7694993,
+  "n_ticks": 264,
   "done": false,
-  "last_honest_px": 1.4213209153464373e-24,
+  "last_honest_px": 1.421605357036859e-24,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1170586,10 +1170586,10 @@
   "weth_px_usd_open": 2332.093,
   "quote_source_open": "kyber",
   "entry_impact_pct": 0.1088,
-  "last_tick_ts": 1793016983.759857,
-  "n_ticks": 146,
+  "last_tick_ts": 1793017223.7694993,
+  "n_ticks": 150,
   "done": false,
-  "last_honest_px": 5.306569176215507e-24,
+  "last_honest_px": 5.307060548216454e-24,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1170848,10 +1170848,10 @@
   "weth_px_usd_open": 2332.093,
   "quote_source_open": "kyber",
   "entry_impact_pct": 0.0255,
-  "last_tick_ts": 1793016983.759857,
-  "n_ticks": 144,
+  "last_tick_ts": 1793017223.7694993,
+  "n_ticks": 148,
   "done": false,
-  "last_honest_px": 5.166434757368841e-24,
+  "last_honest_px": 5.169321987761261e-24,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1171111,10 +1171111,10 @@
   "weth_px_usd_open": 2328.16,
   "quote_source_open": "kyber",
   "entry_impact_pct": -3.4135,
-  "last_tick_ts": 1793016983.759857,
-  "n_ticks": 119,
+  "last_tick_ts": 1793017223.7694993,
+  "n_ticks": 123,
   "done": false,
-  "last_honest_px": 5.144982538838548e-21,
+  "last_honest_px": 2.9946449590228e-21,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1171123,7 +1171123,7 @@
   "policies": {
    "hold_to_end": {
     "remaining": 1.0,
-    "peak_px": 5.144982538838548e-21,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1171166,19 +1171166,19 @@
     "gapped": false
    },
    "sell_2h": {
-    "remaining": 1.0,
-    "peak_px": 5.144982538838548e-21,
+    "remaining": 0.0,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [],
-    "realized_usd": 0.0,
-    "closed": false,
-    "closed_ts": null,
-    "close_reason": "",
-    "close_gap_s": null,
+    "realized_usd": 63.53096093600696,
+    "closed": true,
+    "closed_ts": 1793017043.5944147,
+    "close_reason": "time_exit",
+    "close_gap_s": 59.8,
     "gapped": false
    },
    "sell_3h": {
     "remaining": 1.0,
-    "peak_px": 5.144982538838548e-21,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1171189,7 +1171189,7 @@
    },
    "sell_6h": {
     "remaining": 1.0,
-    "peak_px": 5.144982538838548e-21,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1171200,7 +1171200,7 @@
    },
    "stop_30": {
     "remaining": 1.0,
-    "peak_px": 5.144982538838548e-21,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1171211,7 +1171211,7 @@
    },
    "stop_50": {
     "remaining": 1.0,
-    "peak_px": 5.144982538838548e-21,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1171222,7 +1171222,7 @@
    },
    "cfg_ladder": {
     "remaining": 0.25,
-    "peak_px": 5.144982538838548e-21,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [
      [
       10.0,
@@ -1171238,7 +1171238,7 @@
    },
    "cfg_ladder_stop": {
     "remaining": 0.25,
-    "peak_px": 5.144982538838548e-21,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [
      [
       10.0,
@@ -1171264,14 +1171264,14 @@
     "gapped": false
    },
    "trail_50": {
-    "remaining": 1.0,
-    "peak_px": 5.144982538838548e-21,
+    "remaining": 0.0,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [],
-    "realized_usd": 0.0,
-    "closed": false,
-    "closed_ts": null,
-    "close_reason": "",
-    "close_gap_s": null,
+    "realized_usd": 31.62478470222237,
+    "closed": true,
+    "closed_ts": 1793017164.07548,
+    "close_reason": "trail",
+    "close_gap_s": 60.7,
     "gapped": false
    },
    "tp2_half_trail30": {
@@ -1171292,7 +1171292,7 @@
    },
    "tp2_half_stop50_6h": {
     "remaining": 0.5,
-    "peak_px": 5.144982538838548e-21,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [],
     "realized_usd": 9.9996328196126,
     "closed": false,
@@ -1171338,7 +1171338,7 @@
    },
    "ctl_random_exit": {
     "remaining": 1.0,
-    "peak_px": 5.144982538838548e-21,
+    "peak_px": 5.406982975537865e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1171659,10 +1171659,10 @@
   "weth_px_usd_open": 2325.21,
   "quote_source_open": "kyber",
   "entry_impact_pct": 88.5617,
-  "last_tick_ts": 1793016983.759857,
-  "n_ticks": 71,
+  "last_tick_ts": 1793017223.7694993,
+  "n_ticks": 75,
   "done": false,
-  "last_honest_px": 1.3601754945391533e-23,
+  "last_honest_px": 1.360306851750265e-23,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1171945,10 +1171945,10 @@
   "weth_px_usd_open": 2323.35,
   "quote_source_open": "kyber",
   "entry_impact_pct": 0.1031,
-  "last_tick_ts": 1793016983.759857,
-  "n_ticks": 51,
+  "last_tick_ts": 1793017223.7694993,
+  "n_ticks": 55,
   "done": false,
-  "last_honest_px": 5.219511861765945e-21,
+  "last_honest_px": 2.8444094589876433e-21,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1171957,7 +1171957,7 @@
   "policies": {
    "hold_to_end": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1171990,7 +1171990,7 @@
    },
    "sell_1h": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172001,7 +1172001,7 @@
    },
    "sell_2h": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172012,7 +1172012,7 @@
    },
    "sell_3h": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172023,7 +1172023,7 @@
    },
    "sell_6h": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172034,7 +1172034,7 @@
    },
    "stop_30": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172045,7 +1172045,7 @@
    },
    "stop_50": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172056,7 +1172056,7 @@
    },
    "cfg_ladder": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [
      [
       2.0,
@@ -1172080,7 +1172080,7 @@
    },
    "cfg_ladder_stop": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [
      [
       2.0,
@@ -1172103,19 +1172103,19 @@
     "gapped": false
    },
    "trail_30": {
-    "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "remaining": 0.0,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
-    "realized_usd": 0.0,
-    "closed": false,
-    "closed_ts": null,
-    "close_reason": "",
-    "close_gap_s": null,
+    "realized_usd": 8.827666683773694,
+    "closed": true,
+    "closed_ts": 1793017103.3411188,
+    "close_reason": "trail",
+    "close_gap_s": 59.7,
     "gapped": false
    },
    "trail_50": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172125,24 +1172125,24 @@
     "gapped": false
    },
    "tp2_half_trail30": {
-    "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "remaining": 0.0,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [
      [
       2.0,
       0.5
      ]
     ],
-    "realized_usd": 0.0,
-    "closed": false,
-    "closed_ts": null,
-    "close_reason": "",
-    "close_gap_s": null,
+    "realized_usd": 8.827666683773694,
+    "closed": true,
+    "closed_ts": 1793017103.3411188,
+    "close_reason": "trail",
+    "close_gap_s": 59.7,
     "gapped": false
    },
    "tp2_half_stop50_6h": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [
      [
       2.0,
@@ -1172157,8 +1172157,8 @@
     "gapped": false
    },
    "cfg_ladder_trail30_6h": {
-    "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "remaining": 0.0,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [
      [
       2.0,
@@ -1172173,11 +1172173,11 @@
       0.15
      ]
     ],
-    "realized_usd": 0.0,
-    "closed": false,
-    "closed_ts": null,
-    "close_reason": "",
-    "close_gap_s": null,
+    "realized_usd": 8.827666683773694,
+    "closed": true,
+    "closed_ts": 1793017103.3411188,
+    "close_reason": "trail",
+    "close_gap_s": 59.7,
     "gapped": false
    },
    "ctl_exit_immediately": {
@@ -1172193,7 +1172193,7 @@
    },
    "ctl_random_exit": {
     "remaining": 1.0,
-    "peak_px": 5.219511861765945e-21,
+    "peak_px": 5.641862190232544e-21,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172515,10 +1172515,10 @@
   "weth_px_usd_open": 2327.33,
   "quote_source_open": "kyber",
   "entry_impact_pct": 100.0,
-  "last_tick_ts": 1793016983.759857,
-  "n_ticks": 31,
+  "last_tick_ts": 1793017223.7694993,
+  "n_ticks": 35,
   "done": false,
-  "last_honest_px": 9.329881565931871e-23,
+  "last_honest_px": 9.345317084844841e-23,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1172800,10 +1172800,10 @@
   "weth_px_usd_open": 2330.55,
   "quote_source_open": "kyber",
   "entry_impact_pct": 0.0199,
-  "last_tick_ts": 1793016983.759857,
-  "n_ticks": 22,
+  "last_tick_ts": 1793017223.7694993,
+  "n_ticks": 26,
   "done": false,
-  "last_honest_px": 5.9894255457293e-22,
+  "last_honest_px": 5.46433811952764e-22,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1172812,7 +1172812,7 @@
   "policies": {
    "hold_to_end": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172834,7 +1172834,7 @@
    },
    "sell_30m": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172845,7 +1172845,7 @@
    },
    "sell_1h": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172856,7 +1172856,7 @@
    },
    "sell_2h": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172867,7 +1172867,7 @@
    },
    "sell_3h": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172878,7 +1172878,7 @@
    },
    "sell_6h": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172889,7 +1172889,7 @@
    },
    "stop_30": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172900,7 +1172900,7 @@
    },
    "stop_50": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172910,13 +1172910,9 @@
     "gapped": false
    },
    "cfg_ladder": {
-    "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "remaining": 0.5,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [
-     [
-      2.0,
-      0.5
-     ],
      [
       5.0,
       0.25
@@ -1172926,7 +1172922,7 @@
       0.15
      ]
     ],
-    "realized_usd": 0.0,
+    "realized_usd": 9.981390474850736,
     "closed": false,
     "closed_ts": null,
     "close_reason": "",
@@ -1172934,13 +1172930,9 @@
     "gapped": false
    },
    "cfg_ladder_stop": {
-    "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "remaining": 0.5,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [
-     [
-      2.0,
-      0.5
-     ],
      [
       5.0,
       0.25
@@ -1172950,7 +1172942,7 @@
       0.15
      ]
     ],
-    "realized_usd": 0.0,
+    "realized_usd": 9.981390474850736,
     "closed": false,
     "closed_ts": null,
     "close_reason": "",
@@ -1172959,7 +1172951,7 @@
    },
    "trail_30": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172970,7 +1172962,7 @@
    },
    "trail_50": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1172980,15 +1172972,10 @@
     "gapped": false
    },
    "tp2_half_trail30": {
-    "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
-    "rungs_left": [
-     [
-      2.0,
-      0.5
-     ]
-    ],
-    "realized_usd": 0.0,
+    "remaining": 0.5,
+    "peak_px": 6.588424044554395e-22,
+    "rungs_left": [],
+    "realized_usd": 9.981390474850736,
     "closed": false,
     "closed_ts": null,
     "close_reason": "",
@@ -1172996,15 +1172983,10 @@
     "gapped": false
    },
    "tp2_half_stop50_6h": {
-    "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
-    "rungs_left": [
-     [
-      2.0,
-      0.5
-     ]
-    ],
-    "realized_usd": 0.0,
+    "remaining": 0.5,
+    "peak_px": 6.588424044554395e-22,
+    "rungs_left": [],
+    "realized_usd": 9.981390474850736,
     "closed": false,
     "closed_ts": null,
     "close_reason": "",
@@ -1173012,13 +1172994,9 @@
     "gapped": false
    },
    "cfg_ladder_trail30_6h": {
-    "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "remaining": 0.5,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [
-     [
-      2.0,
-      0.5
-     ],
      [
       5.0,
       0.25
@@ -1173028,7 +1173006,7 @@
       0.15
      ]
     ],
-    "realized_usd": 0.0,
+    "realized_usd": 9.981390474850736,
     "closed": false,
     "closed_ts": null,
     "close_reason": "",
@@ -1173048,7 +1173026,7 @@
    },
    "ctl_random_exit": {
     "remaining": 1.0,
-    "peak_px": 5.9894255457293e-22,
+    "peak_px": 6.588424044554395e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173084,10 +1173062,10 @@
   "weth_px_usd_open": 2334.27,
   "quote_source_open": "kyber",
   "entry_impact_pct": 0.5444,
-  "last_tick_ts": 1793016983.759857,
-  "n_ticks": 19,
+  "last_tick_ts": 1793017223.7694993,
+  "n_ticks": 23,
   "done": false,
-  "last_honest_px": 3.1482412475307325e-22,
+  "last_honest_px": 2.7048236618440553e-22,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1173096,7 +1173074,7 @@
   "policies": {
    "hold_to_end": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173118,7 +1173096,7 @@
    },
    "sell_30m": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173129,7 +1173107,7 @@
    },
    "sell_1h": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173140,7 +1173118,7 @@
    },
    "sell_2h": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173151,7 +1173129,7 @@
    },
    "sell_3h": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173162,7 +1173140,7 @@
    },
    "sell_6h": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173173,7 +1173151,7 @@
    },
    "stop_30": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173184,7 +1173162,7 @@
    },
    "stop_50": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173195,7 +1173173,7 @@
    },
    "cfg_ladder": {
     "remaining": 0.5,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [
      [
       5.0,
@@ -1173215,7 +1173193,7 @@
    },
    "cfg_ladder_stop": {
     "remaining": 0.5,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [
      [
       5.0,
@@ -1173235,7 +1173213,7 @@
    },
    "trail_30": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173246,7 +1173224,7 @@
    },
    "trail_50": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
@@ -1173257,7 +1173235,7 @@
    },
    "tp2_half_trail30": {
     "remaining": 0.5,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 9.989701173670769,
     "closed": false,
@@ -1173268,7 +1173246,7 @@
    },
    "tp2_half_stop50_6h": {
     "remaining": 0.5,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 9.989701173670769,
     "closed": false,
@@ -1173279,7 +1173257,7 @@
    },
    "cfg_ladder_trail30_6h": {
     "remaining": 0.5,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [
      [
       5.0,
@@ -1173310,7 +1173288,7 @@
    },
    "ctl_random_exit": {
     "remaining": 1.0,
-    "peak_px": 3.3921130232793324e-22,
+    "peak_px": 3.3955386502899703e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
