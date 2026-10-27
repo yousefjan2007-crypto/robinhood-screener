@@ -86998,3 +86998,15 @@ ts,token,event_seq,symbol,tier,policy,side,frac_of_original,px,usd_proceeds,gap_
 1793098856.1635296,0xa4cb00181266529eeea75068fbaf0a187c9a0786,6139,SODI,B,ctl_random_exit,no_route,0.0,0.0,0.0,59.3,"NO ROUTE — dead coin, proceeds $0"
 1793099036.8819883,0x247617d77648430690174efbb225e7ca21ab5b29,6140,MMGA,A,*,buy_failed,0.0,0.0,0.0,0,"no route at alert — not opened; ABSENT: no V2 pair, kyber no_route, scanhood no_route"
 1793099036.8819883,0xd03ad748aa2fed370c2e5657899f273b5ed04566,6135,Chapter 1,A,sell_2h,time_exit,1.0,6.151634044422197e-24,0.270048,60.5,
+1793099396.544703,0x8ba3beaf8423e1b381af0a2124d6be01536fe03d,6141,PAD,B,*,buy,1.0,1.7791648528161366e-22,-10.003449,0.0,"shared entry via kyber, impact 2.8336, reserve_weth ?; fired_band -; sidecar_true ctl_inverse_band; buy 0.00431758 WETH ($10.00) → 5.62e+22 raw via kyber impact 2.83%"
+1793099396.544703,0xd03ad748aa2fed370c2e5657899f273b5ed04566,6135,Chapter 1,A,ctl_random_exit,random_exit,1.0,6.153017205916641e-24,0.270109,60.4,
+1793099456.0777357,0x8ba3beaf8423e1b381af0a2124d6be01536fe03d,6141,PAD,B,ctl_exit_immediately,time_exit,1.0,1.654210815850191e-22,9.300888,59.5,
+1793099576.1978226,0xfd67ea19f178b8d41eca257e30d9bcaa2c662217,6129,YOINK,A,ctl_random_exit,random_exit,1.0,5.935758636696362e-24,1.454905,60.1,
+1793099576.1978226,0x8ba3beaf8423e1b381af0a2124d6be01536fe03d,6141,PAD,B,stop_30,stop,1.0,1.0816529779469341e-22,6.081651,60.1,
+1793099576.1978226,0x8ba3beaf8423e1b381af0a2124d6be01536fe03d,6141,PAD,B,trail_30,trail,1.0,1.0816529779469341e-22,6.081651,60.1,
+1793099576.1978226,0x8ba3beaf8423e1b381af0a2124d6be01536fe03d,6141,PAD,B,tp2_half_trail30,trail,1.0,1.0816529779469341e-22,6.081651,60.1,
+1793099576.1978226,0x8ba3beaf8423e1b381af0a2124d6be01536fe03d,6141,PAD,B,cfg_ladder_trail30_6h,trail,1.0,1.0816529779469341e-22,6.081651,60.1,
+1793099636.1600597,0x486c6b77b02a79df1d495866ca673f6683b357bd,6101,Nothing,A,hold_to_end,tracking_window_end,1.0,2.3171280042281807e-24,0.127188,839.3,terminal mark at the last observed price
+1793099636.1600597,0x486c6b77b02a79df1d495866ca673f6683b357bd,6101,Nothing,A,cfg_ladder,tracking_window_end,1.0,2.3171280042281807e-24,0.127188,839.3,terminal mark at the last observed price
+1793099636.1600597,0x23a713f6ff5dbd0181dad5105813ec87e64b0ae2,6102,TOWER,A,hold_to_end,tracking_window_end,1.0,2.317219238332562e-24,0.038832,839.3,terminal mark at the last observed price
+1793099636.1600597,0x23a713f6ff5dbd0181dad5105813ec87e64b0ae2,6102,TOWER,A,cfg_ladder,tracking_window_end,0.5,2.317219238332562e-24,0.019416,839.3,terminal mark at the last observed price
