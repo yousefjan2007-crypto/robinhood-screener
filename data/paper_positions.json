@@ -19834,7 +19834,7 @@
    "cost_usd": 10.0,
    "entry_px_usd": 1.7244826101999195e-22,
    "event_seq": 6318,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": 0.0245,
    "opened_ts": 1793232926.3250008,
    "pending_exits": [],
@@ -19861,12 +19861,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 10.012339369840788,
+   "realized_usd": 19.759093034528938,
    "symbol": "ROBINHOOD",
    "tier": "A",
    "token": "0x207e7047107c69a48c8cbea76c8d92d0d55c09d6",
    "tokens_raw": 57988407310414681997312,
-   "tokens_remaining_raw": 28994203655207340998656,
+   "tokens_remaining_raw": 14497101827603670499328,
    "weth_px_usd_open": 2355.053
   },
   "0x209b538fd9689ac12e6da9ca8fc65f1b8fb5c6f7:5983": {
@@ -85580,13 +85580,13 @@
   "0xbfeeb9e17ac27e01683ed5aec8c9f13ac2561d8a:6320": {
    "alert_ts": 1793234606.0454543,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1793234846.3221714,
    "cost_usd": 10.0,
    "entry_px_usd": 7.497960966895386e-23,
    "event_seq": 6320,
-   "gas_usd": 0.07,
+   "gas_usd": 0.14,
    "impact_pct_open": -15.0645,
    "opened_ts": 1793234606.0454543,
    "pending_exits": [],
@@ -85613,12 +85613,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 0.0,
+   "realized_usd": 0.2517943166930873,
    "symbol": "Kleinfrog",
    "tier": "A",
    "token": "0xbfeeb9e17ac27e01683ed5aec8c9f13ac2561d8a",
    "tokens_raw": 133369592668613341347840,
-   "tokens_remaining_raw": 133369592668613341347840,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2354.047
   },
   "0xbff560f976367613a7fb26b9f5ce594dea0b4330:2839": {
@@ -102846,6 +102846,50 @@
    "tokens_raw": 20651440970210790604800,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2715.74
+  },
+  "0xf5dd7910f33ee89405cfe65d0a54f76952c8c614:6321": {
+   "alert_ts": 1793234846.3221714,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.0594412294666325e-22,
+   "event_seq": 6321,
+   "gas_usd": 0.07,
+   "impact_pct_open": 0.3664,
+   "opened_ts": 1793234846.3221714,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "ROBINHOOD",
+   "tier": "A",
+   "token": "0xf5dd7910f33ee89405cfe65d0a54f76952c8c614",
+   "tokens_raw": 94389379248855764172800,
+   "tokens_remaining_raw": 94389379248855764172800,
+   "weth_px_usd_open": 2354.12
   },
   "0xf5e0e4344a9b2cdcde5bd04a58504050ef9fd2dd:2960": {
    "alert_ts": 1790867746.6565716,
