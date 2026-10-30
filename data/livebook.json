@@ -1256827,10 +1256827,10 @@
   "weth_px_usd_open": 2202.91,
   "quote_source_open": "kyber",
   "entry_impact_pct": 0.4336,
-  "last_tick_ts": 1793365593.0276153,
-  "n_ticks": 384,
+  "last_tick_ts": 1793366432.8859377,
+  "n_ticks": 385,
   "done": false,
-  "last_honest_px": 3.8252005443927e-25,
+  "last_honest_px": 3.824638987255222e-25,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1261209,10 +1261209,10 @@
   "weth_px_usd_open": 2224.25,
   "quote_source_open": "kyber",
   "entry_impact_pct": 1.4496,
-  "last_tick_ts": 1793366192.2057128,
-  "n_ticks": 261,
+  "last_tick_ts": 1793366432.8859377,
+  "n_ticks": 265,
   "done": false,
-  "last_honest_px": 5.862243893476936e-22,
+  "last_honest_px": 5.701408295303677e-22,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1262471,10 +1262471,10 @@
   "weth_px_usd_open": 2227.65,
   "quote_source_open": "kyber",
   "entry_impact_pct": 29.7152,
-  "last_tick_ts": 1793366192.2057128,
-  "n_ticks": 11,
+  "last_tick_ts": 1793366432.8859377,
+  "n_ticks": 15,
   "done": false,
-  "last_honest_px": 2.4299975240772846e-22,
+  "last_honest_px": 2.187997799779998e-22,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1262493,14 +1262493,14 @@
     "gapped": false
    },
    "sell_15m": {
-    "remaining": 1.0,
+    "remaining": 0.0,
     "peak_px": 3.3448027668765395e-22,
     "rungs_left": [],
-    "realized_usd": 0.0,
-    "closed": false,
-    "closed_ts": null,
-    "close_reason": "",
-    "close_gap_s": null,
+    "realized_usd": 19.34840577843418,
+    "closed": true,
+    "closed_ts": 1793366432.8859377,
+    "close_reason": "time_exit",
+    "close_gap_s": 60.1,
     "gapped": false
    },
    "sell_30m": {
@@ -1262707,6 +1262707,290 @@
    "ctl_random_exit": {
     "remaining": 1.0,
     "peak_px": 3.3448027668765395e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   }
+  }
+ },
+ "0x52b284805aabdc5071bbef3f15d0f1dbfa59583d:6428": {
+  "token": "0x52b284805aabdc5071bbef3f15d0f1dbfa59583d",
+  "event_seq": 6428,
+  "event_kind": "first_sighting",
+  "prior_event_seq": null,
+  "symbol": "STEVIE",
+  "tier": "A",
+  "ledger_tier": "A",
+  "ledger_plan_name": "cfg_ladder_stop",
+  "fired_band": "",
+  "sidecar_true": [
+   "band_volume_early"
+  ],
+  "admitted_via": "unconditional",
+  "alert_ts": 1793366192.6751442,
+  "entry_lag_s": 59.8,
+  "opened_ts": 1793366252.471219,
+  "alert_seq": 4581,
+  "cost_usd": 10.000364725468625,
+  "tokens_raw": 90806629670077396418560,
+  "entry_px": 1.1012813449637307e-22,
+  "decimals": 18,
+  "weth_px_usd_open": 2226.75,
+  "quote_source_open": "kyber",
+  "entry_impact_pct": 5.2794,
+  "last_tick_ts": 1793366432.8859377,
+  "n_ticks": 3,
+  "done": false,
+  "last_honest_px": 1.0754184399043203e-22,
+  "suspect_ticks": 0,
+  "deferred_ticks": 0,
+  "suspect": false,
+  "unpriced": false,
+  "max_gap_s": 60.193708658218384,
+  "policies": {
+   "hold_to_end": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_15m": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_30m": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_1h": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_2h": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_3h": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_6h": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "stop_30": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "stop_50": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "cfg_ladder": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "cfg_ladder_stop": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "trail_30": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "trail_50": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "tp2_half_trail30": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "tp2_half_stop50_6h": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "cfg_ladder_trail30_6h": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "ctl_exit_immediately": {
+    "remaining": 0.0,
+    "peak_px": 1.1670449640476988e-22,
+    "rungs_left": [],
+    "realized_usd": 10.597541985860817,
+    "closed": true,
+    "closed_ts": 1793366312.5663257,
+    "close_reason": "time_exit",
+    "close_gap_s": 60.1,
+    "gapped": false
+   },
+   "ctl_random_exit": {
+    "remaining": 1.0,
+    "peak_px": 1.1670449640476988e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
