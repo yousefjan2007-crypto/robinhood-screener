@@ -1270248,10 +1270248,10 @@
   "weth_px_usd_open": 2237.024,
   "quote_source_open": "kyber",
   "entry_impact_pct": 11.4355,
-  "last_tick_ts": 1793430998.2560637,
-  "n_ticks": 374,
+  "last_tick_ts": 1793431838.895197,
+  "n_ticks": 375,
   "done": false,
-  "last_honest_px": 1.8924543450513862e-25,
+  "last_honest_px": 1.893484775573019e-25,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1270533,10 +1270533,10 @@
   "weth_px_usd_open": 2237.024,
   "quote_source_open": "kyber",
   "entry_impact_pct": 2.4331,
-  "last_tick_ts": 1793430998.2560637,
-  "n_ticks": 374,
+  "last_tick_ts": 1793431838.895197,
+  "n_ticks": 375,
   "done": false,
-  "last_honest_px": 1.146558847958372e-24,
+  "last_honest_px": 1.147183142664572e-24,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1273882,10 +1273882,10 @@
   "weth_px_usd_open": 2245.54,
   "quote_source_open": "kyber",
   "entry_impact_pct": -4.3629,
-  "last_tick_ts": 1793430938.5598977,
-  "n_ticks": 361,
+  "last_tick_ts": 1793431778.1467617,
+  "n_ticks": 362,
   "done": false,
-  "last_honest_px": 1.135329094163033e-22,
+  "last_honest_px": 1.1118799666171396e-22,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1274975,10 +1274975,10 @@
   "weth_px_usd_open": 2242.69,
   "quote_source_open": "kyber",
   "entry_impact_pct": 100.0,
-  "last_tick_ts": 1793431598.609991,
-  "n_ticks": 339,
+  "last_tick_ts": 1793431898.237946,
+  "n_ticks": 344,
   "done": false,
-  "last_honest_px": 5.82535914906671e-27,
+  "last_honest_px": 5.828992065104961e-27,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1276682,10 +1276682,10 @@
   "weth_px_usd_open": 2238.61,
   "quote_source_open": "kyber",
   "entry_impact_pct": 1.3675,
-  "last_tick_ts": 1793431598.609991,
-  "n_ticks": 95,
+  "last_tick_ts": 1793431898.237946,
+  "n_ticks": 100,
   "done": false,
-  "last_honest_px": 6.123022075022717e-22,
+  "last_honest_px": 6.670921905740001e-22,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1276945,10 +1276945,10 @@
   "weth_px_usd_open": 2241.048,
   "quote_source_open": "kyber",
   "entry_impact_pct": 8.7894,
-  "last_tick_ts": 1793431598.609991,
-  "n_ticks": 54,
+  "last_tick_ts": 1793431898.237946,
+  "n_ticks": 59,
   "done": false,
-  "last_honest_px": 8.282082260315002e-25,
+  "last_honest_px": 8.287087564561106e-25,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1277229,10 +1277229,10 @@
   "weth_px_usd_open": 2242.43,
   "quote_source_open": "kyber",
   "entry_impact_pct": 9.4478,
-  "last_tick_ts": 1793431598.609991,
-  "n_ticks": 27,
+  "last_tick_ts": 1793431898.237946,
+  "n_ticks": 32,
   "done": false,
-  "last_honest_px": 7.051524367746755e-23,
+  "last_honest_px": 1.0195233132749091e-22,
   "suspect_ticks": 0,
   "deferred_ticks": 0,
   "suspect": false,
@@ -1277262,14 +1277262,14 @@
     "gapped": false
    },
    "sell_30m": {
-    "remaining": 1.0,
+    "remaining": 0.0,
     "peak_px": 1.1393040289815006e-22,
     "rungs_left": [],
-    "realized_usd": 0.0,
-    "closed": false,
-    "closed_ts": null,
-    "close_reason": "",
-    "close_gap_s": null,
+    "realized_usd": 17.885695910281758,
+    "closed": true,
+    "closed_ts": 1793431838.895197,
+    "close_reason": "time_exit",
+    "close_gap_s": 60.7,
     "gapped": false
    },
    "sell_1h": {
@@ -1277478,6 +1277478,291 @@
    "ctl_random_exit": {
     "remaining": 1.0,
     "peak_px": 1.1393040289815006e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   }
+  }
+ },
+ "0xa79ee0c2dd5273757cf58dafa38f54455d8bcad2:6486": {
+  "token": "0xa79ee0c2dd5273757cf58dafa38f54455d8bcad2",
+  "event_seq": 6486,
+  "event_kind": "first_sighting",
+  "prior_event_seq": null,
+  "symbol": "VOLITION",
+  "tier": "B",
+  "ledger_tier": "B",
+  "ledger_plan_name": "cfg_ladder_stop",
+  "fired_band": "",
+  "sidecar_true": [
+   "band_dev_score_ge70",
+   "ctl_inverse_band"
+  ],
+  "admitted_via": "b_cap",
+  "alert_ts": 1793431598.0000155,
+  "entry_lag_s": 60.3,
+  "opened_ts": 1793431658.3042405,
+  "alert_seq": 4634,
+  "cost_usd": 9.995577679083718,
+  "tokens_raw": 36458079831894742007808,
+  "entry_px": 2.741663226690083e-22,
+  "decimals": 18,
+  "weth_px_usd_open": 2242.42,
+  "quote_source_open": "kyber",
+  "entry_impact_pct": 3.9565,
+  "last_tick_ts": 1793431898.237946,
+  "n_ticks": 4,
+  "done": false,
+  "last_honest_px": 2.860668013144935e-22,
+  "suspect_ticks": 0,
+  "deferred_ticks": 0,
+  "suspect": false,
+  "unpriced": false,
+  "max_gap_s": 60.748435258865356,
+  "policies": {
+   "hold_to_end": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_15m": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_30m": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_1h": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_2h": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_3h": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "sell_6h": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "stop_30": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "stop_50": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "cfg_ladder": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "cfg_ladder_stop": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "trail_30": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "trail_50": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "tp2_half_trail30": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "tp2_half_stop50_6h": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "cfg_ladder_trail30_6h": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
+    "rungs_left": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "realized_usd": 0.0,
+    "closed": false,
+    "closed_ts": null,
+    "close_reason": "",
+    "close_gap_s": null,
+    "gapped": false
+   },
+   "ctl_exit_immediately": {
+    "remaining": 0.0,
+    "peak_px": 2.8006053576188286e-22,
+    "rungs_left": [],
+    "realized_usd": 10.210469370569937,
+    "closed": true,
+    "closed_ts": 1793431718.4957438,
+    "close_reason": "time_exit",
+    "close_gap_s": 60.2,
+    "gapped": false
+   },
+   "ctl_random_exit": {
+    "remaining": 1.0,
+    "peak_px": 2.860668013144935e-22,
     "rungs_left": [],
     "realized_usd": 0.0,
     "closed": false,
