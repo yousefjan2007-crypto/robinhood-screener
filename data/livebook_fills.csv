@@ -101416,3 +101416,12 @@ ts,token,event_seq,symbol,tier,policy,side,frac_of_original,px,usd_proceeds,gap_
 1793808282.2991645,0x0833c94aa78c146c0f4ab22b970b874bbc520eed,6932,NOVUS,A,ctl_random_exit,no_route,0.0,0.0,0.0,59.5,"NO ROUTE — dead coin, proceeds $0"
 1793808462.4078581,0x7be78e3430ca9c2895b0269e48c05a074354e015,6934,RURU,B,*,buy,1.0,3.401503773340363e-22,-9.999892,0.0,"shared entry via kyber, impact 0.8605, reserve_weth ?; fired_band -; sidecar_true ctl_inverse_band; buy 0.00411492 WETH ($10.00) → 2.94e+22 raw via kyber impact 0.86%"
 1793808462.4078581,0xf73a21ecc084a491a7c4a2f7c97a58dcbe60b416,6935,LAWYER,A,*,buy,1.0,2.749563675238455e-23,-9.999892,0.0,"shared entry via kyber, impact -548.3450, reserve_weth ?; fired_band -; sidecar_true band_volume_early; buy 0.00411492 WETH ($10.00) → 3.64e+23 raw via kyber impact -548.35%"
+1793808522.2990363,0xb6b0ad4345b2a4ac5d2365ee46ac2a5d284393bc,6915,BunThing,B,sell_3h,time_exit,1.0,3.038014549940641e-22,18.680751,59.9,
+1793808522.2990363,0x7be78e3430ca9c2895b0269e48c05a074354e015,6934,RURU,B,ctl_exit_immediately,time_exit,1.0,3.23918736157749e-22,9.522707,59.9,
+1793808522.2990363,0xf73a21ecc084a491a7c4a2f7c97a58dcbe60b416,6935,LAWYER,A,ctl_exit_immediately,time_exit,1.0,3.064634655681227e-23,11.145774,59.9,
+1793808582.5816894,0x05c298c0f8a84b8f3828831ccc16ffd29dc16887,6929,RAM,B,sell_15m,time_exit,1.0,1.427877871731793e-22,8.743831,60.3,
+1793808582.5816894,0xf73a21ecc084a491a7c4a2f7c97a58dcbe60b416,6935,LAWYER,A,cfg_ladder,tp_2x,0.5,5.49912735047691e-23,9.999892,60.3,limit fill at rung level
+1793808582.5816894,0xf73a21ecc084a491a7c4a2f7c97a58dcbe60b416,6935,LAWYER,A,cfg_ladder_stop,tp_2x,0.5,5.49912735047691e-23,9.999892,60.3,limit fill at rung level
+1793808582.5816894,0xf73a21ecc084a491a7c4a2f7c97a58dcbe60b416,6935,LAWYER,A,tp2_half_trail30,tp_2x,0.5,5.49912735047691e-23,9.999892,60.3,limit fill at rung level
+1793808582.5816894,0xf73a21ecc084a491a7c4a2f7c97a58dcbe60b416,6935,LAWYER,A,tp2_half_stop50_6h,tp_2x,0.5,5.49912735047691e-23,9.999892,60.3,limit fill at rung level
+1793808582.5816894,0xf73a21ecc084a491a7c4a2f7c97a58dcbe60b416,6935,LAWYER,A,cfg_ladder_trail30_6h,tp_2x,0.5,5.49912735047691e-23,9.999892,60.3,limit fill at rung level
