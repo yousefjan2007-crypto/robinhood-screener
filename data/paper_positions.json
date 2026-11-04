@@ -3914,13 +3914,13 @@
   "0x05c298c0f8a84b8f3828831ccc16ffd29dc16887:6923": {
    "alert_ts": 1793802041.3776834,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "stop",
+   "closed": true,
+   "closed_ts": 1793830250.5157628,
    "cost_usd": 10.0,
    "entry_px_usd": 7.81222351954752e-23,
    "event_seq": 6923,
-   "gas_usd": 0.14,
+   "gas_usd": 0.21000000000000002,
    "impact_pct_open": -0.8263,
    "opened_ts": 1793802041.3776834,
    "pending_exits": [],
@@ -3947,12 +3947,12 @@
     "trail_arm": null
    },
    "quote_source_open": "kyber",
-   "realized_usd": 9.060320057842702,
+   "realized_usd": 11.496221993462965,
    "symbol": "RAM",
    "tier": "A",
    "token": "0x05c298c0f8a84b8f3828831ccc16ffd29dc16887",
    "tokens_raw": 128004530016048438575104,
-   "tokens_remaining_raw": 64002265008024219287552,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2316.16
   },
   "0x05ce35504212ff63eaedf54e01821cba12022584:3161": {
@@ -94334,6 +94334,50 @@
    "tokens_raw": 4156186290601111995809792,
    "tokens_remaining_raw": 4156186290601111995809792,
    "weth_px_usd_open": 2395.0095
+  },
+  "0xb672b27bdc8d10d4751454a244424447165b9f18:6975": {
+   "alert_ts": 1793830250.5157628,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 5.741434974229274e-23,
+   "event_seq": 6975,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1793830250.5157628,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "DMAI",
+   "tier": "A",
+   "token": "0xb672b27bdc8d10d4751454a244424447165b9f18",
+   "tokens_raw": 174172485535158260203520,
+   "tokens_remaining_raw": 174172485535158260203520,
+   "weth_px_usd_open": 2421.84
   },
   "0xb674c4eb359d19653a53b5843e10c7b3ea0d8054:4479": {
    "alert_ts": 1791969158.2232032,
