@@ -106781,3 +106781,16 @@ ts,token,event_seq,symbol,tier,policy,side,frac_of_original,px,usd_proceeds,gap_
 1793968049.6665268,0x866bad5d0625aca3d5d19ae5ebfb8e7172dc4df2,7859,MHD,B,sell_1h,time_exit,1.0,1.648658585872724e-22,24.992031,60.6,
 1793968109.2339513,0x3024d06034a3fc1faf85f11fabb491c25ff7e5fd,7882,PAIR,B,ctl_exit_immediately,time_exit,1.0,1.0442236171178859e-22,9.992159,59.6,
 1793968169.3672476,0x8b81b790016b2d1bf6a4fb12d1549ab8a4700e17,7861,RM,B,sell_1h,time_exit,1.0,1.7265986855687075e-23,0.014785,60.1,
+1793968289.2113528,0xf8dacca6186a19ea3879846dd7973d27269fe15b,7883,Inu,B,*,buy,1.0,6.285430852195259e-23,-9.99755,0.0,"shared entry via kyber, impact 2.8636, reserve_weth ?; fired_band -; sidecar_true ctl_inverse_band; buy 0.00445153 WETH ($10.00) → 1.59e+23 raw via kyber impact 2.86%"
+1793968289.2113528,0xe564a126bf7d828202666544330b4b47901443f8,7884,SMoney,B,*,buy_failed,0.0,0.0,0.0,0,"no route at alert — not opened; ABSENT: no V2 pair, kyber no_route, scanhood no_route"
+1793968289.2113528,0xa793b5deecbd39f0fac8fd73299c814729727777,7885,SMoney,B,*,buy_failed,0.0,0.0,0.0,0,"no route at alert — not opened; ABSENT: no V2 pair, kyber no_route, scanhood no_route"
+1793968349.6527247,0xf8dacca6186a19ea3879846dd7973d27269fe15b,7883,Inu,B,ctl_exit_immediately,time_exit,1.0,6.877018617762101e-23,10.938524,60.4,
+1793968409.2055967,0xc715ff70bfc083b1ac0c73abc44b53cc8a8d5ee5,7598,LULB,A,hold_to_end,tracking_window_end,1.0,2.5378709733541486e-25,0.06532,839.6,terminal mark at the last observed price
+1793968409.2055967,0xc715ff70bfc083b1ac0c73abc44b53cc8a8d5ee5,7598,LULB,A,cfg_ladder,tracking_window_end,0.5,2.5378709733541486e-25,0.03266,839.6,terminal mark at the last observed price
+1793968409.2055967,0x5d264648b0e387eaacac89466a3fe84944a47857,7599,coin,B,hold_to_end,tracking_window_end,1.0,1.1962524504441386e-24,0.254733,839.6,terminal mark at the last observed price
+1793968409.2055967,0x5d264648b0e387eaacac89466a3fe84944a47857,7599,coin,B,cfg_ladder,tracking_window_end,0.1,1.1962524504441386e-24,0.025473,839.6,terminal mark at the last observed price
+1793968409.2055967,0x3024d06034a3fc1faf85f11fabb491c25ff7e5fd,7882,PAIR,B,cfg_ladder,tp_2x,0.5,2.090491506218837e-22,10.001939,59.6,limit fill at rung level
+1793968409.2055967,0x3024d06034a3fc1faf85f11fabb491c25ff7e5fd,7882,PAIR,B,cfg_ladder_stop,tp_2x,0.5,2.090491506218837e-22,10.001939,59.6,limit fill at rung level
+1793968409.2055967,0x3024d06034a3fc1faf85f11fabb491c25ff7e5fd,7882,PAIR,B,tp2_half_trail30,tp_2x,0.5,2.090491506218837e-22,10.001939,59.6,limit fill at rung level
+1793968409.2055967,0x3024d06034a3fc1faf85f11fabb491c25ff7e5fd,7882,PAIR,B,tp2_half_stop50_6h,tp_2x,0.5,2.090491506218837e-22,10.001939,59.6,limit fill at rung level
+1793968409.2055967,0x3024d06034a3fc1faf85f11fabb491c25ff7e5fd,7882,PAIR,B,cfg_ladder_trail30_6h,tp_2x,0.5,2.090491506218837e-22,10.001939,59.6,limit fill at rung level
