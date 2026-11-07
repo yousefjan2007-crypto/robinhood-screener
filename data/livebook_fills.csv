@@ -109143,3 +109143,15 @@ ts,token,event_seq,symbol,tier,policy,side,frac_of_original,px,usd_proceeds,gap_
 1794031285.8858867,0x820fff49c1547ae9cedb4a4cd69bd82bb2ea7b1c,8189,GSTR,A,cfg_ladder,no_route,0.0,0.0,0.0,60.3,"NO ROUTE — dead coin, proceeds $0"
 1794031285.8858867,0x820fff49c1547ae9cedb4a4cd69bd82bb2ea7b1c,8189,GSTR,A,ctl_random_exit,no_route,0.0,0.0,0.0,60.3,"NO ROUTE — dead coin, proceeds $0"
 1794031436.891936,0xb5faade6cbcd67807f98d2849a4770405d70cd2e,8158,NATE,B,ctl_random_exit,random_exit,1.0,4.478712867566058e-27,0.000493,60.8,
+1794031496.5154438,0x1b99bd672b6061f5fc8255082613063bfee92749,8194,PLS,B,*,buy_failed,0.0,0.0,0.0,0,"no route at alert — not opened; ABSENT: no V2 pair, kyber no_route, scanhood no_route"
+1794031496.5154438,0xee915415b0527b9c9b2740180195940f9f4369e8,8195,MACCA,B,*,buy_failed,0.0,0.0,0.0,0,"no route at alert — not opened; ABSENT: no V2 pair, kyber no_route, scanhood no_route"
+1794031496.5154438,0xe70061163e8e3e8be66314b2ed4ad5c220182538,8196,mem,A,*,buy,1.0,2.933691949118807e-22,-10.00129,0.0,"shared entry via kyber, impact -10.7672, reserve_weth ?; fired_band -; sidecar_true band_volume_early; buy 0.00445299 WETH ($10.00) → 3.41e+22 raw via kyber impact -10.77%"
+1794031496.5154438,0x4332e728a9df27545e78656ea391fd172723a011,8142,MACCA,A,sell_3h,time_exit,1.0,2.7561456401133464e-22,26.170281,59.6,
+1794031496.5154438,0x4e5b4605fb9700b83951f6cb01aab27af799fde6,8143,LUCKY,B,sell_3h,time_exit,1.0,7.34171430138385e-23,6.919373,59.6,
+1794031496.5154438,0x7a75bae321a76acf5570a10ded9d590c082488b4,8171,Alice,B,sell_1h,time_exit,1.0,1.567168158200491e-22,13.163827,59.6,
+1794031556.2479572,0xe70061163e8e3e8be66314b2ed4ad5c220182538,8196,mem,A,ctl_exit_immediately,time_exit,1.0,5.787404706427368e-22,19.729921,59.7,
+1794031616.8680325,0xe70061163e8e3e8be66314b2ed4ad5c220182538,8196,mem,A,cfg_ladder,tp_2x,0.5,5.867383898237614e-22,10.00129,60.6,limit fill at rung level
+1794031616.8680325,0xe70061163e8e3e8be66314b2ed4ad5c220182538,8196,mem,A,cfg_ladder_stop,tp_2x,0.5,5.867383898237614e-22,10.00129,60.6,limit fill at rung level
+1794031616.8680325,0xe70061163e8e3e8be66314b2ed4ad5c220182538,8196,mem,A,tp2_half_trail30,tp_2x,0.5,5.867383898237614e-22,10.00129,60.6,limit fill at rung level
+1794031616.8680325,0xe70061163e8e3e8be66314b2ed4ad5c220182538,8196,mem,A,tp2_half_stop50_6h,tp_2x,0.5,5.867383898237614e-22,10.00129,60.6,limit fill at rung level
+1794031616.8680325,0xe70061163e8e3e8be66314b2ed4ad5c220182538,8196,mem,A,cfg_ladder_trail30_6h,tp_2x,0.5,5.867383898237614e-22,10.00129,60.6,limit fill at rung level
