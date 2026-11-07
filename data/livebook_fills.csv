@@ -110110,3 +110110,11 @@ ts,token,event_seq,symbol,tier,policy,side,frac_of_original,px,usd_proceeds,gap_
 1794061611.744828,0x17adc0d51c945fa4ec9a6492f4618c15141a3450,8243,LETRO,A,ctl_random_exit,random_exit,1.0,6.137192934454018e-24,1.142794,87.9,
 1794061739.2698455,0xa1c0d4ff9041053a79df9793be75e16439a994a3,8126,Ponzi,A,hold_to_end,tracking_window_end,1.0,2.2509869035266228e-24,0.09596,851.5,terminal mark at the last observed price
 1794061739.2698455,0xa1c0d4ff9041053a79df9793be75e16439a994a3,8126,Ponzi,A,cfg_ladder,tracking_window_end,1.0,2.2509869035266228e-24,0.09596,851.5,terminal mark at the last observed price
+1794061833.3841162,0xae5d4ae9251c5f1f6f944a26326a6d61335cca3d,8303,Flash,B,sell_15m,time_exit,1.0,1.6698319967232128e-22,18.202151,94.1,
+1794061893.749819,0xa43c9245c509ab4114036874c511c6e35b12fe2d,8305,SUNPEAK,B,*,buy,1.0,2.061021156582963e-22,-9.999735,0.0,"shared entry via kyber, impact 2.3479, reserve_weth ?; fired_band -; sidecar_true band_dev_score_ge70,ctl_inverse_band,ctl_random_band; buy 0.00445937 WETH ($10.00) → 4.85e+22 raw via kyber impact 2.35%"
+1794061893.749819,0x2ffaa2d6039949d564dab3754273d4406f0ea431,8306,CASHDOG,B,*,buy_failed,0.0,0.0,0.0,0,"no route at alert — not opened; ABSENT: no V2 pair, kyber no_route, scanhood no_route"
+1794061893.749819,0xae5d4ae9251c5f1f6f944a26326a6d61335cca3d,8303,Flash,B,cfg_ladder,tp_2x,0.5,1.83479066983084e-22,10.000149,60.4,limit fill at rung level
+1794061893.749819,0xae5d4ae9251c5f1f6f944a26326a6d61335cca3d,8303,Flash,B,cfg_ladder_stop,tp_2x,0.5,1.83479066983084e-22,10.000149,60.4,limit fill at rung level
+1794061893.749819,0xae5d4ae9251c5f1f6f944a26326a6d61335cca3d,8303,Flash,B,tp2_half_trail30,tp_2x,0.5,1.83479066983084e-22,10.000149,60.4,limit fill at rung level
+1794061893.749819,0xae5d4ae9251c5f1f6f944a26326a6d61335cca3d,8303,Flash,B,tp2_half_stop50_6h,tp_2x,0.5,1.83479066983084e-22,10.000149,60.4,limit fill at rung level
+1794061893.749819,0xae5d4ae9251c5f1f6f944a26326a6d61335cca3d,8303,Flash,B,cfg_ladder_trail30_6h,tp_2x,0.5,1.83479066983084e-22,10.000149,60.4,limit fill at rung level
