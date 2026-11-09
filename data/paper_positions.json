@@ -13015,6 +13015,50 @@
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2426.28
   },
+  "0x104b513e79b39efa0ea9e7aa6833356eb05b4c84:8556": {
+   "alert_ts": 1794235967.8239255,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 1.7163394112058252e-22,
+   "event_seq": 8556,
+   "gas_usd": 0.07,
+   "impact_pct_open": -1.1454,
+   "opened_ts": 1794235967.8239255,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "ELON2028",
+   "tier": "A",
+   "token": "0x104b513e79b39efa0ea9e7aa6833356eb05b4c84",
+   "tokens_raw": 58263534209556117716992,
+   "tokens_remaining_raw": 58263534209556117716992,
+   "weth_px_usd_open": 2132.054
+  },
   "0x104f0a950dc577bad1de7588b592d7f846c0a62e:8464": {
    "alert_ts": 1794180638.1592195,
    "champion_at_open": "cfg_ladder_stop",
@@ -78914,9 +78958,9 @@
   "0x78751b485cc54af8bd485e1c12047c89f22947c6:8439": {
    "alert_ts": 1794148561.0231872,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1794235967.8239255,
    "cost_usd": 10.0,
    "entry_px_usd": 1.7448703985635569e-22,
    "event_seq": 8439,
@@ -78952,7 +78996,7 @@
    "tier": "A",
    "token": "0x78751b485cc54af8bd485e1c12047c89f22947c6",
    "tokens_raw": 57310846743874944106496,
-   "tokens_remaining_raw": 57310846743874944106496,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2236.92
   },
   "0x787b9388c0a715b9e2688088de97b2a004d452ed:1329": {
