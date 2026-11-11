@@ -118647,3 +118647,12 @@ ts,token,event_seq,symbol,tier,policy,side,frac_of_original,px,usd_proceeds,gap_
 1794433859.837371,0xfcc484e510481d8f63bce94d4b71e93092101f68,8768,AME,B,ctl_random_exit,no_route,0.0,0.0,0.0,59.9,"NO ROUTE — dead coin, proceeds $0"
 1794434339.6712747,0x8664e8e6e1982ba9893ef7a6bca1dadc4207bc67,8770,Max,A,sell_15m,time_exit,1.0,3.004161665562586e-22,15.787168,59.6,
 1794434579.9667659,0x8664e8e6e1982ba9893ef7a6bca1dadc4207bc67,8771,Max,B,sell_15m,time_exit,1.0,3.582075399597708e-22,16.9636,60.6,
+1794435119.9592123,0x57ad998579032c9ca1890629b1773b17578f3cac,8772,Saxon,B,*,buy,1.0,1.6018450002607866e-22,-9.997342,0.0,"shared entry via kyber, impact -0.0350, reserve_weth ?; fired_band -; sidecar_true ctl_inverse_band; buy 0.00483054 WETH ($10.00) → 6.24e+22 raw via kyber impact -0.04%"
+1794435179.884812,0x57ad998579032c9ca1890629b1773b17578f3cac,8772,Saxon,B,ctl_exit_immediately,time_exit,1.0,1.7908120810180748e-22,11.176712,59.9,
+1794435239.4944205,0x8664e8e6e1982ba9893ef7a6bca1dadc4207bc67,8770,Max,A,sell_30m,time_exit,1.0,4.016263308914402e-22,21.105863,59.6,
+1794435239.4944205,0x8664e8e6e1982ba9893ef7a6bca1dadc4207bc67,8770,Max,A,cfg_ladder,tp_2x,0.5,3.8085368565284996e-22,10.00712,59.6,limit fill at rung level
+1794435239.4944205,0x8664e8e6e1982ba9893ef7a6bca1dadc4207bc67,8770,Max,A,cfg_ladder_stop,tp_2x,0.5,3.8085368565284996e-22,10.00712,59.6,limit fill at rung level
+1794435239.4944205,0x8664e8e6e1982ba9893ef7a6bca1dadc4207bc67,8770,Max,A,tp2_half_trail30,tp_2x,0.5,3.8085368565284996e-22,10.00712,59.6,limit fill at rung level
+1794435239.4944205,0x8664e8e6e1982ba9893ef7a6bca1dadc4207bc67,8770,Max,A,tp2_half_stop50_6h,tp_2x,0.5,3.8085368565284996e-22,10.00712,59.6,limit fill at rung level
+1794435239.4944205,0x8664e8e6e1982ba9893ef7a6bca1dadc4207bc67,8770,Max,A,cfg_ladder_trail30_6h,tp_2x,0.5,3.8085368565284996e-22,10.00712,59.6,limit fill at rung level
+1794435359.192507,0x57ad998579032c9ca1890629b1773b17578f3cac,8773,Saxon,A,*,buy,1.0,2.6083228384591843e-22,-9.999901,0.0,"shared entry via kyber, impact 0.1325, reserve_weth ?; fired_band band_volume_early; sidecar_true band_volume_early; buy 0.00482959 WETH ($10.00) → 3.83e+22 raw via kyber impact 0.13%"
