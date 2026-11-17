@@ -125636,3 +125636,14 @@ ts,token,event_seq,symbol,tier,policy,side,frac_of_original,px,usd_proceeds,gap_
 1794878447.3631482,0xcaeed5281bd1eeb26d5f8bd550bf5c3727ba6514,9114,NOUNY,B,ctl_random_exit,random_exit,1.0,6.518881570128838e-23,3.189866,62.3,
 1794878447.3631482,0x25c38d41f013c9d11cc3bb4691688c6a0dd5114a,9129,cyber,B,sell_30m,time_exit,1.0,3.1229778874997843e-24,0.130544,62.3,
 1794878507.2577133,0x7fe6927e9c92caad5fa0fc48c2c32de0c7cdf982,9130,JOY,B,sell_15m,time_exit,1.0,5.62028790712245e-23,11.621554,59.9,
+1794878627.356311,0xc5457f44549e4dcc8574a57dd1aecc5e86da62c1,9133,BAWSAQ,B,*,buy_failed,0.0,0.0,0.0,0,"no route at alert — not opened; ABSENT: no V2 pair, kyber no_route, scanhood no_route"
+1794878627.356311,0x4a66bc56323fc6b860d8de9d017379db36b86c58,9134,CCM,B,*,buy,1.0,5.366530880886835e-23,-10.005098,0.0,"shared entry via kyber, impact 8.2242, reserve_weth ?; fired_band -; sidecar_true ctl_inverse_band; buy 0.00550642 WETH ($10.01) → 1.86e+23 raw via kyber impact 8.22%"
+1794878627.356311,0x8fe9613da5c5589e9d91058f5287cad1a6afd65a,9135,SpaceXJak,B,*,buy,1.0,6.440151134264509e-23,-10.005098,0.0,"shared entry via kyber, impact 0.0405, reserve_weth ?; fired_band -; sidecar_true ctl_inverse_band; buy 0.00550642 WETH ($10.01) → 1.55e+23 raw via kyber impact 0.04%"
+1794878627.356311,0xca6e8cb2f2800193ae1095433d499ce124b52d5a,9125,GLITCH,B,sell_1h,time_exit,1.0,8.637606788936688e-25,0.160888,60.0,
+1794878687.3245542,0x4a66bc56323fc6b860d8de9d017379db36b86c58,9134,CCM,B,ctl_exit_immediately,time_exit,1.0,5.037842931906764e-23,9.392309,60.0,
+1794878687.3245542,0x8fe9613da5c5589e9d91058f5287cad1a6afd65a,9135,SpaceXJak,B,cfg_ladder,tp_2x,0.5,1.2880302268529018e-22,10.005098,60.0,limit fill at rung level
+1794878687.3245542,0x8fe9613da5c5589e9d91058f5287cad1a6afd65a,9135,SpaceXJak,B,cfg_ladder_stop,tp_2x,0.5,1.2880302268529018e-22,10.005098,60.0,limit fill at rung level
+1794878687.3245542,0x8fe9613da5c5589e9d91058f5287cad1a6afd65a,9135,SpaceXJak,B,tp2_half_trail30,tp_2x,0.5,1.2880302268529018e-22,10.005098,60.0,limit fill at rung level
+1794878687.3245542,0x8fe9613da5c5589e9d91058f5287cad1a6afd65a,9135,SpaceXJak,B,tp2_half_stop50_6h,tp_2x,0.5,1.2880302268529018e-22,10.005098,60.0,limit fill at rung level
+1794878687.3245542,0x8fe9613da5c5589e9d91058f5287cad1a6afd65a,9135,SpaceXJak,B,cfg_ladder_trail30_6h,tp_2x,0.5,1.2880302268529018e-22,10.005098,60.0,limit fill at rung level
+1794878687.3245542,0x8fe9613da5c5589e9d91058f5287cad1a6afd65a,9135,SpaceXJak,B,ctl_exit_immediately,time_exit,1.0,1.325558600453802e-22,20.593219,60.0,
