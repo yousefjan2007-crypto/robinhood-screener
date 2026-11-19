@@ -82656,9 +82656,9 @@
   "0x75c26c5d5c0a91a4b173ac134f3b53b5fe6dfe1d:9254": {
    "alert_ts": 1794970286.50051,
    "champion_at_open": "cfg_ladder_stop",
-   "close_reason": null,
-   "closed": false,
-   "closed_ts": null,
+   "close_reason": "no_route",
+   "closed": true,
+   "closed_ts": 1795058066.136597,
    "cost_usd": 10.0,
    "entry_px_usd": 6.191105606373584e-23,
    "event_seq": 9254,
@@ -82694,7 +82694,7 @@
    "tier": "A",
    "token": "0x75c26c5d5c0a91a4b173ac134f3b53b5fe6dfe1d",
    "tokens_raw": 161522038805237917024256,
-   "tokens_remaining_raw": 161522038805237917024256,
+   "tokens_remaining_raw": 0,
    "weth_px_usd_open": 1797.68
   },
   "0x75e216be7afa3b0e2d11b987d573ecca9f9f34b2:5259": {
@@ -116768,6 +116768,50 @@
    "tokens_raw": 61263175679204466360320,
    "tokens_remaining_raw": 0,
    "weth_px_usd_open": 2389.53
+  },
+  "0xc8b4bc165f152ddf812577d846914efb7b50067e:9368": {
+   "alert_ts": 1795058066.136597,
+   "champion_at_open": "cfg_ladder_stop",
+   "close_reason": null,
+   "closed": false,
+   "closed_ts": null,
+   "cost_usd": 10.0,
+   "entry_px_usd": 7.40133278610225e-23,
+   "event_seq": 9368,
+   "gas_usd": 0.07,
+   "impact_pct_open": 100.0,
+   "opened_ts": 1795058066.136597,
+   "pending_exits": [],
+   "plan": {
+    "flow": null,
+    "ladder": [
+     [
+      2.0,
+      0.5
+     ],
+     [
+      5.0,
+      0.25
+     ],
+     [
+      10.0,
+      0.15
+     ]
+    ],
+    "max_hold_s": null,
+    "name": "cfg_ladder_stop",
+    "stop": 0.5,
+    "trail": null,
+    "trail_arm": null
+   },
+   "quote_source_open": "kyber",
+   "realized_usd": 0.0,
+   "symbol": "GTA Strategy",
+   "tier": "A",
+   "token": "0xc8b4bc165f152ddf812577d846914efb7b50067e",
+   "tokens_raw": 135110800838159333588992,
+   "tokens_remaining_raw": 135110800838159333588992,
+   "weth_px_usd_open": 1764.33
   },
   "0xc8e4d89030a66081012cc20e21d10dddde8ab35a:6943": {
    "alert_ts": 1793811161.6883745,
